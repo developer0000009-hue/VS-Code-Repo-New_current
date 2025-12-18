@@ -1,0 +1,548 @@
+# ===============================================================================================
+#  SCHOOL MANAGEMENT SYSTEM - COMPREHENSIVE ARCHITECTURE & SYSTEM DOCUMENTATION
+#  Version: 5.0.0 (Production Release)
+#  Last Updated: Dec 16, 2025
+#  Architecture: Multi-Tenant, Role-Based, Cloud-Native SaaS Platform
+# ===============================================================================================
+
+## 🔹 **1. EXECUTIVE SUMMARY & SYSTEM OVERVIEW**
+
+### **1.1. System Vision**
+The School Management System is an enterprise-grade, multi-tenant SaaS platform designed to revolutionize educational administration through intelligent automation, comprehensive data management, and seamless stakeholder collaboration.
+
+### **1.2. Core Architecture Principles**
+- **Security-First**: Every design decision prioritizes data protection and privacy
+- **Scalability**: Built for growth from single institutions to multi-national chains
+- **Multi-Tenancy**: Complete data isolation between educational institutions
+- **Role-Based Access**: Granular permissions with least-privilege enforcement
+- **API-Driven**: All operations accessible through secure, documented APIs
+- **Audit-Ready**: Complete audit trail for compliance and security monitoring
+
+### **1.3. Technology Stack**
+```
+Frontend: React 18 + TypeScript + Tailwind CSS
+├── State Management: React Context + Custom Hooks
+├── Routing: React Router v6 with lazy loading
+├── Forms: Custom validation with Zod schemas
+├── UI Components: Custom design system with Radix primitives
+├── Charts: Recharts for analytics visualization
+└── Build: Vite with Tree-shaking and Code splitting
+
+Backend: Supabase (PostgreSQL + Auth + Storage + Edge Functions)
+├── Database: PostgreSQL 15+ with custom extensions
+├── Authentication: Supabase Auth with JWT tokens
+├── Authorization: Row Level Security (RLS) at database level
+├── File Storage: Supabase Storage with CDN
+├── Real-time: WebSocket subscriptions for live updates
+└── API: PostgREST with custom RPC functions
+
+Infrastructure: Vercel + Supabase Cloud
+├── Hosting: Vercel with global edge deployment
+├── Database: Supabase managed PostgreSQL
+├── CDN: Vercel Edge Network for static assets
+├── Monitoring: Supabase Analytics + Custom dashboards
+└── CI/CD: GitHub Actions with automated deployments
+```
+
+---
+
+## 🔹 **2. DETAILED SYSTEM ARCHITECTURE**
+
+### **2.1. High-Level Architecture Diagram**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CLIENT LAYER (Frontend)                     │
+├─────────────────────────────────────────────────────────────────┤
+│  React SPA (Browser/Mobile/PWA)                                 │
+│  ├── Authentication State Management                            │
+│  ├── Role-Based UI Rendering                                    │
+│  ├── Real-time Data Subscriptions                               │
+│  └── Offline-First Progressive Enhancement                      │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API GATEWAY LAYER                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Supabase PostgREST + Edge Functions                            │
+│  ├── Authentication Middleware (JWT Validation)                 │
+│  ├── Rate Limiting & Abuse Prevention                           │
+│  ├── Request Logging & Audit Trail                              │
+│  └── Data Validation & Sanitization                             │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 BUSINESS LOGIC LAYER                            │
+├─────────────────────────────────────────────────────────────────┤
+│  PostgreSQL Functions (RPC)                                     │
+│  ├── Authentication & Authorization Logic                       │
+│  ├── Multi-Tenant Data Isolation                                │
+│  ├── Business Rule Enforcement                                  │
+│  ├── Data Validation & Constraints                              │
+│  ├── Audit Logging & Compliance                                 │
+│  └── Integration with External Services                         │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   DATA PERSISTENCE LAYER                        │
+├─────────────────────────────────────────────────────────────────┤
+│  PostgreSQL Database                                            │
+│  ├── Row Level Security (RLS) Policies                          │
+│  ├── Multi-Tenant Data Partitioning                             │
+│  ├── Audit Tables & Change Tracking                             │
+│  ├── Performance Indexes & Optimization                         │
+│  └── Backup & Disaster Recovery                                 │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 INTEGRATION LAYER                               │
+├─────────────────────────────────────────────────────────────────┤
+│  External Services & APIs                                       │
+│  ├── Google Gemini AI Integration                               │
+│  ├── Email Service (SendGrid/Resend)                            │
+│  ├── Payment Gateway (Stripe/PayPal)                           │
+│  ├── SMS Service (Twilio)                                       │
+│  └── File Storage (Supabase Storage + CDN)                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### **2.2. Data Flow Architecture**
+
+#### **2.2.1. Authentication Flow**
+```
+User Login Request
+        │
+        ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Supabase Auth │───▶│  JWT Generation │───▶│  Profile Lookup │
+│   Validation    │    │   + RLS Token   │    │   + Role Cache  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+        │                                              │
+        ▼                                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│           Client-Side State Management                      │
+│    ├── User Profile & Role Context                         │
+│    ├── Permission Matrix Caching                           │
+│    └── Real-time Subscriptions Setup                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### **2.2.2. Multi-Tenant Data Isolation Flow**
+```
+User Request with JWT
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│              RLS Policy Evaluation                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ Tenant ID   │  │ User Role   │  │ Permissions │         │
+│  │ Matching    │  │ Validation  │  │ Matrix      │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Data Access Control                             │
+│  ├── Branch-based filtering (get_my_branch_ids())          │
+│  ├── Role-based access (teacher_profiles, etc.)            │
+│  └── Admin overrides (super_admin bypass)                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔹 **3. ROLE-BASED ACCESS CONTROL (RBAC) SYSTEM**
+
+### **3.1. Role Hierarchy & Permissions**
+
+#### **3.1.1. Super Admin (System-Wide)**
+```
+Permissions: SYSTEM_ADMIN, ALL_ACCESS, OVERRIDE_RLS
+Access Scope: All tenants, all data, system configuration
+Functions: System maintenance, audit access, cross-tenant analytics
+```
+
+#### **3.1.2. School Administration (Institution-Level)**
+```
+Permissions: SCHOOL_ADMIN, MULTI_BRANCH_ACCESS, USER_MANAGEMENT
+Access Scope: All branches within their institution
+Functions: Multi-branch oversight, financial reports, system settings
+```
+
+#### **3.1.3. Branch Admin (Branch-Level)**
+```
+Permissions: BRANCH_ADMIN, SINGLE_BRANCH_ACCESS
+Access Scope: Single assigned branch only
+Functions: Branch operations, local staff management, branch reporting
+```
+
+#### **3.1.4. Principal (Academic Leadership)**
+```
+Permissions: ACADEMIC_ADMIN, STAFF_SUPERVISION
+Access Scope: All academic operations within assigned scope
+Functions: Academic oversight, teacher evaluation, curriculum management
+```
+
+#### **3.1.5. HR Manager (Personnel Management)**
+```
+Permissions: HR_MANAGEMENT, EMPLOYEE_RECORDS
+Access Scope: Staff records, hiring, payroll coordination
+Functions: Employee lifecycle management, compliance reporting
+```
+
+#### **3.1.6. Academic Coordinator (Curriculum Oversight)**
+```
+Permissions: ACADEMIC_COORDINATION, CURRICULUM_MANAGEMENT
+Access Scope: Academic programs, course scheduling, assessment
+Functions: Curriculum design, teacher coordination, academic reporting
+```
+
+#### **3.1.7. Accountant (Financial Management)**
+```
+Permissions: FINANCE_MANAGEMENT, PAYROLL_ACCESS
+Access Scope: Financial operations, fee collection, expense tracking
+Functions: Financial reporting, payment processing, budget management
+```
+
+#### **3.1.8. Teacher (Instructional Delivery)**
+```
+Permissions: CLASS_MANAGEMENT, GRADE_ENTRY, PARENT_COMMUNICATION
+Access Scope: Assigned classes, enrolled students, lesson planning
+Functions: Classroom management, grading, parent communication
+```
+
+#### **3.1.9. Student (Learning Management)**
+```
+Permissions: PERSONAL_DATA, ASSIGNMENT_ACCESS
+Access Scope: Own academic records, assignments, communication
+Functions: Assignment submission, grade viewing, profile management
+```
+
+#### **3.1.10. Parent/Guardian (Student Oversight)**
+```
+Permissions: CHILD_DATA_ACCESS, COMMUNICATION
+Access Scope: Enrolled children's records, communications
+Functions: Child progress monitoring, fee payment, document submission
+```
+
+#### **3.1.11. Transport Staff (Operational)**
+```
+Permissions: TRANSPORT_MANAGEMENT, ROUTE_OVERSIGHT
+Access Scope: Assigned routes, student transportation tracking
+Functions: Bus attendance, route management, parent notifications
+```
+
+#### **3.1.12. E-commerce Operator (Marketplace)**
+```
+Permissions: PRODUCT_MANAGEMENT, ORDER_PROCESSING
+Access Scope: School marketplace operations, product catalogs
+Functions: Product listings, order fulfillment, payment processing
+```
+
+---
+
+## 🔹 **4. MULTI-TENANCY & DATA ISOLATION**
+
+### **4.1. Tenant Isolation Strategy**
+
+#### **4.1.1. School-Level Isolation**
+```
+Each Educational Institution = Independent Tenant
+├── Complete data separation at database level
+├── Independent authentication and user management
+├── Separate financial and reporting data
+├── Isolated communication channels
+└── Independent system configuration
+```
+
+#### **4.1.2. Branch-Level Segmentation**
+```
+Within Each School = Multiple Branches
+├── Branch-specific user groups
+├── Branch-scoped data access (RLS)
+├── Independent operational data
+├── Separate reporting and analytics
+└── Cross-branch administrative controls (Head Office only)
+```
+
+---
+
+## 🔹 **5. SECURITY ARCHITECTURE**
+
+### **5.1. Defense-in-Depth Security Model**
+
+#### **5.1.1. Authentication Layer**
+```
+Multi-Factor Authentication (MFA)
+├── Password-based authentication (Supabase Auth)
+├── Email verification for new accounts
+├── Optional SMS/Email OTP for sensitive operations
+├── Session management with JWT tokens
+└── Automatic session timeout and refresh
+```
+
+#### **5.1.2. Authorization Layer**
+```
+Role-Based Access Control (RBAC)
+├── Database-level RLS policies
+├── Application-level permission checks
+├── API-level route protection
+└── Client-side UI permission rendering
+```
+
+#### **5.1.3. Data Protection Layer**
+```
+Encryption & Data Security
+├── Encryption at rest (database level)
+├── Encryption in transit (HTTPS/WSS)
+├── Sensitive field encryption (PII, financial data)
+├── Secure file storage with access controls
+└── Data anonymization for analytics
+```
+
+### **5.2. Row Level Security (RLS) Implementation**
+
+#### **5.2.1. RLS Policy Categories**
+
+**1. Ownership-Based Policies**
+```sql
+-- Users can only access their own data
+CREATE POLICY "Users can manage their own profile" 
+ON public.profiles
+FOR ALL USING (id = auth.uid());
+```
+
+**2. Role-Based Policies**
+```sql
+-- Teachers can view students in their classes
+CREATE POLICY "Teachers can view class students"
+ON public.student_profiles
+FOR SELECT USING (
+  assigned_class_id IN (
+    SELECT id FROM school_classes 
+    WHERE class_teacher_id = auth.uid()
+  )
+);
+```
+
+**3. Tenant-Based Policies**
+```sql
+-- Branch-scoped data access
+CREATE POLICY "Branch-scoped data access"
+ON public.school_classes
+FOR ALL USING (
+  branch_id IN (SELECT get_my_branch_ids())
+);
+```
+
+**4. Administrative Override Policies**
+```sql
+-- Super admin bypass
+CREATE POLICY "Super admin override"
+ON public.profiles
+FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE id = auth.uid() AND is_super_admin = true
+  )
+);
+```
+
+### **5.3. Audit & Compliance**
+
+#### **5.3.1. Comprehensive Audit Trail**
+```sql
+-- Audit logging table
+CREATE TABLE public.audit_logs (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    user_id uuid REFERENCES profiles(id),
+    action text NOT NULL,
+    resource_type text NOT NULL,
+    resource_id text,
+    old_values jsonb,
+    new_values jsonb,
+    ip_address inet,
+    user_agent text,
+    created_at timestamptz DEFAULT now()
+);
+```
+
+#### **5.3.2. Compliance Monitoring**
+- **GDPR Compliance**: Data portability, right to be forgotten
+- **FERPA Compliance**: Student record privacy protection
+- **SOX Compliance**: Financial data integrity and audit trail
+- **ISO 27001**: Information security management
+
+---
+
+## 🔹 **6. SCALABILITY & PERFORMANCE ARCHITECTURE**
+
+### **6.1. Database Optimization Strategy**
+
+#### **6.1.1. Indexing Strategy**
+```sql
+-- Performance-critical indexes
+CREATE INDEX CONCURRENTLY idx_profiles_role ON profiles(role);
+CREATE INDEX CONCURRENTLY idx_student_profiles_class ON student_profiles(assigned_class_id);
+CREATE INDEX CONCURRENTLY idx_attendance_date_student ON attendance(attendance_date, student_id);
+CREATE INDEX CONCURRENTLY idx_teacher_profiles_branch ON teacher_profiles(branch_id);
+CREATE INDEX CONCURRENTLY idx_admissions_status ON admissions(status);
+```
+
+#### **6.1.2. Query Optimization**
+- **Materialized Views**: For complex reporting queries
+- **Partitioning**: Time-based partitioning for audit logs
+- **Connection Pooling**: PgBouncer for connection management
+- **Read Replicas**: For reporting and analytics workloads
+
+---
+
+## 🔹 **7. AI INTEGRATION ARCHITECTURE**
+
+### **7.1. Google Gemini AI Integration**
+
+#### **7.1.1. AI Service Architecture**
+```
+AI Integration Layer
+├── Gemini API Integration: Text generation and analysis
+├── Prompt Engineering: Optimized prompts for educational context
+├── Response Processing: AI output validation and formatting
+├── Error Handling: Graceful degradation and retry logic
+└── Usage Monitoring: AI request tracking and cost optimization
+```
+
+#### **7.1.2. AI Use Cases Implementation**
+
+**1. Curriculum Generation**
+- Automated syllabus creation based on learning objectives
+- Weekly topic planning with activity suggestions
+- Assessment question generation
+- Resource recommendation
+
+**2. Intelligent Scheduling**
+- Conflict detection for timetables
+- Optimal teacher-classroom assignments
+- Resource utilization optimization
+- Exception handling for special events
+
+**3. Academic Analytics**
+- Student performance predictions
+- Learning pattern analysis
+- Intervention recommendations
+- Progress tracking insights
+
+#### **7.1.3. AI Safety & Governance**
+- **Input Validation**: Sanitization of all AI inputs
+- **Output Filtering**: Review of AI-generated content
+- **Human Oversight**: Critical decisions require human review
+- **Bias Detection**: Regular auditing of AI responses
+- **Privacy Compliance**: Data anonymization before AI processing
+
+---
+
+## 🔹 **8. ERROR HANDLING & RESILIENCE**
+
+### **8.1. Comprehensive Error Strategy**
+
+#### **8.1.1. Error Classification**
+- **CRITICAL**: System down, data loss
+- **HIGH**: Major feature broken
+- **MEDIUM**: Feature degraded
+- **LOW**: Minor inconvenience
+- **INFO**: Informational
+
+#### **8.1.2. Resilience Patterns**
+- **Circuit Breaker Pattern**: Prevent cascade failures
+- **Retry Strategy**: Exponential backoff for transient errors
+- **Graceful Degradation**: Feature flags and fallback mechanisms
+- **Offline Mode**: Cache critical data for offline access
+
+---
+
+## 🔹 **9. MONITORING & OBSERVABILITY**
+
+### **9.1. Comprehensive Monitoring Strategy**
+
+#### **9.1.1. Key Performance Indicators**
+- **Database Response Time**: < 100ms for 95th percentile
+- **API Response Time**: < 200ms for authenticated requests
+- **Page Load Time**: < 3 seconds for initial load
+- **Real-time Latency**: < 500ms for live updates
+- **Error Rate**: < 0.1% for critical operations
+
+#### **9.1.2. Monitoring Stack**
+```
+Observability Platform
+├── Database Monitoring: Supabase Analytics + Custom queries
+├── Application Monitoring: Vercel Analytics + Sentry
+├── Real-time Monitoring: WebSocket connection health
+├── Performance Tracking: Core Web Vitals monitoring
+└── Alert System: Automated alerts for SLA breaches
+```
+
+---
+
+## 🔹 **10. DEPLOYMENT & OPERATIONS**
+
+### **10.1. CI/CD Pipeline Architecture**
+
+#### **10.1.1. Deployment Strategy**
+```
+Environment Strategy
+├── Development: Feature development and testing
+├── Staging: Production-like testing environment
+├── Production: Live system with real data
+├── Disaster Recovery: Backup environment for recovery
+└── Monitoring: Separate environment for observability
+```
+
+#### **10.1.2. Backup & Disaster Recovery**
+```
+Recovery Time Objectives (RTO)
+├── Critical Systems: 1 hour
+├── Non-critical Systems: 4 hours
+└── Analytics Systems: 24 hours
+
+Recovery Point Objectives (RPO)
+├── Transactional Data: 15 minutes
+├── Configuration Data: 1 hour
+└── Historical Data: 24 hours
+```
+
+---
+
+## 🔹 **11. COMPLIANCE & GOVERNANCE**
+
+### **11.1. Regulatory Compliance**
+
+#### **11.1.1. Educational Compliance**
+- **FERPA**: Family Educational Rights and Privacy Act
+- **COPPA**: Children's Online Privacy Protection Act
+- **State Education Regulations**: Local compliance requirements
+- **Accreditation Standards**: Educational institution requirements
+
+#### **11.1.2. Data Protection Compliance**
+- **GDPR**: General Data Protection Regulation (EU)
+- **CCPA**: California Consumer Privacy Act
+- **PIPEDA**: Personal Information Protection and Electronic Documents Act (Canada)
+- **LGPD**: Lei Geral de Proteção de Dados (Brazil)
+- **Privacy by Design**: Built-in privacy protections
+
+---
+
+## 🔹 **12. FUTURE ROADMAP & EVOLUTION**
+
+### **12.1. Technology Evolution**
+
+#### **12.1.1. Short-term Enhancements (6 months)**
+- **Mobile Application**: Native iOS/Android apps
+- **Advanced Analytics**: Machine learning insights
+- **Integration Marketplace**: Third-party integrations
+- **Offline Capabilities**: Progressive Web App features
+- **Enhanced Security**: Biometric authentication
+
+#### **12.1.2. Medium-term Expansion (12 months)**
+-

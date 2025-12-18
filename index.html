@@ -1,0 +1,236 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark"> <!-- Default to dark theme -->
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>School Management Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root, .light {
+        --background: 0 0% 100%;
+        --foreground: 224 71.4% 4.1%;
+        --card: 0 0% 100%;
+        --card-foreground: 224 71.4% 4.1%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 224 71.4% 4.1%;
+        --primary: 262.1 83.3% 57.8%;
+        --primary-foreground: 210 20% 98%;
+        --secondary: 220 14.3% 95.9%;
+        --secondary-foreground: 220.9 39.3% 11%;
+        --muted: 220 14.3% 95.9%;
+        --muted-foreground: 220 8.9% 46.1%;
+        --accent: 220 14.3% 95.9%;
+        --accent-foreground: 220.9 39.3% 11%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 20% 98%;
+        --border: 220 13% 91%;
+        --input: 220 13% 91%;
+        --ring: 262.1 83.3% 57.8%;
+      }
+      .dark {
+        --background: 228 9% 10%;
+        --foreground: 210 20% 98%;
+        --card: 228 9% 13%;
+        --card-foreground: 210 20% 98%;
+        --popover: 228 9% 10%;
+        --popover-foreground: 210 20% 98%;
+        --primary: 258 90% 66%;
+        --primary-foreground: 210 20% 98%;
+        --secondary: 228 9% 17%;
+        --secondary-foreground: 210 20% 98%;
+        --muted: 228 9% 17%;
+        --muted-foreground: 215 20% 65%;
+        --accent: 228 9% 25%;
+        --accent-foreground: 210 20% 98%;
+        --destructive: 0 72.2% 50.6%;
+        --destructive-foreground: 210 20% 98%;
+        --border: 228 9% 20%;
+        --input: 228 9% 22%;
+        --ring: 258 90% 66%;
+      }
+      .school {
+        --background: 210 40% 98%;
+        --foreground: 215.4 16.3% 46.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 224 71.4% 4.1%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 224 71.4% 4.1%;
+        --primary: 346.8 77.2% 49.8%;
+        --primary-foreground: 355.7 100% 97.3%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 215.4 16.3% 46.9%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 346.8 77.2% 49.8%;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: hsl(var(--background));
+      }
+      .dark body {
+        background-color: #0d1117;
+      }
+      .admin-dashboard-background {
+        background-color: hsl(var(--muted));
+        background-image: radial-gradient(hsl(var(--border)) 1px, transparent 1px);
+        background-size: 16px 16px;
+      }
+      .dark .admin-dashboard-background {
+        background-color: hsl(var(--background));
+        background-image: radial-gradient(hsl(228, 9%, 15%) 0.5px, transparent 0.5px);
+        background-size: 16px 16px;
+      }
+      @supports (font-feature-settings: 'cv11') {
+        body {
+          font-feature-settings: 'cv11';
+        }
+      }
+      /* Custom scrollbar for a premium feel */
+      .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+          background: hsl(var(--muted) / 0.5);
+          border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--border));
+          border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--muted-foreground));
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // Important for dark mode to work
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              serif: ['Playfair Display', 'serif'],
+            },
+            colors: {
+              border: 'hsl(var(--border))',
+              input: 'hsl(var(--input))',
+              ring: 'hsl(var(--ring))',
+              background: 'hsl(var(--background))',
+              foreground: 'hsl(var(--foreground))',
+              primary: {
+                DEFAULT: 'hsl(var(--primary))',
+                foreground: 'hsl(var(--primary-foreground))',
+              },
+              secondary: {
+                DEFAULT: 'hsl(var(--secondary))',
+                foreground: 'hsl(var(--secondary-foreground))',
+              },
+              destructive: {
+                DEFAULT: 'hsl(var(--destructive))',
+                foreground: 'hsl(var(--destructive-foreground))',
+              },
+              muted: {
+                DEFAULT: 'hsl(var(--muted))',
+                foreground: 'hsl(var(--muted-foreground))',
+              },
+              accent: {
+                DEFAULT: 'hsl(var(--accent))',
+                foreground: 'hsl(var(--accent-foreground))',
+              },
+              popover: {
+                DEFAULT: 'hsl(var(--popover))',
+                foreground: 'hsl(var(--popover-foreground))',
+              },
+              card: {
+                DEFAULT: 'hsl(var(--card))',
+                foreground: 'hsl(var(--card-foreground))',
+                alt: 'hsl(var(--card-alt))',
+              },
+            },
+            animation: {
+                swing: 'swing 1s ease-in-out',
+                shine: 'shine 5s ease-in-out infinite',
+                aurora: 'aurora 60s linear infinite',
+                'card-glow': 'card-glow 3s ease-in-out infinite',
+                'fade-in': 'fade-in 0.5s ease-out forwards',
+                'slide-in-from-bottom-4': 'slide-in-from-bottom-4 0.5s ease-out forwards',
+                'sparkle': 'sparkle 1.5s infinite linear',
+                'fade-in-up': 'fade-in-up 0.8s ease-out forwards',
+            },
+            keyframes: {
+                swing: {
+                    '0%, 100%': { transform: 'rotate(0deg)' },
+                    '20%, 60%': { transform: 'rotate(20deg)' },
+                    '40%, 80%': { transform: 'rotate(-20deg)' },
+                },
+                shine: {
+                    '0%, 100%': { backgroundPosition: '0% 50%' },
+                    '50%': { backgroundPosition: '100% 50%' },
+                },
+                aurora: {
+                  '0%': { backgroundPosition: '0% 50%', backgroundSize: '300% 300%' },
+                  '50%': { backgroundPosition: '100% 50%', backgroundSize: '300% 300%' },
+                  '100%': { backgroundPosition: '0% 50%', backgroundSize: '300% 300%' },
+                },
+                'card-glow': {
+                    '0%': { boxShadow: '0 0 10px -10px hsl(var(--primary))' },
+                    '40%': { boxShadow: '0 0 30px 0px hsl(var(--primary) / 0.4)' },
+                    '60%': { boxShadow: '0 0 30px 0px hsl(var(--primary) / 0.4)' },
+                    '100%': { boxShadow: '0 0 10px -10px hsl(var(--primary))' },
+                },
+                'fade-in': {
+                    'from': { opacity: '0' },
+                    'to': { opacity: '1' },
+                },
+                'slide-in-from-bottom-4': {
+                    'from': { transform: 'translateY(1rem)', opacity: '0' },
+                    'to': { transform: 'translateY(0)', opacity: '1' },
+                },
+                'sparkle': {
+                    '0%': { transform: 'scale(0) rotate(0deg)', opacity: '0.5' },
+                    '50%': { transform: 'scale(1) rotate(180deg)', opacity: '1' },
+                    '100%': { transform: 'scale(0) rotate(360deg)', opacity: '0.5' },
+                },
+                'fade-in-up': {
+                    'from': { opacity: '0', transform: 'translateY(20px)' },
+                    'to': { opacity: '1', transform: 'translateY(0)' },
+                },
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "react-bootstrap": "https://esm.sh/react-bootstrap@^2.10.10"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-background text-foreground">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
