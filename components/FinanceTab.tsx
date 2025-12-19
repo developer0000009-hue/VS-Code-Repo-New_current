@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { 
-    FinanceData, Invoice, InvoiceStatus, FeeStructure, FeeComponent, SchoolClass, 
+    FinanceData, InvoiceStatus, FeeStructure, FeeComponent, SchoolClass, 
     StudentFeeSummary, StudentFinanceDetails, StudentInvoiceDetails, Payment, Refund, Concession, FeeFrequency, UserProfile
 } from '../types';
 import Spinner from './common/Spinner';

@@ -1,6 +1,5 @@
 
 import React, { ErrorInfo, ReactNode } from 'react';
-import ReactDOM from 'react-bootstrap';
 import ReactDOMClient from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
@@ -24,7 +23,16 @@ interface ErrorBoundaryState {
  * Standard Error Boundary for catching UI exceptions.
  */
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Fix: Explicitly define state property to resolve access errors
   public state: ErrorBoundaryState = { hasError: false };
+
+  // Fix: Explicitly define props property to resolve access errors (line 64 error fix)
+  public props: ErrorBoundaryProps;
+
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.props = props;
+  }
 
   public static getDerivedStateFromError(_error: Error): ErrorBoundaryState {
     return { hasError: true };
@@ -35,6 +43,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   public render() {
+    // Fix: access state correctly
     if (this.state.hasError) {
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-6 text-center">
@@ -44,7 +53,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                </svg>
             </div>
             <h1 className="text-2xl font-bold mb-2">Portal Temporarily Unavailable</h1>
-            <p className="mb-8 text-muted-foreground max-w-sm mx-auto">An unexpected error occurred. We've logged the incident and are working on it.</p>
+            <p className="mb-8 text-muted-foreground max-sm mx-auto">An unexpected error occurred. We've logged the incident and are working on it.</p>
             <button 
                 onClick={() => window.location.href = '/'} 
                 className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:bg-primary/90 transition-all active:scale-95"
@@ -55,6 +64,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
 
+    // Fix: access props correctly
     return this.props.children;
   }
 }

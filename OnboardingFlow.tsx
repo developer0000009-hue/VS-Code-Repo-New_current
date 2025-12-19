@@ -30,43 +30,48 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
     const [step, setStep] = useState<'role' | 'profile' | 'pricing' | 'branches'>('role');
     const [selectedRole, setSelectedRole] = useState<Role | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isTransitioning, setIsTransitioning] = useState(false);
     
     const isMounted = useRef(true);
-    const initialized = useRef(false);
 
     useEffect(() => {
         return () => { isMounted.current = false; };
     }, []);
     
+    // Unified state synchronization effect
     useEffect(() => {
-        if (initialized.current) return;
+        if (!isMounted.current || isTransitioning) return;
 
-        setLoading(true);
+        // If no role is selected, we must show the role selection screen
+        if (!profile.role) {
+            setSelectedRole(null);
+            setStep('role');
+            setLoading(false);
+            return;
+        }
+
+        // If a role is present, determine the current step
+        setSelectedRole(profile.role);
         
-        if (profile.role) {
-            setSelectedRole(profile.role);
-            if (profile.role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
-                // If we have institutional record progress, use it
-                const dbStep = onboardingStep;
-                if (dbStep && ['profile', 'pricing', 'branches'].includes(dbStep)) {
-                    if (isMounted.current) setStep(dbStep as any);
-                } else {
-                    if (isMounted.current) setStep('profile');
-                }
+        if (profile.role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
+            // Priority: Database driven onboarding step
+            const dbStep = onboardingStep;
+            if (dbStep && ['profile', 'pricing', 'branches'].includes(dbStep)) {
+                setStep(dbStep as any);
             } else {
-                if (profile.profile_completed && isMounted.current) onComplete();
-                else if (isMounted.current) setStep('profile');
+                setStep('profile');
             }
         } else {
-            if (isMounted.current) {
-                setSelectedRole(null);
-                setStep('role');
+            // Non-admin roles: check completion status
+            if (profile.profile_completed) {
+                onComplete();
+            } else {
+                setStep('profile');
             }
         }
         
-        if (isMounted.current) setLoading(false);
-        initialized.current = true;
-    }, [profile, onboardingStep, onComplete]);
+        setLoading(false);
+    }, [profile.role, profile.profile_completed, onboardingStep, isTransitioning]);
 
     const handleSignOut = async () => {
         if (isMounted.current) setLoading(true);
@@ -74,7 +79,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
     };
     
     const handleRoleSelect = async (role: Role) => {
-        if (!isMounted.current) return;
+        if (!isMounted.current || isTransitioning) return;
+        setIsTransitioning(true);
         setLoading(true);
         
         try {
@@ -83,6 +89,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                 const { data, error } = await supabase.rpc('initialize_school_admin');
                 if (error) throw error;
                 
+                // Immediately transition locally while App.tsx re-fetches
                 if (isMounted.current) setStep('profile');
             } else {
                 const { error: updateError } = await supabase
@@ -94,15 +101,23 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                 if (isMounted.current) setStep('profile');
             }
 
-            if (onStepChange) await onStepChange();
+            // Sync with parent App component and WAIT for it to finish
+            if (onStepChange) {
+                await onStepChange();
+            }
+            
             setSelectedRole(role);
 
         } catch (err: any) {
             console.error('Role selection failed:', err);
-            alert(`Setup failed: ${err.message || "An unexpected error occurred during institutional setup."}`);
+            // Provide explicit feedback instead of silent failure
+            alert(`Setup failed: ${err.message || "Institutional initialization failed. Please check your connection and try again."}`);
             setStep('role');
         } finally {
-            if (isMounted.current) setLoading(false);
+            if (isMounted.current) {
+                setIsTransitioning(false);
+                setLoading(false);
+            }
         }
     };
 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Role, BuiltInRoles } from '../types';
 import { ROLE_ICONS } from '../constants';
 import { useRoles } from '../contexts/RoleContext';
@@ -8,6 +8,7 @@ import { supabase } from '../services/supabase';
 import { XIcon } from './icons/XIcon';
 import { SchoolIcon } from './icons/SchoolIcon';
 import { UsersIcon } from './icons/UsersIcon';
+import { CheckCircleIcon } from './icons/CheckCircleIcon';
 
 interface RoleSelectionPageProps {
     onRoleSelect: (role: Role) => void;
@@ -63,8 +64,24 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
     const { roles, loading } = useRoles();
     const [isSchoolAdminModalOpen, setIsSchoolAdminModalOpen] = useState(false);
     const [joinLoading, setJoinLoading] = useState(false);
+    const [createLoading, setCreateLoading] = useState(false);
     const [joinError, setJoinError] = useState<string | null>(null);
+    const [invitationCode, setInvitationCode] = useState('');
     const [selectedRole, setSelectedRole] = useState<string | null>(null);
+
+    // Watchdog to prevent infinite loading state
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout>;
+        if (createLoading) {
+            timer = setTimeout(() => {
+                if (createLoading) {
+                    console.warn("Onboarding watchdog triggered: Resetting createLoading after 8s timeout.");
+                    setCreateLoading(false);
+                }
+            }, 8000);
+        }
+        return () => clearTimeout(timer);
+    }, [createLoading]);
 
     const publicRoles: string[] = [
         BuiltInRoles.SCHOOL_ADMINISTRATION,
@@ -75,44 +92,68 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
         BuiltInRoles.ECOMMERCE_OPERATOR
     ];
 
-    // Ensure we only show roles that exist in our system definition
     const displayRoles = roles.filter(r => publicRoles.includes(r));
 
     const handleRoleClick = async (role: Role) => {
-        if (selectedRole) return; // Prevent double clicks
+        if (selectedRole || createLoading || joinLoading) return;
         
         setSelectedRole(role);
 
-        // Provide immediate visual feedback
         if (role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
-            // Add a small delay for UI smoothness
+            // Short delay for visual feedback before opening modal
             setTimeout(() => {
                 setIsSchoolAdminModalOpen(true);
                 setSelectedRole(null);
-            }, 300);
+            }, 250);
         } else {
-            // Trigger selection immediately
              onRoleSelect(role);
         }
     };
 
-    const handleJoinBranch = async () => {
+    const handleCreateNewSchool = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (createLoading) return;
+        
+        setCreateLoading(true);
+        try {
+            // This triggers handleRoleSelect in OnboardingFlow
+            await onRoleSelect(BuiltInRoles.SCHOOL_ADMINISTRATION);
+        } catch (err) {
+            console.error("New School Creation Trigger Failed:", err);
+            setCreateLoading(false);
+        } finally {
+            // Note: If parent transitions state, this component unmounts
+            // so this block is mostly for handled errors.
+            setCreateLoading(false);
+        }
+    }
+
+    const handleJoinBranch = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!invitationCode.trim() || joinLoading) {
+            setJoinError("Please enter your invitation code.");
+            return;
+        }
+
         setJoinLoading(true);
         setJoinError(null);
         
         try {
-            const { data, error } = await supabase.rpc('verify_and_link_branch_admin');
+            const { data, error } = await supabase.rpc('verify_and_link_branch_admin', { 
+                p_invitation_code: invitationCode.trim().toUpperCase() 
+            });
             
             if (error) throw error;
             
             if (data.success) {
-                await onComplete();
+                onComplete();
             } else {
-                setJoinError(data.message || 'Could not find a matching branch. Please check your email and try again.');
+                setJoinError(data.message || 'Invalid or expired invitation code.');
+                setJoinLoading(false);
             }
         } catch (err: any) {
-            setJoinError(err.message || "An unexpected error occurred.");
-        } finally {
+            setJoinError(err.message || "Invitation verification failed.");
             setJoinLoading(false);
         }
     };
@@ -121,7 +162,7 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
         return (
             <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-background">
                 <Spinner size="lg" />
-                <p className="text-muted-foreground animate-pulse font-medium">Loading access roles...</p>
+                <p className="text-muted-foreground animate-pulse font-medium">Synchronizing access portals...</p>
             </div>
         );
     }
@@ -140,7 +181,7 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
                         Select Your Portal
                     </h1>
                     <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                        Welcome to the digital campus. Choose your profile below to access your personalized dashboard and tools.
+                        Welcome to the digital campus. Choose your profile below to access your personalized tools.
                     </p>
                 </div>
 
@@ -155,7 +196,7 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
                             shadow: 'hover:shadow-lg'
                         };
                         const isSelected = selectedRole === name;
-                        const isDisabled = !!selectedRole && !isSelected;
+                        const isDisabled = (!!selectedRole && !isSelected) || createLoading || joinLoading;
 
                         return (
                             <button
@@ -173,7 +214,6 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
                                     ${isDisabled ? 'opacity-40 scale-95 grayscale cursor-not-allowed' : 'cursor-pointer'}
                                 `}
                             >
-                                {/* Hover Gradient Background */}
                                 <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[2rem]`} />
                                 
                                 <div className="relative z-10 flex flex-col h-full w-full">
@@ -204,59 +244,70 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
                 </div>
             </div>
 
-            {/* School Admin Type Selection Modal */}
+            {/* Setup Administration Flow Modal */}
             {isSchoolAdminModalOpen && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex justify-center items-center z-50 p-4 animate-in fade-in duration-300" onClick={() => setIsSchoolAdminModalOpen(false)}>
-                    <div className="bg-card w-full max-w-4xl rounded-[2rem] shadow-2xl border border-white/10 overflow-hidden transform transition-all scale-100 ring-1 ring-black/5" onClick={e => e.stopPropagation()}>
-                        <header className="p-8 border-b border-border flex justify-between items-center bg-muted/30">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center z-50 p-4 animate-in fade-in duration-300" onClick={() => !createLoading && setIsSchoolAdminModalOpen(false)}>
+                    <div className="bg-card w-full max-w-4xl rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden transform transition-all scale-100 ring-1 ring-black/5" onClick={e => e.stopPropagation()}>
+                        <header className="p-8 pb-4 flex justify-between items-start">
                             <div>
-                                <h2 className="text-2xl font-bold text-foreground">Setup Administration</h2>
-                                <p className="text-muted-foreground text-sm mt-1">Choose how you want to initialize your admin access.</p>
+                                <h2 className="text-3xl font-serif font-extrabold text-foreground tracking-tight">Setup Administration</h2>
+                                <p className="text-muted-foreground text-base mt-2">Choose how you want to initialize your admin access.</p>
                             </div>
-                            <button onClick={() => setIsSchoolAdminModalOpen(false)} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                            <button onClick={() => !createLoading && setIsSchoolAdminModalOpen(false)} className="p-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
                                 <XIcon className="w-6 h-6"/>
                             </button>
                         </header>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
-                            {/* Option 1: Create New */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border/60">
+                            {/* Option 1: Create New School */}
                             <button 
-                                onClick={() => onRoleSelect(BuiltInRoles.SCHOOL_ADMINISTRATION)} 
-                                className="p-12 text-center hover:bg-muted/30 transition-all group flex flex-col items-center h-full relative overflow-hidden"
+                                onClick={handleCreateNewSchool} 
+                                disabled={createLoading}
+                                className="p-12 text-center hover:bg-muted/30 transition-all group flex flex-col items-center h-full relative overflow-hidden disabled:opacity-70 disabled:cursor-wait"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"/>
-                                <div className="relative z-10">
-                                    <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-inner border border-primary/20">
-                                        <SchoolIcon className="w-12 h-12 text-primary"/>
+                                <div className="relative z-10 flex flex-col items-center">
+                                    <div className="w-24 h-24 bg-primary/10 rounded-[2rem] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-inner border border-primary/20">
+                                        {createLoading ? <Spinner size="lg" className="text-primary" /> : <SchoolIcon className="w-12 h-12 text-primary"/>}
                                     </div>
-                                    <h3 className="text-2xl font-bold text-foreground mb-3">Create New School</h3>
-                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+                                    <h3 className="text-2xl font-bold text-foreground mb-4">Create New School</h3>
+                                    <p className="text-sm text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
                                         Set up a brand new institution profile. You will be the <strong>Super Administrator</strong> for the head office.
                                     </p>
-                                    <span className="mt-8 inline-block text-xs font-bold text-primary uppercase tracking-widest border-b-2 border-transparent group-hover:border-primary transition-all">
-                                        Get Started &rarr;
-                                    </span>
+                                    <div className="mt-10 inline-flex items-center gap-2 text-xs font-black text-primary uppercase tracking-[0.2em] group-hover:gap-3 transition-all">
+                                        {createLoading ? 'INITIALIZING...' : <>GET STARTED <span>&rarr;</span></>}
+                                    </div>
                                 </div>
                             </button>
                             
-                            {/* Option 2: Join Existing */}
-                            <div className="p-12 text-center hover:bg-muted/30 transition-all flex flex-col items-center h-full bg-muted/5 relative overflow-hidden">
+                            {/* Option 2: Join Existing Branch */}
+                            <div className="p-12 text-center bg-muted/5 flex flex-col items-center h-full relative overflow-hidden">
                                 <div className="relative z-10 w-full flex flex-col items-center">
                                     <div className="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center mb-8 shadow-inner border border-blue-500/20">
                                         <UsersIcon className="w-12 h-12 text-blue-600"/>
                                     </div>
-                                    <h3 className="text-2xl font-bold text-foreground mb-3">Join as Branch Admin</h3>
-                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed mb-8">
+                                    <h3 className="text-2xl font-bold text-foreground mb-4">Join as Branch Admin</h3>
+                                    <p className="text-sm text-muted-foreground max-w-[280px] mx-auto leading-relaxed mb-8">
                                         If your Head Office has invited you via email, select this to link your account to an existing branch.
                                     </p>
                                     
-                                    <button
-                                        onClick={handleJoinBranch}
-                                        disabled={joinLoading}
-                                        className="w-full max-w-xs py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 hover:shadow-blue-500/25 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {joinLoading ? <Spinner size="sm" className="text-white"/> : 'Verify & Join Branch'}
-                                    </button>
+                                    <div className="w-full max-w-xs space-y-3">
+                                        <input 
+                                            type="text"
+                                            value={invitationCode}
+                                            onChange={(e) => setInvitationCode(e.target.value)}
+                                            placeholder="Enter Invitation Code"
+                                            disabled={joinLoading || createLoading}
+                                            className="w-full px-4 py-3 bg-background border border-border rounded-xl text-center font-mono font-bold tracking-widest focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all uppercase placeholder:text-muted-foreground/30 placeholder:normal-case"
+                                        />
+                                        <button
+                                            onClick={handleJoinBranch}
+                                            disabled={joinLoading || createLoading}
+                                            className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 hover:shadow-blue-500/40 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            {joinLoading ? <Spinner size="sm" className="text-white"/> : 'Verify & Join Branch'}
+                                        </button>
+                                    </div>
                                     
                                     {joinError && (
                                         <div className="mt-6 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-xs font-bold rounded-lg border border-red-100 dark:border-red-800 w-full max-w-xs animate-in slide-in-from-bottom-2">
@@ -266,6 +317,11 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
                                 </div>
                             </div>
                         </div>
+                        <footer className="p-6 bg-muted/20 border-t border-border/40 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.1em]">
+                                Requires an active paid GCP project • <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-primary hover:underline">Billing Docs</a>
+                            </p>
+                        </footer>
                     </div>
                 </div>
             )}

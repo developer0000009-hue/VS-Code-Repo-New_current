@@ -28,8 +28,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Supabase initialization error: Missing URL or Anon Key.');
 }
 
-// Storage key versioned to prevent session pollution during development
-export const STORAGE_KEY = 'gurukul_auth_prod_v1';
+// Versioned storage key is vital to prevent cache-related auth bugs across releases
+export const STORAGE_KEY = 'gurukul_auth_session_v9.09';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -37,6 +37,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         persistSession: true,
         detectSessionInUrl: true,
         storageKey: STORAGE_KEY,
-        flowType: 'pkce', // Best practice for SPA security
+        flowType: 'pkce',
     },
 });
