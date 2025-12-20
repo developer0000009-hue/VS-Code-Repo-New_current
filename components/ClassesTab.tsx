@@ -29,15 +29,12 @@ import ClassWorkspace from './classes/ClassWorkspace';
 
 // --- Types ---
 
+// Fix: Interface 'ExtendedClass' incorrectly extends interface 'SchoolClass'. 
+// Removed redundant property declarations that were conflicting with the base interface by being made optional.
 interface ExtendedClass extends SchoolClass {
     teacher_name?: string;
     student_count?: number;
-    grade_level?: string;
-    academic_year?: string;
-    class_teacher_id?: string;
-    capacity?: number;
     created_at?: string;
-    section?: string;
 }
 
 type QuickFilterType = 'All' | 'No Teacher' | 'No Students' | 'Overloaded' | 'New' | 'Full';
@@ -179,7 +176,7 @@ const ClassroomAIModal: React.FC<{ classes: ExtendedClass[]; onClose: () => void
             }
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3-flash-preview',
                 contents: prompt
             });
             
@@ -335,8 +332,8 @@ const ClassesTab: React.FC<ClassesTabProps> = ({ branchId }) => {
             if (quickFilter === 'Full') matchesFilter = (cls.student_count || 0) === (cls.capacity || 30);
             return matchesSearch && matchesFilter;
         }).sort((a, b) => {
-            const aVal = a[sortConfig.key] || '';
-            const bVal = b[sortConfig.key] || '';
+            const aVal = (a[sortConfig.key] || '').toString();
+            const bVal = (b[sortConfig.key] || '').toString();
             if (aVal < bVal) return sortConfig.direction === 'ascending' ? -1 : 1;
             if (aVal > bVal) return sortConfig.direction === 'ascending' ? 1 : -1;
             return 0;

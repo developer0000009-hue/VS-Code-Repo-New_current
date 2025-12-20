@@ -1,6 +1,7 @@
 
 import React from 'react';
 
+// --- Roles ---
 export type Role = 'School Administration' | 'Branch Admin' | 'Principal' | 'HR Manager' | 'Academic Coordinator' | 'Accountant' | 'Teacher' | 'Student' | 'Parent/Guardian' | 'Transport Staff' | 'E-commerce Operator' | 'Super Admin';
 
 export const BuiltInRoles = {
@@ -18,6 +19,7 @@ export const BuiltInRoles = {
     SUPER_ADMIN: 'Super Admin' as Role
 };
 
+// --- User Profiles ---
 export interface UserProfile {
     id: string;
     email: string;
@@ -29,24 +31,47 @@ export interface UserProfile {
     is_super_admin?: boolean;
     created_at?: string;
     email_confirmed_at?: string | null;
-    parent_guardian_details?: string;
-    address?: string;
-    gender?: string;
-    date_of_birth?: string;
 }
 
 export interface ProfileData {
-    [key: string]: any;
+    id?: string;
+    user_id: string;
+    display_name?: string;
+    phone?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface SchoolAdminProfileData extends ProfileData {
+    school_name: string;
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    admin_contact_name: string;
+    admin_contact_email: string;
+    admin_contact_phone?: string;
+    admin_designation: string;
+    academic_board?: string;
+    affiliation_number?: string;
+    school_type?: string;
+    academic_year_start?: string;
+    academic_year_end?: string;
+    grade_range_start?: string;
+    grade_range_end?: string;
+    onboarding_step?: string;
+    plan_id?: string;
+    workload_limit?: number;
 }
 
 export interface ParentProfileData extends ProfileData {
     relationship_to_student: string;
-    gender?: string;
+    gender: string;
     number_of_children?: number;
-    address?: string;
-    country?: string;
-    state?: string;
-    city?: string;
+    address: string;
+    country: string;
+    state: string;
+    city: string;
     pin_code?: string;
     secondary_parent_name?: string;
     secondary_parent_relationship?: string;
@@ -62,14 +87,15 @@ export interface StudentProfileData extends ProfileData {
     parent_guardian_details?: string;
     roll_number?: string;
     student_id_number?: string;
-    address?: string;
+    assigned_class_id?: number;
+    branch_id?: number;
 }
 
 export interface TeacherProfileData extends ProfileData {
-    subject: string;
-    qualification: string;
-    experience_years: number;
-    date_of_joining: string;
+    subject?: string;
+    qualification?: string;
+    experience_years?: number;
+    date_of_joining?: string;
     bio?: string;
     specializations?: string;
     profile_picture_url?: string;
@@ -81,6 +107,8 @@ export interface TeacherProfileData extends ProfileData {
     employment_type?: string;
     employment_status?: string;
     branch_id?: number;
+    salary?: string;
+    bank_details?: string;
     workload_limit?: number;
 }
 
@@ -95,34 +123,14 @@ export interface EcommerceProfileData extends ProfileData {
     business_type: string;
 }
 
-export interface SchoolAdminProfileData {
-    school_name: string;
-    address: string;
-    country: string;
-    state: string;
-    city: string;
-    admin_contact_name: string;
-    admin_contact_email: string;
-    admin_contact_phone: string;
-    admin_designation?: string;
-    plan_id?: string;
-    onboarding_step?: string;
-    academic_board?: string;
-    affiliation_number?: string;
-    school_type?: string;
-    academic_year_start?: string;
-    academic_year_end?: string;
-    grade_range_start?: string;
-    grade_range_end?: string;
-}
-
+// --- Branches & Departments ---
 export interface SchoolBranch {
     id: number;
     name: string;
     address: string;
-    city?: string;
-    state?: string;
-    country?: string;
+    city: string;
+    state: string;
+    country: string;
     is_main_branch: boolean;
     admin_name?: string;
     admin_email?: string;
@@ -130,206 +138,39 @@ export interface SchoolBranch {
     email?: string;
 }
 
-export interface SchoolClass {
+export interface SchoolDepartment {
     id: number;
     name: string;
-    grade_level?: string;
-    section?: string;
-    branch_id?: number;
-    academic_year?: string;
-    class_teacher_id?: string;
-    capacity?: number;
+    description?: string;
+    hod_id?: string;
+    hod_name?: string;
+    teacher_count?: number;
+    course_count?: number;
 }
 
-export interface Course {
-    id: number;
-    title: string;
-    code: string;
-    description?: string;
-    credits: number;
-    category: string;
-    grade_level: string;
-    status: CourseStatus;
-    teacher_id?: string;
-    teacher_name?: string;
-    department?: string;
-    modules_count?: number;
-    enrolled_count?: number;
-    subject_type?: string;
-    created_at?: string;
-}
+// --- Admissions & Enquiries ---
+export type AdmissionStatus = 'Pending Review' | 'Documents Requested' | 'Approved' | 'Rejected' | 'Enquiry' | 'Payment Pending';
 
 export interface AdmissionApplication {
     id: number;
     applicant_name: string;
     grade: string;
+    date_of_birth?: string;
+    gender?: string;
+    status: AdmissionStatus;
+    submitted_at: string;
+    updated_at?: string;
     parent_name: string;
     parent_email: string;
     parent_phone: string;
-    status: string;
-    submitted_at: string;
-    student_user_id?: string;
-    // Fix: Added missing branch_id property to resolve Property 'branch_id' does not exist error
+    application_number?: string;
     branch_id?: number;
     branch_name?: string;
-    application_number?: string;
-    profile_photo_url?: string;
-    date_of_birth?: string;
-    gender?: string;
+    student_user_id?: string;
+    student_system_email?: string;
     medical_info?: string;
     emergency_contact?: string;
-    student_system_email?: string;
-    updated_at?: string;
-}
-
-export interface StudentDashboardData {
-    profile: UserProfile & { roll_number?: string, student_id_number?: string, grade?: string, parent_guardian_details?: string };
-    admission: AdmissionApplication;
-    timetable: any[];
-    assignments: StudentAssignment[];
-    attendanceSummary: { total_days: number, present_days: number, absent_days: number, late_days: number };
-    recentGrades: any[];
-    announcements: Communication[];
-    studyMaterials: StudyMaterial[];
-    needs_onboarding: boolean;
-    classInfo?: { name: string, teacher_name: string };
-}
-
-export interface StudentInvoice {
-    id: number;
-    amount: number;
-    amount_paid: number;
-    due_date: string;
-    status: InvoiceStatus;
-    description: string;
-}
-
-export interface StudentInvoiceDetails extends StudentInvoice {
-    concession_amount?: number;
-}
-
-export interface StudentAttendanceRecord {
-    date: string;
-    status: AttendanceStatus;
-    notes?: string;
-}
-
-export interface StudentForAdmin extends UserProfile {
-    grade?: string;
-    student_id_number?: string;
-    parent_guardian_details?: string;
-    assigned_class_id?: number;
-    assigned_class_name?: string;
-    gender?: string;
-    date_of_birth?: string;
-    address?: string;
     profile_photo_url?: string;
-    roll_number?: string;
-}
-
-export interface StudentRosterItem {
-    id: string;
-    display_name: string;
-    roll_number?: string;
-}
-
-export type AdmissionStatus = string;
-export type CourseStatus = 'Active' | 'Inactive' | 'Draft' | 'Archived' | 'Pending';
-
-export type AttendanceStatus = 'Present' | 'Absent' | 'Late';
-
-export interface AttendanceRecord {
-    id?: number;
-    student_id: string;
-    class_id: number;
-    attendance_date: string;
-    status: AttendanceStatus;
-    notes?: string;
-}
-
-export type InvoiceStatus = 'Paid' | 'Pending' | 'Overdue' | 'Partial';
-
-export interface FinanceData {
-    revenue_ytd: number;
-    collections_this_month: number;
-    pending_dues: number;
-    overdue_accounts: number;
-    online_payments: number;
-    refunds_processed: number;
-    dues_data?: DuesDashboardData;
-    expense_data?: ExpenseDashboardData;
-}
-
-export type FeeFrequency = 'One-time' | 'Annually' | 'Quarterly' | 'Monthly';
-
-export interface FeeComponent {
-    id: number;
-    structure_id: number;
-    name: string;
-    amount: number;
-    frequency: FeeFrequency;
-}
-
-export interface FeeStructure {
-    id: number;
-    name: string;
-    description?: string;
-    academic_year: string;
-    components?: FeeComponent[];
-}
-
-export interface StudentFeeSummary {
-    student_id: string;
-    display_name: string;
-    class_name: string;
-    total_billed: number;
-    total_paid: number;
-    outstanding_balance: number;
-    overall_status: string;
-}
-
-export interface StudentFinanceDetails {
-    invoices: StudentInvoiceDetails[];
-    payments: Payment[];
-}
-
-export interface Payment {
-    id: number;
-    invoice_id: number;
-    amount: number;
-    payment_date: string;
-    payment_method: string;
-    receipt_number: string;
-}
-
-export interface Refund {
-    id: number;
-    amount: number;
-    refund_date: string;
-}
-
-export interface Concession {
-    id: number;
-    amount: number;
-}
-
-export interface AdminAnalyticsStats {
-    total_applications: number;
-    total_users: number;
-    pending_applications: number;
-}
-
-export interface Communication {
-    id: number;
-    sender_name?: string;
-    sender_role?: string;
-    subject: string;
-    body: string;
-    sent_at: string;
-    status: string;
-    recipients: string[];
-    target_criteria?: any;
-    message_id?: number;
 }
 
 export type EnquiryStatus = 'New' | 'Contacted' | 'In Review' | 'Completed';
@@ -337,10 +178,10 @@ export type EnquiryStatus = 'New' | 'Contacted' | 'In Review' | 'Completed';
 export interface Enquiry {
     id: number;
     applicant_name: string;
-    grade: string;
     parent_name: string;
     parent_email: string;
     parent_phone: string;
+    grade: string;
     status: EnquiryStatus;
     received_at: string;
     notes?: string;
@@ -352,16 +193,17 @@ export interface MyEnquiry extends Enquiry {
 }
 
 export interface TimelineItem {
-    id: number;
+    id: string;
     item_type: 'MESSAGE' | 'EVENT';
-    is_admin: boolean;
     created_at: string;
     created_by_name: string;
+    is_admin: boolean;
     details: any;
 }
 
-export type ShareCodeStatus = 'Active' | 'Expired' | 'Revoked' | 'Redeemed';
+// --- Verification & Codes ---
 export type ShareCodeType = 'Enquiry' | 'Admission';
+export type ShareCodeStatus = 'Active' | 'Expired' | 'Revoked' | 'Redeemed';
 
 export interface ShareCode {
     id: number;
@@ -371,21 +213,72 @@ export interface ShareCode {
     status: ShareCodeStatus;
     code_type: ShareCodeType;
     expires_at: string;
-    created_at?: string;
+    created_at: string;
 }
 
 export interface VerifiedShareCodeData {
     admission_id: number;
     applicant_name: string;
-    grade: string;
-    gender: string;
-    date_of_birth: string;
     parent_name: string;
     parent_email: string;
     parent_phone: string;
+    grade: string;
+    gender: string;
+    date_of_birth: string;
     code_type: ShareCodeType;
     already_imported: boolean;
     error?: string;
+}
+
+// --- Documents ---
+export interface DocumentRequirement {
+    id: number;
+    admission_id: number;
+    document_name: string;
+    status: 'Pending' | 'Submitted' | 'Accepted' | 'Rejected';
+    notes_for_parent?: string;
+    rejection_reason?: string;
+}
+
+export interface AdmissionDocument {
+    id: number;
+    admission_id: number;
+    requirement_id: number;
+    file_name: string;
+    storage_path: string;
+    uploaded_at: string;
+}
+
+// --- Classes & Courses ---
+export interface SchoolClass {
+    id: number;
+    name: string;
+    grade_level: string;
+    section: string;
+    academic_year: string;
+    class_teacher_id?: string;
+    branch_id?: number;
+    capacity?: number;
+}
+
+export type CourseStatus = 'Active' | 'Draft' | 'Archived' | 'Pending' | 'Inactive';
+
+export interface Course {
+    id: number;
+    title: string;
+    code: string;
+    description?: string;
+    credits?: number;
+    category?: string;
+    status: CourseStatus;
+    teacher_id?: string;
+    teacher_name?: string;
+    grade_level?: string;
+    department?: string;
+    enrolled_count?: number;
+    modules_count?: number;
+    subject_type?: string;
+    created_at?: string;
 }
 
 export interface CourseModule {
@@ -397,8 +290,28 @@ export interface CourseModule {
     duration_hours?: number;
 }
 
+// --- Attendance ---
+export type AttendanceStatus = 'Present' | 'Absent' | 'Late';
+
+export interface AttendanceRecord {
+    id?: number;
+    student_id: string;
+    class_id: number;
+    attendance_date: string;
+    status: AttendanceStatus;
+    notes?: string;
+    recorded_by?: string;
+}
+
+export interface StudentAttendanceRecord {
+    date: string;
+    status: AttendanceStatus;
+    notes?: string;
+}
+
+// --- Timetable ---
 export type Day = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
-export type TimeSlot = string;
+export type TimeSlot = '08:00' | '09:00' | '10:00' | '11:00' | '13:00' | '14:00' | '15:00';
 
 export interface TimetableEntry {
     id: string;
@@ -408,151 +321,81 @@ export interface TimetableEntry {
     subject: string;
     teacher: string;
     room?: string;
+    class_name?: string;
     isConflict?: boolean;
-    class_name?: string;
 }
 
-export interface TeacherExtended extends UserProfile {
-    details?: TeacherProfileData;
-    dailyStatus?: string;
+// --- Finance ---
+export interface FinanceData {
+    revenue_ytd: number;
+    collections_this_month: number;
+    pending_dues: number;
+    overdue_accounts: number;
+    online_payments: number;
+    refunds_processed: number;
 }
 
-export interface TeacherDocument {
+export interface FeeStructure {
     id: number;
-    teacher_id: string;
-    document_name: string;
-    document_type: string;
-    file_path: string;
-    status: string;
-    uploaded_at: string;
-}
-
-export interface TeacherSubjectMapping {
-    id: number;
-    teacher_id: string;
-    subject_id: number;
-    class_id: number;
-    academic_year: string;
-    class_name?: string;
-    subject_name?: string;
-}
-
-export interface TeacherClassOverview {
-    id: number;
-    name: string;
-    student_count: number;
-}
-
-export interface TeacherClassDetails {
-    roster: StudentRosterItem[];
-    assignments: any[];
-    studyMaterials: StudyMaterial[];
-    subjects: ClassSubject[];
-}
-
-export interface ClassSubject {
-    id: number;
-    name: string;
-}
-
-export interface LessonPlan {
-    id: number;
-    title: string;
-    subject_name: string;
-    lesson_date: string;
-    objectives: string;
-    activities: string;
-    resources: any[];
-}
-
-export interface StudyMaterial {
-    id: number;
-    subject: string;
-    title: string;
-    file_name: string;
-    file_path: string;
-    file_type: string;
-    created_at: string;
-    is_bookmarked?: boolean;
-}
-
-export type SubmissionStatus = 'Not Submitted' | 'Submitted' | 'Late' | 'Graded';
-
-export interface StudentAssignment {
-    id: number;
-    title: string;
-    subject: string;
-    description: string;
-    due_date: string;
-    status: SubmissionStatus;
-    submission_grade?: string;
-    teacher_feedback?: string;
-    file_path?: string;
-}
-
-export interface Workshop {
-    id: number;
-    title: string;
-    description: string;
-    workshop_date: string;
-}
-
-export interface TeacherProfessionalDevelopmentData {
-    total_points: number;
-    training_records: any[];
-    awards: any[];
-}
-
-export interface ClassPerformanceSummary {
-    average_grade: number;
-    attendance_rate: number;
-}
-
-export interface StudentPerformanceReport {
-    attendance_summary: { present: number, absent: number, late: number };
-    assignments: any[];
-}
-
-export interface TransportDashboardData {
-    route: { id: number, name: string, description: string };
-    students: BusStudent[];
-}
-
-export interface BusStudent {
-    id: string;
-    display_name: string;
-    grade: string;
-    parent_guardian_details: string;
-    status?: BusAttendanceStatus;
-}
-
-export interface BusAttendanceRecord {
-    student_id: string;
-    status: BusAttendanceStatus;
-}
-
-export type BusTripType = 'Morning Pickup' | 'Afternoon Drop-off';
-export type BusAttendanceStatus = 'Boarded' | 'Absent';
-
-export interface BusRoute {
-    id: number;
-    name: string;
-}
-
-export interface BulkImportResult {
-    success_count: number;
-    failure_count: number;
-    errors: any[];
-}
-
-export interface SchoolDepartment {
-    id: number;
+    branch_id?: number | null;
     name: string;
     description?: string;
-    hod_id?: string;
-    hod_name?: string;
-    teacher_count?: number;
-    course_count?: number;
+    academic_year: string;
+    target_grade?: string;
+    status: 'Draft' | 'Active' | 'Archived';
+    is_active: boolean;
+    currency: 'INR' | 'USD';
+    components?: FeeComponent[];
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface FeeComponent {
+    id: number;
+    structure_id: number;
+    name: string;
+    amount: number;
+    frequency: 'One-time' | 'Monthly' | 'Quarterly' | 'Annually';
+    is_mandatory: boolean;
+    ledger_code?: string;
+}
+
+export type InvoiceStatus = 'Paid' | 'Pending' | 'Overdue' | 'Partial';
+
+export interface StudentInvoice {
+    id: number;
+    student_id: string;
+    description: string;
+    amount: number;
+    amount_paid: number;
+    due_date: string;
+    status: InvoiceStatus;
+    concession_amount?: number;
+}
+
+export interface StudentFeeSummary {
+    student_id: string;
+    display_name: string;
+    class_name: string;
+    total_billed: number;
+    total_paid: number;
+    outstanding_balance: number;
+    overall_status: 'Paid' | 'Pending' | 'Overdue' | 'No Invoices';
+}
+
+export interface Payment {
+    id: number;
+    invoice_id: number;
+    amount: number;
+    payment_date: string;
+    payment_method: string;
+    receipt_number: string;
+    reference?: string;
+}
+
+export interface StudentFinanceDetails {
+    invoices: StudentInvoice[];
+    payments: Payment[];
 }
 
 export interface DuesDashboardData {
@@ -575,51 +418,257 @@ export interface ClassDuesInfo {
     total_dues: number;
 }
 
+export interface Expense {
+    id: number;
+    category: string;
+    amount: number;
+    vendor_name?: string;
+    expense_date: string;
+    description: string;
+    status: 'Pending' | 'Approved' | 'Rejected';
+    invoice_url?: string;
+    payment_mode?: string;
+}
+
 export interface ExpenseDashboardData {
     total_expenses_month: number;
     pending_approvals: number;
     recent_expenses: Expense[];
 }
 
-export interface Expense {
-    id: number;
-    description: string;
-    category: string;
-    amount: number;
-    expense_date: string;
-    status: 'Pending' | 'Approved' | 'Rejected';
-    vendor_name?: string;
-    invoice_url?: string;
-}
-
+// --- Reports ---
 export interface FeeCollectionReportItem {
-    // defined by RPC response
+    transaction_date: string;
+    student_name: string;
+    class_name: string;
+    amount: number;
+    payment_method: string;
+    receipt_number: string;
 }
 
 export interface ExpenseReportItem {
-    // defined by RPC response
+    expense_date: string;
+    category: string;
+    description: string;
+    amount: number;
+    vendor: string;
+    status: string;
 }
 
 export interface StudentLedgerEntry {
-    // defined by RPC response
+    date: string;
+    type: string;
+    description: string;
+    debit: number;
+    credit: number;
+    balance: number;
 }
 
-export interface DocumentRequirement {
-    id: number;
-    admission_id: number;
-    document_name: string;
-    status: 'Pending' | 'Submitted' | 'Accepted' | 'Rejected';
-    notes_for_parent?: string;
-    rejection_reason?: string;
+// --- Student Specific ---
+export interface StudentForAdmin extends UserProfile {
+    grade: string;
+    student_id_number?: string;
+    roll_number?: string;
+    assigned_class_id?: number;
+    assigned_class_name?: string;
+    parent_guardian_details?: string;
+    profile_photo_url?: string;
+    gender?: string;
+    date_of_birth?: string;
+    address?: string;
 }
 
-export interface AdmissionDocument {
+export interface StudentDashboardData {
+    profile: StudentForAdmin;
+    admission: AdmissionApplication;
+    classInfo: SchoolClass | null;
+    attendanceSummary: {
+        total_days: number;
+        present_days: number;
+        absent_days: number;
+        late_days: number;
+    };
+    assignments: StudentAssignment[];
+    recentGrades: any[];
+    announcements: Communication[];
+    timetable: any[];
+    studyMaterials: StudyMaterial[];
+    needs_onboarding: boolean;
+}
+
+export type SubmissionStatus = 'Not Submitted' | 'Submitted' | 'Late' | 'Graded';
+
+export interface StudentAssignment {
     id: number;
-    admission_id: number;
-    requirement_id: number;
+    title: string;
+    description: string;
+    subject: string;
+    due_date: string;
+    status: SubmissionStatus;
+    submission_grade?: string;
+    teacher_feedback?: string;
+    file_path?: string;
+}
+
+export interface StudyMaterial {
+    id: number;
+    title: string;
     file_name: string;
-    storage_path: string;
+    file_path: string;
+    file_type: string;
+    subject: string;
+    is_bookmarked: boolean;
+    created_at: string;
+}
+
+// --- Teacher Specific ---
+export interface TeacherExtended extends UserProfile {
+    details?: TeacherProfileData;
+    dailyStatus?: string;
+}
+
+export interface TeacherDocument {
+    id: number;
+    teacher_id: string;
+    document_name: string;
+    document_type: string;
+    file_path: string;
+    status: 'Verified' | 'Pending';
     uploaded_at: string;
 }
 
-export type FunctionComponentWithIcon<P = {}> = React.FC<P> & { Icon?: React.FC<React.SVGProps<SVGSVGElement>> };
+export interface TeacherSubjectMapping {
+    id: number;
+    teacher_id: string;
+    subject_id: number;
+    class_id: number;
+    academic_year: string;
+    class_name?: string;
+    subject_name?: string;
+    credits?: number;
+    category?: string;
+}
+
+export interface TeacherClassOverview {
+    id: number;
+    name: string;
+    student_count: number;
+}
+
+export interface TeacherClassDetails {
+    roster: StudentRosterItem[];
+    assignments: any[];
+    studyMaterials: any[];
+    subjects: ClassSubject[];
+}
+
+export interface StudentRosterItem {
+    id: string;
+    display_name: string;
+    roll_number?: string;
+}
+
+export interface ClassSubject {
+    id: number;
+    name: string;
+}
+
+export interface LessonPlan {
+    id: number;
+    title: string;
+    subject_name: string;
+    lesson_date: string;
+    objectives: string;
+    activities: string;
+    resources: any[];
+}
+
+export interface ClassPerformanceSummary {
+    average_grade: number;
+    attendance_rate: number;
+}
+
+export interface StudentPerformanceReport {
+    attendance_summary: {
+        present: number;
+        absent: number;
+        late: number;
+    };
+    assignments: any[];
+}
+
+export interface Workshop {
+    id: number;
+    title: string;
+    description: string;
+    workshop_date: string;
+}
+
+export interface TeacherProfessionalDevelopmentData {
+    total_points: number;
+    training_records: any[];
+    awards: any[];
+}
+
+// --- Transport ---
+export interface TransportDashboardData {
+    route: {
+        id: number;
+        name: string;
+        description: string;
+    };
+    students: BusStudent[];
+}
+
+export interface BusStudent {
+    id: string;
+    display_name: string;
+    grade: string;
+    parent_guardian_details: string;
+    status?: BusAttendanceStatus;
+}
+
+export interface BusAttendanceRecord {
+    student_id: string;
+    status: BusAttendanceStatus;
+}
+
+export type BusAttendanceStatus = 'Boarded' | 'Absent';
+export type BusTripType = 'Morning Pickup' | 'Afternoon Drop-off';
+
+export interface BusRoute {
+    id: number;
+    name: string;
+    description: string;
+}
+
+// --- Communication ---
+export interface Communication {
+    id: number;
+    subject: string;
+    body: string;
+    sender_name: string;
+    sender_role?: string;
+    sent_at: string;
+    recipients: string[];
+    status?: string;
+    target_criteria?: any;
+}
+
+// --- Analytics ---
+export interface AdminAnalyticsStats {
+    total_users: number;
+    total_applications: number;
+    pending_applications: number;
+}
+
+export interface BulkImportResult {
+    success_count: number;
+    failure_count: number;
+    errors: any[];
+}
+
+// --- Common ---
+export type FunctionComponentWithIcon<P = {}> = React.FC<P> & {
+    Icon?: React.FC<React.SVGProps<SVGSVGElement>>;
+};

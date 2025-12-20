@@ -15,6 +15,7 @@ import TeacherDashboard from './components/TeacherDashboard';
 import TransportDashboard from './components/TransportDashboard';
 import EcommerceDashboard from './components/EcommerceDashboard';
 import NotFound from './components/common/NotFound';
+import { XIcon } from './components/icons/XIcon';
 
 // Explicit role mapping to routes
 const ROLE_ROUTES: Record<string, string> = {
@@ -43,26 +44,39 @@ const App: React.FC = () => {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [onboardingStep, setOnboardingStep] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const [authError, setAuthError] = useState<string | null>(null);
     const navigate = useNavigate();
     const isFetching = useRef(false);
 
     /**
      * Atomically fetches or initializes the user profile based on the session.
-     * Also fetches onboarding progress for administrators.
      */
     const loadUserData = useCallback(async (currentSession: any, force = false) => {
         if (isFetching.current && !force) return;
         isFetching.current = true;
+        setAuthError(null);
         
         try {
-            // 1. Fetch Core Profile
+            // 1. Fetch Core Profile - Use maybeSingle to handle empty results without throw
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', currentSession.user.id)
-                .single();
+                .maybeSingle();
 
-            if (profileError && profileError.code === 'PGRST116') {
+            if (profileError) {
+                console.error("Profile fetch error details:", profileError.message, profileError.details, profileError.hint);
+                // If it's a real database error (not just missing data), we should notify the user
+                if (profileError.code !== 'PGRST116') {
+                     setAuthError(`Institutional synchronization error: ${profileError.message}`);
+                     setLoading(false);
+                     return;
+                }
+            }
+
+            if (!profileData) {
+                console.warn("Profile not found in database, attempting institutional auto-creation...");
+                // Profile not found - either trigger didn't run or record missing
                 const { data: newProfile, error: insertError } = await supabase.from('profiles').upsert({
                     id: currentSession.user.id,
                     email: currentSession.user.email,
@@ -70,11 +84,23 @@ const App: React.FC = () => {
                     role: currentSession.user.user_metadata?.role || null,
                     profile_completed: false,
                     is_active: true
-                }).select().single();
+                }).select().maybeSingle();
                 
-                if (insertError) throw insertError;
+                if (insertError) {
+                    console.error("Profile auto-creation failed details:", insertError.message, insertError.details, insertError.hint);
+                    setAuthError(`Institutional profile initialization failed: ${insertError.message}. Please check your connection or contact administration.`);
+                    setLoading(false);
+                    return;
+                }
+                
+                if (!newProfile) {
+                     setAuthError("Institutional profile missing or access denied. Please contact administration.");
+                     setLoading(false);
+                     return;
+                }
+
                 setProfile(newProfile as UserProfile);
-            } else if (profileData) {
+            } else {
                 setProfile(profileData as UserProfile);
                 
                 // 2. Fetch Onboarding Step for Admins
@@ -90,8 +116,9 @@ const App: React.FC = () => {
                     }
                 }
             }
-        } catch (e) {
-            console.error("Critical Auth Sync Error:", e);
+        } catch (e: any) {
+            console.error("Critical Auth Sync Error:", e.message || e);
+            setAuthError(e.message || "An unexpected error occurred during institutional synchronization.");
         } finally {
             isFetching.current = false;
             setLoading(false);
@@ -106,6 +133,7 @@ const App: React.FC = () => {
             setSession(null);
             setProfile(null);
             setOnboardingStep(null);
+            setAuthError(null);
             navigate('/', { replace: true });
         } catch (err) {
             console.error("Logout Error:", err);
@@ -122,27 +150,29 @@ const App: React.FC = () => {
             const { error } = await supabase.rpc('switch_active_role', { p_target_role: newRole });
             if (error) throw error;
             
-            // Reload user data to sync updated profile state
             await loadUserData(session, true);
             
             const targetPath = ROLE_ROUTES[newRole] || '/dashboard';
             navigate(targetPath, { replace: true });
         } catch (e: any) {
-            console.error("Role switch failed:", e);
+            console.error("Role switch failed:", e.message || e);
         } finally {
             setLoading(false);
         }
     }, [profile, session, loadUserData, navigate]);
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+        const initializeAuth = async () => {
+            const { data: { session: initialSession } } = await supabase.auth.getSession();
             setSession(initialSession);
             if (initialSession) {
-                loadUserData(initialSession);
+                await loadUserData(initialSession);
             } else {
                 setLoading(false);
             }
-        });
+        };
+
+        initializeAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
             if (event === 'SIGNED_OUT') {
@@ -172,12 +202,26 @@ const App: React.FC = () => {
             </div>
         );
     }
+
+    if (authError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
+                <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
+                    <XIcon className="w-8 h-8" />
+                </div>
+                <h1 className="text-xl font-bold mb-2">Access Issue</h1>
+                <p className="text-muted-foreground mb-6 max-w-xs mx-auto">{authError}</p>
+                <button onClick={handleSignOut} className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg transition-all hover:bg-primary/90">
+                    Return to Login
+                </button>
+            </div>
+        );
+    }
     
     if (!session || !profile) {
         return <AuthPage />;
     }
     
-    // Redirect to onboarding if profile is incomplete or role is missing
     if (!profile.profile_completed || !profile.role) {
         return (
             <OnboardingFlow 

@@ -17,6 +17,7 @@ import { MailIcon } from './icons/MailIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { FilterIcon } from './icons/FilterIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
+import ConfirmationModal from './common/ConfirmationModal';
 
 // --- Types & Constants ---
 
@@ -119,6 +120,14 @@ const AdmissionDetailModal: React.FC<{
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [processing, setProcessing] = useState(false);
 
+    // Confirmation State
+    const [confirmModal, setConfirmModal] = useState<{ 
+        isOpen: boolean; 
+        type: 'Approve' | 'Reject' | 'Warning';
+        title: string;
+        message: string;
+    }>({ isOpen: false, type: 'Approve', title: '', message: '' });
+
     useEffect(() => {
         setDocLoading(true);
         supabase.from('document_requirements')
@@ -131,25 +140,41 @@ const AdmissionDetailModal: React.FC<{
             });
     }, [application.id]);
 
-    const updateStatus = async (status: string) => {
-        // Strict check before approval
-        if (status === 'Approved') {
+    const handleActionTrigger = (actionType: 'Approve' | 'Reject') => {
+        if (actionType === 'Approve') {
             const unverifiedDocs = docs.filter(d => d.status !== 'Accepted');
             if (unverifiedDocs.length > 0) {
-                const confirmUnverified = confirm(
-                    `Warning: ${unverifiedDocs.length} documents are not yet marked as 'Accepted'. Do you still want to proceed with approval?`
-                );
-                if (!confirmUnverified) return;
-            } else if (!confirm(`Are you sure you want to approve ${application.applicant_name} and create their student profile?`)) {
-                return;
+                setConfirmModal({
+                    isOpen: true,
+                    type: 'Warning',
+                    title: 'Unverified Documents',
+                    message: `Warning: ${unverifiedDocs.length} documents are not yet marked as 'Accepted'. Do you still want to proceed with approving ${application.applicant_name}?`
+                });
+            } else {
+                setConfirmModal({
+                    isOpen: true,
+                    type: 'Approve',
+                    title: 'Approve Admission',
+                    message: `Are you sure you want to approve ${application.applicant_name} and create their student profile?`
+                });
             }
         } else {
-            if(!confirm(`Are you sure you want to mark this application as ${status}?`)) return;
+            setConfirmModal({
+                isOpen: true,
+                type: 'Reject',
+                title: 'Reject Application',
+                message: `Are you sure you want to reject the application for ${application.applicant_name}? This action is irreversible.`
+            });
         }
+    };
 
+    const handleConfirmedAction = async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setProcessing(true);
         
         try {
+            const status = confirmModal.type === 'Reject' ? 'Rejected' : 'Approved';
+
             if(status === 'Approved') {
                 // Call the enhanced approval RPC
                 const { data, error } = await supabase.rpc('approve_admission_application', { p_admission_id: application.id });
@@ -164,8 +189,8 @@ const AdmissionDetailModal: React.FC<{
                     throw new Error(data?.message || 'Failed to approve application. Please check logs.');
                 }
             } else {
-                // Update other statuses
-                const { error } = await supabase.rpc('update_admission_status', { p_admission_id: application.id, p_new_status: status });
+                // Update to Rejected
+                const { error } = await supabase.rpc('update_admission_status', { p_admission_id: application.id, p_new_status: 'Rejected' });
                 if (error) throw error;
                 
                 onClose(); 
@@ -384,10 +409,18 @@ const AdmissionDetailModal: React.FC<{
                                 <div className="flex w-full sm:w-auto gap-3">
                                 {application.status !== 'Approved' && (
                                     <>
-                                        <button onClick={()=>updateStatus('Rejected')} disabled={processing} className="flex-1 sm:flex-none px-6 py-3 rounded-xl border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 transition-colors">
+                                        <button 
+                                            onClick={()=>handleActionTrigger('Reject')} 
+                                            disabled={processing} 
+                                            className="flex-1 sm:flex-none px-6 py-3 rounded-xl border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+                                        >
                                             Reject
                                         </button>
-                                        <button onClick={()=>updateStatus('Approved')} disabled={processing} className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm shadow-lg hover:shadow-emerald-500/25 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95">
+                                        <button 
+                                            onClick={()=>handleActionTrigger('Approve')} 
+                                            disabled={processing} 
+                                            className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm shadow-lg hover:shadow-emerald-500/25 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                                        >
                                             {processing ? <Spinner size="sm" className="text-white"/> : <><CheckCircleIcon className="w-5 h-5"/> Approve Admission</>}
                                         </button>
                                     </>
@@ -397,6 +430,18 @@ const AdmissionDetailModal: React.FC<{
                     </div>
                 </div>
             </div>
+
+            {/* Custom Confirmation Modal for standard UI across breakpoints */}
+            <ConfirmationModal 
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={handleConfirmedAction}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                confirmText={confirmModal.type === 'Reject' ? 'Yes, Reject' : 'Yes, Proceed'}
+                loading={processing}
+            />
+
             {reqModal && <RequestDocumentsModal admissionId={application.id} applicantName={application.applicant_name} onClose={()=>setReqModal(false)} onSuccess={()=>{setReqModal(false); /* trigger refetch docs */}} />}
             {previewUrl && <PreviewModal url={previewUrl} onClose={()=>setPreviewUrl(null)} />}
         </div>

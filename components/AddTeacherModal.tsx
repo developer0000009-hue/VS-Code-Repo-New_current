@@ -24,13 +24,21 @@ interface AddTeacherModalProps {
 
 const STEPS = ['Basic Info', 'Photo', 'Role & Dept', 'Academics', 'Documents', 'Review'];
 
-const FloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string, icon?: React.ReactNode }> = ({ label, icon, className, ...props }) => (
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+const FloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string, icon?: React.ReactNode, readOnly?: boolean }> = ({ label, icon, className, readOnly, ...props }) => (
     <div className="relative group w-full">
         <div className="absolute top-1/2 -translate-y-1/2 left-4 text-muted-foreground/60 group-focus-within:text-primary transition-colors z-10 pointer-events-none">{icon}</div>
-        <input {...props} placeholder=" " className={`peer block w-full rounded-xl border border-input bg-background px-4 py-3.5 pl-11 text-sm text-foreground shadow-sm focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${className}`} />
-        <label className="absolute left-11 top-0 -translate-y-1/2 bg-background px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-sm peer-placeholder-shown:font-normal peer-placeholder-shown:normal-case peer-focus:top-0 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:text-primary pointer-events-none">{label}</label>
+        <input {...props} readOnly={readOnly} placeholder=" " className={`peer block w-full rounded-xl border border-input bg-background px-4 py-3.5 pl-11 text-sm text-foreground shadow-sm focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${readOnly ? 'bg-muted/30 cursor-not-allowed border-transparent' : ''} ${className}`} />
+        <label className={`absolute left-11 top-0 -translate-y-1/2 bg-background px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 transition-all peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-sm peer-placeholder-shown:font-normal peer-placeholder-shown:normal-case peer-focus:top-0 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:text-primary pointer-events-none ${readOnly ? 'bg-transparent' : ''}`}>{label}</label>
     </div>
 );
+
+const generateEmployeeId = () => {
+    const year = new Date().getFullYear();
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return `EMP-${year}-${random}`;
+};
 
 const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, branchId }) => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -78,6 +86,13 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
     const handleSubmit = async () => {
         setLoading(true);
         setErrorMsg(null);
+
+        if (!EMAIL_REGEX.test(formData.email)) {
+            setErrorMsg("Please enter a valid email address.");
+            setLoading(false);
+            return;
+        }
+
         try {
             // Generate a UUID for the new teacher (simulating auth.uid)
             const mockUserId = crypto.randomUUID(); 
@@ -125,11 +140,34 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
         }
     };
 
-    const handleNext = () => setCurrentStep(prev => Math.min(prev + 1, STEPS.length - 1));
+    const handleNext = () => {
+        const nextStep = currentStep + 1;
+        
+        // Basic Step Validation
+        if (currentStep === 0) {
+            if (!formData.display_name.trim()) {
+                setErrorMsg("Full Name is required.");
+                return;
+            }
+            if (!formData.email.trim() || !EMAIL_REGEX.test(formData.email)) {
+                setErrorMsg("A valid email address is required.");
+                return;
+            }
+            setErrorMsg(null);
+        }
+
+        // Auto-generate ID if entering Step 2 (Role & Dept) and ID is missing
+        if (nextStep === 2 && !formData.employee_id) {
+            setFormData(prev => ({ ...prev, employee_id: generateEmployeeId() }));
+        }
+        setCurrentStep(nextStep);
+    };
+    
     const handleBack = () => setCurrentStep(prev => Math.max(prev - 1, 0));
 
     // Render Steps
-    const renderStep = () => {
+    // Fix: Rename renderStep to renderStepContent to match usage on line 392
+    const renderStepContent = () => {
         switch (currentStep) {
             case 0: // Basic Info
                 return (
@@ -176,7 +214,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                     <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
                         <h3 className="text-lg font-bold text-foreground">Role & Department</h3>
                         <div className="grid grid-cols-2 gap-5">
-                            <FloatingInput label="Employee ID" name="employee_id" value={formData.employee_id} onChange={handleChange} icon={<BriefcaseIcon className="w-4 h-4"/>} />
+                            <FloatingInput label="Employee ID" name="employee_id" value={formData.employee_id} readOnly={true} icon={<div className="w-4 h-4 font-bold text-[10px] flex items-center justify-center border border-current rounded">ID</div>} />
                             <FloatingInput label="Department" name="department" value={formData.department} onChange={handleChange} icon={<BriefcaseIcon className="w-4 h-4"/>} />
                         </div>
                         <FloatingInput label="Designation" name="designation" value={formData.designation} onChange={handleChange} icon={<UserIcon className="w-4 h-4"/>} />
@@ -230,7 +268,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                         <h3 className="text-lg font-bold text-foreground">Upload Documents</h3>
                         
-                        <div className="border-2 border-dashed border-border rounded-xl p-6 hover:bg-muted/30 transition-colors relative group">
+                        <div className="border-2 border-dashed border-border rounded-xl p-6 hover:bg-muted/30 transition-colors relative group bg-muted/5">
                             <div className="flex items-center gap-4">
                                 <div className={`p-3 rounded-lg ${resumeFile ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'}`}>
                                     {resumeFile ? <CheckCircleIcon className="w-6 h-6"/> : <FilePlusIcon className="w-6 h-6"/>}
@@ -243,7 +281,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setResumeFile(e.target.files[0])} />
                         </div>
 
-                        <div className="border-2 border-dashed border-border rounded-xl p-6 hover:bg-muted/30 transition-colors relative group">
+                        <div className="border-2 border-dashed border-border rounded-xl p-6 hover:bg-muted/30 transition-colors relative group bg-muted/5">
                             <div className="flex items-center gap-4">
                                 <div className={`p-3 rounded-lg ${idProofFile ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'}`}>
                                     {idProofFile ? <CheckCircleIcon className="w-6 h-6"/> : <FilePlusIcon className="w-6 h-6"/>}
@@ -287,6 +325,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                             <div>
                                 <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider pb-2 border-b border-border mb-4">Professional Role</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                                    <div><p className="text-muted-foreground">Employee ID</p><p className="font-mono font-bold text-primary">{formData.employee_id}</p></div>
                                     <div><p className="text-muted-foreground">Primary Subject</p><p className="font-semibold text-foreground">{formData.subject}</p></div>
                                     <div><p className="text-muted-foreground">Qualification</p><p className="font-semibold text-foreground">{formData.qualification}</p></div>
                                     <div><p className="text-muted-foreground">Experience</p><p className="font-semibold text-foreground">{formData.experience_years} years</p></div>
@@ -327,6 +366,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                     <div className="bg-muted p-4 rounded-xl mb-6">
                         <p className="text-xs font-bold text-muted-foreground uppercase">Current Status</p>
                         <p className="text-lg font-bold text-amber-600">Pending Verification</p>
+                        <p className="text-[10px] font-mono text-muted-foreground/60 mt-1">ID: {formData.employee_id}</p>
                     </div>
                     <button onClick={onSuccess} className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:bg-primary/90 transition-all">
                         Done
@@ -344,13 +384,13 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                         <h2 className="text-xl font-bold">New Teacher Onboarding</h2>
                         <p className="text-xs text-muted-foreground mt-1">Complete all steps to register faculty.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"><XIcon className="w-5 h-5"/></button>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><XIcon className="w-5 h-5"/></button>
                 </div>
                 <div className="px-6 pt-4">
                     <Stepper steps={STEPS} currentStep={currentStep} />
                 </div>
                 <div className="p-8 overflow-y-auto flex-grow custom-scrollbar bg-background">
-                    {renderStep()}
+                    {renderStepContent()}
                 </div>
                 <div className="p-6 border-t border-border bg-muted/10 flex justify-between items-center">
                     <button 
@@ -363,7 +403,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                     <button 
                         onClick={currentStep === STEPS.length - 1 ? handleSubmit : handleNext} 
                         disabled={loading || (currentStep === 0 && (!formData.display_name || !formData.email))}
-                        className="flex items-center gap-2 px-8 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
+                        className="flex items-center gap-2 px-8 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
                     >
                         {loading ? <Spinner size="sm" className="text-white"/> : (
                             currentStep === STEPS.length - 1 ? 'Create Account' : <>Next <ChevronRightIcon className="w-4 h-4"/></>

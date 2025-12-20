@@ -6,6 +6,15 @@ import { XIcon } from '../icons/XIcon';
 import { DollarSignIcon } from '../icons/DollarSignIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 
+// Robust error formatter helper
+const formatError = (err: any): string => {
+    if (!err) return "An unknown error occurred.";
+    if (typeof err === 'string') return err;
+    const message = err.message || err.error_description || err.details || err.hint;
+    if (message && typeof message === 'string' && !message.includes("[object Object]")) return message;
+    return "An unexpected error occurred while processing the payment.";
+};
+
 interface PayableInvoice {
     id: number;
     description: string;
@@ -72,9 +81,9 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
             setStep('success');
             setTimeout(() => {
                 onSuccess();
-            }, 1500); // Give user time to see success message
+            }, 1500); 
         } catch (err: any) {
-            setError(err.message);
+            setError(formatError(err));
             setStep('form');
         } finally {
             setLoading(false);
@@ -107,7 +116,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
         return (
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
                 <div className="p-6 overflow-y-auto space-y-5">
-                    {error && <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">{error}</div>}
+                    {error && <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm border border-destructive/20 font-medium">{error}</div>}
 
                     <div>
                         <label className="input-label">Invoice to Pay</label>
@@ -124,7 +133,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
                             <label className="input-label">Amount</label>
                             <div className="relative">
                                 <DollarSignIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-                                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required className="input-base w-full pl-8" />
+                                <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required className="input-base w-full pl-8" />
                             </div>
                         </div>
                         <div>
@@ -164,7 +173,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-card w-full max-w-lg rounded-2xl shadow-xl border border-border flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                <header className="p-6 border-b border-border flex justify-between items-center bg-muted/20">
+                <header className="p-6 border-b border-border bg-muted/20 flex justify-between items-center bg-muted/20">
                     <div>
                         <h3 className="text-lg font-bold text-foreground">Record Payment</h3>
                         <p className="text-xs text-muted-foreground">For: {studentName}</p>
@@ -173,6 +182,13 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
                 </header>
                 {renderContent()}
             </div>
+            <style>{`
+                .input-base { width: 100%; background-color: hsl(var(--background)); border: 1px solid hsl(var(--input)); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; transition: all 0.2s; }
+                .input-base:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.1); }
+                .input-label { font-size: 0.875rem; font-weight: 500; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem; display: block; }
+                .btn-primary { padding: 0.75rem 1.5rem; background-color: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-radius: 0.5rem; font-weight: 700; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; } .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+                .btn-secondary { padding: 0.75rem 1.5rem; background-color: hsl(var(--muted)); color: hsl(var(--foreground)); border-radius: 0.5rem; font-weight: 600; }
+            `}</style>
         </div>
     );
 };

@@ -25,19 +25,35 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
         setLoading(true);
         setError(null);
 
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-        if (signInError) {
-            setError(signInError.message);
-            setLoading(false);
-            return;
-        }
-        
-        if (!data.session) {
-            setError("Unable to sign in. Please check your credentials.");
+            if (signInError) {
+                // Check if specific Supabase error for unconfirmed email
+                if (signInError.message.toLowerCase().includes('confirm') || signInError.message.toLowerCase().includes('verified')) {
+                    setError("Account activation pending. Please check your inbox for the verification link.");
+                } else {
+                    setError(signInError.message);
+                }
+                setLoading(false);
+                return;
+            }
+            
+            if (!data.session) {
+                // Correct credentials but no session usually means email confirmation required
+                setError("Email confirmation required. Please check your inbox to activate your portal.");
+                setLoading(false);
+                return;
+            }
+
+            // Successful login! The listener in App.tsx will detect the new session.
+            // We do not set loading to false because the component will be unmounted shortly.
+        } catch (err: any) {
+            console.error("Login exception:", err);
+            setError("A network error occurred. Please verify your connection.");
             setLoading(false);
         }
     };
@@ -53,7 +69,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
 
             <form onSubmit={handleLogin} className="space-y-6">
                 {error && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-4 rounded-xl flex items-start gap-3 animate-pulse">
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-4 rounded-xl flex items-start gap-3 animate-in shake duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
@@ -122,7 +138,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-[52px] flex items-center justify-center py-3.5 px-6 rounded-xl shadow-lg shadow-primary/25 text-sm font-bold text-white bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all transform hover:-translate-y-0.5"
+                        className="w-full h-[52px] flex items-center justify-center py-3.5 px-6 rounded-xl shadow-lg shadow-primary/25 text-sm font-bold text-white bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all transform hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {loading ? <Spinner size="sm" className="text-white" /> : 'Sign In'}
                     </button>
