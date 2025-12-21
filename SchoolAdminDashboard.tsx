@@ -23,7 +23,6 @@ import Spinner from './components/common/Spinner';
 import AnalyticsTab from './components/AnalyticsTab';
 import TeachersManagementTab from './components/TeachersManagementTab';
 import ClassesTab from './components/ClassesTab';
-// FIX: Import getAdminMenu to build the menu structure for sidebar and navbar.
 import { getAdminMenu } from './components/admin/AdminMenuConfig';
 
 interface SchoolAdminDashboardProps {
@@ -90,10 +89,8 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
         return profile.role === BuiltInRoles.SCHOOL_ADMINISTRATION;
     }, [profile.role]);
 
-    // FIX: Define isBranchAdmin based on isHeadOfficeAdmin to resolve 'Cannot find name' error.
     const isBranchAdmin = !isHeadOfficeAdmin;
 
-    // FIX: Define menuGroups to be passed to child components.
     const menuGroups = useMemo(() => {
         if (!profile.role) return [];
         return getAdminMenu(isHeadOfficeAdmin, profile.role);
@@ -129,11 +126,10 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
 
     // Force redirect to Dashboard if non-admin tries to access branch management directly
     useEffect(() => {
-        const isBranchAdmin = !isHeadOfficeAdmin;
         if (isBranchAdmin && activeComponent === 'Branches') {
             setActiveComponent('Dashboard');
         }
-    }, [isHeadOfficeAdmin, activeComponent]);
+    }, [isBranchAdmin, activeComponent]);
 
     const handleBranchNavigation = useCallback((branchId: number) => {
         setCurrentBranchId(branchId);
@@ -163,9 +159,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
             case 'Attendance': return <AttendanceTab />;
             case 'Timetable': return <TimetableTab />;
             case 'Finance': return <FinanceTab profile={profile} />;
-            // FIX: Pass profile prop to CommunicationTab to resolve type error and provide context.
             case 'Communication': return <CommunicationTab profile={profile} />;
-            // FIX: Pass profile prop to UserManagementTab to resolve type error and enable features like audit logging.
             case 'User Management': return <UserManagementTab profile={profile} isHeadOfficeAdmin={isHeadOfficeAdmin} />;
             case 'Analytics': return <AnalyticsTab />;
             case 'Meetings': return <MeetingsTab />;
@@ -184,7 +178,6 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
                 setActiveComponent={setActiveComponent}
                 isCollapsed={isSidebarCollapsed}
                 setCollapsed={setIsSidebarCollapsed}
-// FIX: Pass the defined isBranchAdmin variable to resolve the 'Cannot find name' error.
                 isBranchAdmin={isBranchAdmin}
                 isHeadOfficeAdmin={isHeadOfficeAdmin}
                 menuGroups={menuGroups}
@@ -195,7 +188,6 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
                 <Navbar 
                     activeComponent={activeComponent}
                     setActiveComponent={setActiveComponent}
-// FIX: Pass the defined isBranchAdmin variable to resolve the 'Cannot find name' error.
                     isBranchAdmin={isBranchAdmin}
                     isHeadOfficeAdmin={isHeadOfficeAdmin}
                     profile={profile}

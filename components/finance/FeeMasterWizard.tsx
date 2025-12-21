@@ -13,6 +13,7 @@ import { GridIcon } from '../icons/GridIcon';
 import { ChevronRightIcon } from '../icons/ChevronRightIcon';
 import { ChevronLeftIcon } from '../icons/ChevronLeftIcon';
 import { TrendingUpIcon } from '../icons/TrendingUpIcon';
+import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
 
 interface FeeMasterWizardProps {
     onClose: () => void;
@@ -24,9 +25,24 @@ const FREQUENCIES = ['One-time', 'Monthly', 'Quarterly', 'Annually'];
 
 const formatError = (err: any): string => {
     if (!err) return "An unknown error occurred.";
+    
+    // Convert object errors to string for analysis
+    const strErr = JSON.stringify(err);
+    
+    // Catch Supabase Schema Cache issues
+    if (strErr.includes("Could not find the") && strErr.includes("column")) {
+        return "Database Schema Mismatch: The 'currency' column is missing. Please run the migration script in 'schema.txt' to update your database.";
+    }
+
     if (typeof err === 'string') return err;
+    
+    // Prioritize standard error fields
     const message = err.message || err.error_description || err.details || err.hint;
-    if (typeof message === 'string') return message;
+    if (message && typeof message === 'string') return message;
+    
+    // Fallback to JSON string if it's a readable object, otherwise default text
+    if (strErr && strErr !== '{}' && strErr !== '[]') return `System Error: ${strErr.substring(0, 100)}...`;
+    
     return "Failed to synchronize with institutional data servers.";
 };
 
@@ -65,13 +81,18 @@ const FeeMasterWizard: React.FC<FeeMasterWizardProps> = ({ onClose, onSuccess, b
         if (step === 3) {
             const fetchClasses = async () => {
                 setLoadingClasses(true);
-                const { data } = await supabase.from('school_classes').select('*').eq('grade_level', formData.targetGrade);
+                // Ensure we filter by branchId if available to show relevant classes
+                let query = supabase.from('school_classes').select('*').eq('grade_level', formData.targetGrade);
+                if (branchId) {
+                    query = query.eq('branch_id', branchId);
+                }
+                const { data } = await query;
                 if (data) setAvailableClasses(data);
                 setLoadingClasses(false);
             };
             fetchClasses();
         }
-    }, [step, formData.targetGrade]);
+    }, [step, formData.targetGrade, branchId]);
 
     const handleAddComponent = () => {
         setComponents([...components, { name: '', amount: 0, frequency: 'Monthly', is_mandatory: false }]);
@@ -101,6 +122,24 @@ const FeeMasterWizard: React.FC<FeeMasterWizardProps> = ({ onClose, onSuccess, b
     const handleFinalize = async (publish: boolean = false) => {
         setLoading(true);
         setError(null);
+
+        // Validation Checks
+        if (!branchId) {
+            setError("Critical Error: No active branch selected. Please select a branch from the dashboard.");
+            setLoading(false);
+            return;
+        }
+        if (!formData.name.trim()) {
+            setError("Validation Error: Fee Structure Name is required.");
+            setLoading(false);
+            return;
+        }
+        if (components.length === 0) {
+            setError("Validation Error: At least one fee component is required.");
+            setLoading(false);
+            return;
+        }
+
         try {
             // 1. Create Structure Record
             const { data: struct, error: structError } = await supabase
@@ -170,8 +209,12 @@ const FeeMasterWizard: React.FC<FeeMasterWizardProps> = ({ onClose, onSuccess, b
 
                 <div className="flex-grow overflow-y-auto custom-scrollbar p-10 bg-background">
                     {error && (
-                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-xs font-black text-red-600 uppercase tracking-widest animate-in slide-in-from-top-2">
-                             System Warning: {error}
+                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-2">
+                             <AlertTriangleIcon className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                             <div>
+                                 <p className="text-sm font-bold text-red-600">System Alert</p>
+                                 <p className="text-xs text-red-500 mt-1 leading-relaxed">{error}</p>
+                             </div>
                         </div>
                     )}
 
@@ -351,6 +394,10 @@ const FeeMasterWizard: React.FC<FeeMasterWizardProps> = ({ onClose, onSuccess, b
                                 <div className="flex justify-between items-center text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-4">
                                     <span>Global Valuation</span>
                                     <span className="text-foreground font-mono">{formatCurrency(totalYearlyAmount, formData.currency)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-4">
+                                    <span>Base Currency</span>
+                                    <span className="text-foreground font-mono font-bold">{formData.currency}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[10px] font-black uppercase text-muted-foreground tracking-widest">
                                     <span>Ledger Components</span>

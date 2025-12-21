@@ -259,6 +259,7 @@ export interface SchoolClass {
     class_teacher_id?: string;
     branch_id?: number;
     capacity?: number;
+    teacher_name?: string;
 }
 
 export type CourseStatus = 'Active' | 'Draft' | 'Archived' | 'Pending' | 'Inactive';
