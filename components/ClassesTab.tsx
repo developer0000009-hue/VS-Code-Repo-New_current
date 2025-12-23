@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { SchoolClass, Course, UserProfile, SchoolAdminProfileData } from '../types';
@@ -29,9 +28,12 @@ import ClassWorkspace from './classes/ClassWorkspace';
 
 // --- Types ---
 
-// Fix: Interface 'ExtendedClass' incorrectly extends interface 'SchoolClass'. 
-// Removed redundant property declarations that were conflicting with the base interface by being made optional.
+// Fix: Redefined ExtendedClass to clearly include all properties needed for table display and sorting.
 interface ExtendedClass extends SchoolClass {
+    id: number;
+    name: string;
+    grade_level: string;
+    capacity: number;
     teacher_name?: string;
     student_count?: number;
     created_at?: string;
@@ -302,7 +304,7 @@ const ClassesTab: React.FC<ClassesTabProps> = ({ branchId }) => {
             setClasses(extended);
             
             const { data: schoolData } = await supabase.from('school_admin_profiles').select('*').limit(1).single();
-            if(schoolData) setSchoolProfile(schoolData);
+            if(schoolData) setSchoolProfile(schoolData as SchoolAdminProfileData);
 
         } catch (error) {
             console.error(error);

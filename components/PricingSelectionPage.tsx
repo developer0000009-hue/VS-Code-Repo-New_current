@@ -68,8 +68,8 @@ const formatError = (err: any): string => {
     
     // If it's an object but has no clean message, try to stringify it safely
     try {
-        const json = JSON.stringify(err);
-        if (json && json !== '{}' && json !== '[]') return json;
+        const json = JSON.stringify(err, null, 2);
+        if (json && json !== '{}' && json !== '[]') return `System Error: ${json}`;
     } catch {
         // Ignore JSON errors
     }
@@ -150,7 +150,7 @@ const PricingSelectionPage: React.FC<PricingSelectionPageProps> = ({ onComplete,
                 onComplete();
             }
         } catch (err: any) {
-            console.error("Pricing Selection Error:", err);
+            console.error("Pricing Selection Error:", JSON.stringify(err, null, 2));
             if (isMounted.current) {
                 setError(formatError(err));
                 setLoading(false);
@@ -298,11 +298,11 @@ const PricingSelectionPage: React.FC<PricingSelectionPageProps> = ({ onComplete,
 
             {/* Error Message */}
             {error && (
-                <div className="max-w-md mx-auto mb-8 p-4 bg-destructive/10 text-destructive rounded-xl text-center text-sm border border-destructive/20 font-semibold animate-pulse flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <div className="max-w-xl mx-auto mb-8 p-4 bg-destructive/10 text-destructive rounded-xl text-center text-sm border border-destructive/20 font-semibold animate-pulse flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0">
                         <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clipRule="evenodd" />
                     </svg>
-                    {error}
+                    <span className="break-words text-left">{error}</span>
                 </div>
             )}
 

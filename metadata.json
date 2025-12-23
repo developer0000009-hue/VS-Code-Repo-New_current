@@ -1,7 +1,7 @@
 {
-  "name": "Gurukul v9.09",
-  "description": "Restored Backup (Dec 11, 2025 11:00 AM). System Stability Verified.",
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "name": "Gurukul v9.09",
+  "description": ""
 }

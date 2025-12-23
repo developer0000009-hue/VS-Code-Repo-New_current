@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { MyEnquiry, TimelineItem, EnquiryStatus, Communication } from '../../types';
@@ -10,16 +9,18 @@ import { SchoolIcon } from '../icons/SchoolIcon';
 import { ClockIcon } from '../icons/ClockIcon';
 import { ChevronLeftIcon } from '../icons/ChevronLeftIcon';
 import { XIcon } from '../icons/XIcon';
-
-// --- Types & Constants ---
+// Fix: Added missing icon imports
+import { DocumentTextIcon } from '../icons/DocumentTextIcon';
+import { CommunicationIcon } from '../icons/CommunicationIcon';
+import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 
 type Tab = 'inbox' | 'enquiries';
 
 const statusColors: { [key in EnquiryStatus]: string } = {
-  'New': 'bg-blue-100 text-blue-700 border-blue-200',
-  'Contacted': 'bg-amber-100 text-amber-700 border-amber-200',
-  'In Review': 'bg-purple-100 text-purple-700 border-purple-200',
-  'Completed': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'New': 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+  'Contacted': 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+  'In Review': 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+  'Completed': 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
 };
 
 const formatTimeAgo = (dateString: string) => {
@@ -40,8 +41,6 @@ const formatTimeAgo = (dateString: string) => {
     return "Just now";
 };
 
-// --- Sub-Components ---
-
 const TimelineEvent: React.FC<{ item: TimelineItem }> = ({ item }) => {
     let content = null;
     switch (item.details.type) {
@@ -58,22 +57,26 @@ const TimelineEvent: React.FC<{ item: TimelineItem }> = ({ item }) => {
             const docs = item.details.data?.documents as string[] || [];
             const message = item.details.data?.message;
             return (
-                <div className="flex justify-center my-4">
-                    <div className="bg-card border border-border p-4 rounded-xl shadow-sm max-w-md w-full">
-                         <div className="flex items-center gap-2 mb-2 text-primary">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2-2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
-                            <span className="text-xs font-bold uppercase tracking-wider">Document Request</span>
+                <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="bg-card border border-border p-5 rounded-2xl shadow-sm max-w-md w-full relative overflow-hidden">
+                         <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+                         <div className="flex items-center gap-2 mb-3 text-primary">
+                            <DocumentTextIcon className="h-4 w-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Document Verification Request</span>
                          </div>
-                        <p className="text-sm text-muted-foreground mb-2"><span className="font-semibold text-foreground">{item.created_by_name}</span> requested:</p>
-                        <ul className="list-disc list-inside text-sm space-y-1 ml-1 text-foreground">
-                            {docs.map((doc, i) => <li key={i}>{doc}</li>)}
-                        </ul>
+                        <p className="text-sm text-muted-foreground mb-3 font-medium"><span className="font-bold text-foreground">{item.created_by_name}</span> requires the following:</p>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {docs.map((doc, i) => (
+                                <span key={i} className="px-2 py-1 bg-muted rounded text-[10px] font-bold text-foreground/70 border border-border">{doc}</span>
+                            ))}
+                        </div>
                         {message && (
                             <div className="mt-3 pt-3 border-t border-border">
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Note:</p>
-                                <p className="text-sm italic text-muted-foreground/80">"{message}"</p>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mb-1">Administrative Note</p>
+                                <p className="text-sm italic text-muted-foreground/80 font-medium">"{message}"</p>
                             </div>
                         )}
+                        <p className="text-[9px] text-muted-foreground/50 mt-4 text-right">{new Date(item.created_at).toLocaleString()}</p>
                     </div>
                 </div>
             );
@@ -84,9 +87,9 @@ const TimelineEvent: React.FC<{ item: TimelineItem }> = ({ item }) => {
     if (!content) return null;
 
     return (
-        <div className="flex justify-center my-3">
-            <span className="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border">
-                {item.created_by_name} {content} • {formatTimeAgo(item.created_at)}
+        <div className="flex justify-center my-3 animate-in fade-in slide-in-from-top-1 duration-300">
+            <span className="text-[10px] font-bold text-muted-foreground bg-muted/50 px-4 py-1.5 rounded-full border border-border/60 shadow-sm">
+                <span className="text-foreground">{item.created_by_name}</span> {content} • <span className="opacity-60">{formatTimeAgo(item.created_at)}</span>
             </span>
         </div>
     );
@@ -135,37 +138,44 @@ const ConversationView: React.FC<{ enquiry: MyEnquiry, onBack: () => void, refre
     };
 
     return (
-        <div className="flex flex-col h-full bg-card rounded-r-2xl">
+        <div className="flex flex-col h-full bg-card rounded-r-2xl border-l border-border/40">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 border-b border-border bg-card">
-                <div className="flex items-center gap-2 lg:gap-3">
-                    <button onClick={onBack} className="lg:hidden p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground">
-                        <ChevronLeftIcon className="h-5 w-5" />
+            <div className="flex items-center justify-between px-4 py-3 lg:px-8 lg:py-6 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                    <button onClick={onBack} className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-muted text-muted-foreground">
+                        <ChevronLeftIcon className="h-6 w-6" />
                     </button>
                     <div>
-                        <h2 className="text-base lg:text-lg font-bold text-foreground leading-tight">{enquiry.applicant_name}</h2>
-                        <p className="text-xs text-muted-foreground">Enquiry ID: #{enquiry.id}</p>
+                        <h2 className="text-base lg:text-xl font-black text-foreground tracking-tight uppercase font-serif">{enquiry.applicant_name}</h2>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Enquiry Registry</span>
+                            <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border border-border">ID: #{enquiry.id}</span>
+                        </div>
                     </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${statusColors[enquiry.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                    {enquiry.status}
-                </span>
+                <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.15em] border shadow-sm ${statusColors[enquiry.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                        {enquiry.status}
+                    </span>
+                </div>
             </div>
 
             {/* Timeline / Chat Area */}
-            <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-[#fafafa] dark:bg-background/50">
-                 {loading ? <div className="flex justify-center items-center h-full"><Spinner /></div> : 
+            <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-muted/5 custom-scrollbar">
+                 {loading ? <div className="flex flex-col justify-center items-center h-full space-y-3"><Spinner size="lg" /><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Decrypting secure line...</p></div> : 
                  timeline.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground">
-                        <p>No messages yet. Start the conversation!</p>
+                    <div className="flex flex-col items-center justify-center h-full p-10 text-center opacity-30">
+                        <CommunicationIcon className="w-16 h-16 mb-4" />
+                        <h3 className="font-bold text-lg">No interaction history</h3>
+                        <p className="text-sm max-w-xs mx-auto">Messages sent by the school or your responses will appear here for audit tracking.</p>
                     </div>
                  ) : timeline.map((item) =>
                     item.item_type === 'MESSAGE' ? (
-                        <div key={`msg-${item.id}`} className={`flex flex-col ${!item.is_admin ? 'items-end' : 'items-start'}`}>
-                            <div className={`max-w-[80%] lg:max-w-[70%] p-4 rounded-2xl shadow-sm relative ${!item.is_admin ? 'bg-primary text-primary-foreground rounded-tr-none' : 'bg-white dark:bg-card border border-border text-foreground rounded-tl-none'}`}>
-                                <p className="text-sm whitespace-pre-wrap leading-relaxed">{item.details.message}</p>
+                        <div key={`msg-${item.id}`} className={`flex flex-col ${!item.is_admin ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                            <div className={`max-w-[85%] lg:max-w-[70%] p-5 rounded-[1.5rem] shadow-md relative ${!item.is_admin ? 'bg-primary text-primary-foreground rounded-tr-none shadow-primary/20' : 'bg-card border border-border/80 text-foreground rounded-tl-none shadow-black/5'}`}>
+                                <p className="text-sm whitespace-pre-wrap leading-relaxed font-medium">{item.details.message}</p>
                             </div>
-                             <p className={`text-[10px] mt-1 px-1 ${!item.is_admin ? 'text-right text-muted-foreground' : 'text-left text-muted-foreground'}`}>
+                             <p className={`text-[9px] font-bold uppercase tracking-wider mt-2 px-1 ${!item.is_admin ? 'text-right text-muted-foreground' : 'text-left text-muted-foreground'}`}>
                                 {item.created_by_name} • {formatTimeAgo(item.created_at)}
                             </p>
                         </div>
@@ -175,110 +185,92 @@ const ConversationView: React.FC<{ enquiry: MyEnquiry, onBack: () => void, refre
             </div>
 
             {/* Input Area */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-card flex gap-3 items-end">
-                <div className="relative flex-grow">
-                    <textarea 
-                        value={newMessage} 
-                        onChange={(e) => setNewMessage(e.target.value)} 
-                        placeholder="Type your message..." 
-                        className="w-full p-3 pr-10 bg-muted/50 border border-input rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none text-sm min-h-[50px] max-h-[150px]"
-                        rows={1}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSendMessage(e);
-                            }
-                        }}
-                    />
-                </div>
-                <button type="submit" disabled={isSending || !newMessage.trim()} className="p-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-transform active:scale-95 flex-shrink-0">
-                    {isSending ? <Spinner size="sm" className="text-current"/> : (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                            <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                        </svg>
-                    )}
-                </button>
-            </form>
+            <div className="p-4 lg:p-6 border-t border-border bg-card/80 backdrop-blur-md">
+                <form onSubmit={handleSendMessage} className="flex gap-4 items-end max-w-4xl mx-auto">
+                    <div className="relative flex-grow">
+                        <textarea 
+                            value={newMessage} 
+                            onChange={(e) => setNewMessage(e.target.value)} 
+                            placeholder="Type a response to the school..." 
+                            className="w-full p-4 pr-12 bg-muted/30 border border-input rounded-[1.5rem] focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-background outline-none transition-all resize-none text-sm min-h-[58px] max-h-[150px] font-medium leading-relaxed shadow-inner"
+                            rows={1}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendMessage(e);
+                                }
+                            }}
+                        />
+                        <div className="absolute right-4 bottom-4 text-[9px] font-black text-muted-foreground/30 pointer-events-none uppercase tracking-widest">Secure</div>
+                    </div>
+                    <button type="submit" disabled={isSending || !newMessage.trim()} className="h-[58px] w-[58px] bg-primary text-primary-foreground rounded-2xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-primary/20 transition-all transform active:scale-95 flex-shrink-0 flex items-center justify-center">
+                        {isSending ? <Spinner size="sm" className="text-current"/> : (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                                <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                            </svg>
+                        )}
+                    </button>
+                </form>
+            </div>
         </div>
     );
 };
 
 const AnnouncementDetail: React.FC<{ announcement: Communication, onClose: () => void }> = ({ announcement, onClose }) => {
     return (
-        <div className="flex flex-col h-full bg-card animate-in fade-in slide-in-from-right-10 duration-300 lg:animate-none">
-             {/* Enhanced Header */}
-             <div className="px-4 py-3 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75 sticky top-0 z-30 flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-3">
-                    <button 
-                        onClick={onClose} 
-                        className="lg:hidden flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary-foreground transition-colors font-medium text-sm"
-                        aria-label="Back to list"
-                    >
-                        <ChevronLeftIcon className="h-4 w-4" />
-                        <span>Back</span>
-                    </button>
-                    
-                    <div className="hidden lg:flex items-center gap-2 text-muted-foreground px-2">
-                        <MegaphoneIcon className="h-4 w-4 opacity-70" />
-                        <span className="text-xs font-bold uppercase tracking-widest opacity-70">Announcement</span>
-                    </div>
-                </div>
-                
-                <button 
-                    onClick={onClose} 
-                    className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    title="Close"
-                >
-                    <XIcon className="h-5 w-5" />
-                </button>
-             </div>
-
-             {/* Main Content */}
-             <div className="flex-grow overflow-y-auto custom-scrollbar">
-                <div className="max-w-3xl mx-auto p-6 sm:p-8 lg:p-10">
-                    
-                    {/* Sender Info Block */}
-                    <div className="flex items-center gap-4 mb-8">
-                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-primary-foreground text-2xl font-bold shadow-lg shadow-primary/20 shrink-0 transform rotate-3">
-                             {announcement.sender_name ? announcement.sender_name.charAt(0) : 'A'}
+        <div className="flex flex-col h-full bg-card animate-in fade-in slide-in-from-right-10 duration-500">
+             <div className="px-6 py-4 lg:px-8 lg:py-6 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-30 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-4">
+                    <button onClick={onClose} className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-muted text-muted-foreground"><ChevronLeftIcon className="h-6 w-6"/></button>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-inner border border-primary/10">
+                            <MegaphoneIcon className="h-6 w-6" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-lg text-foreground">{announcement.sender_name || 'School Administration'}</h3>
-                            <p className="text-sm text-muted-foreground font-medium">{announcement.sender_role || 'Administrator'}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                                {new Date(announcement.sent_at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} 
-                                <span className="w-1 h-1 rounded-full bg-muted-foreground/50"></span>
-                                {new Date(announcement.sent_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                             <h3 className="font-black text-lg text-foreground tracking-tight uppercase font-serif">Broadcast Detail</h3>
+                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Institutional Transmission</p>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-all"><XIcon className="w-6 h-6"/></button>
+             </div>
+
+             <div className="flex-grow overflow-y-auto p-6 md:p-12 lg:p-16 bg-background custom-scrollbar">
+                <div className="max-w-4xl mx-auto space-y-10">
+                    <div className="flex items-center gap-5 bg-muted/30 p-6 rounded-[2rem] border border-border/60 shadow-inner">
+                         <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-br from-primary to-indigo-700 text-white flex items-center justify-center text-2xl font-black shadow-xl ring-4 ring-primary/5">
+                             {announcement.sender_name ? announcement.sender_name.charAt(0) : 'A'}
+                        </div>
+                        <div className="flex-grow">
+                            <h3 className="font-black text-lg text-foreground leading-tight">{announcement.sender_name || 'School Administration'}</h3>
+                            <p className="text-xs font-bold text-indigo-500 mt-1 uppercase tracking-widest">
+                                {announcement.sender_role || 'Staff Official'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-mono mt-1 flex items-center gap-1.5 opacity-60">
+                                <ClockIcon className="w-3 h-3"/> {new Date(announcement.sent_at).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' })}
                             </p>
                         </div>
                     </div>
 
-                    {/* Subject */}
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground leading-snug mb-6 tracking-tight">
-                        {announcement.subject}
-                    </h1>
-                    
-                     {/* Context Tags */}
-                     {announcement.target_criteria?.type === 'class' && (
-                         <div className="mb-6">
-                            <span className="inline-flex items-center gap-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                                <SchoolIcon className="w-3 h-3" /> Class Announcement
-                            </span>
-                         </div>
-                    )}
+                    <div className="space-y-6">
+                        <h1 className="text-3xl md:text-5xl font-serif font-black text-foreground leading-[1.1] tracking-tight text-balance">
+                            {announcement.subject}
+                        </h1>
 
-                    <div className="w-full h-px bg-border mb-8"></div>
+                        <div className="h-1.5 w-24 bg-gradient-to-r from-primary to-transparent rounded-full opacity-30"></div>
 
-                    {/* Message Body */}
-                    <div className="prose dark:prose-invert prose-slate max-w-none text-foreground/90 text-base sm:text-lg leading-relaxed whitespace-pre-wrap">
-                        {announcement.body}
+                        <div className="prose dark:prose-invert prose-slate max-w-none text-foreground/80 text-lg leading-relaxed whitespace-pre-wrap font-medium">
+                            {announcement.body}
+                        </div>
                     </div>
                 </div>
              </div>
 
-             {/* Footer */}
-             <div className="p-4 border-t border-border bg-muted/5 flex justify-center text-xs text-muted-foreground">
-                 <span className="opacity-70 bg-muted px-3 py-1 rounded-full">Broadcast Message • Replies Disabled</span>
+             <div className="p-6 border-t border-border bg-muted/10 flex justify-center backdrop-blur-md">
+                 <div className="flex items-center gap-2 px-6 py-2 rounded-full bg-background border border-border shadow-sm">
+                     <CheckCircleIcon className="w-4 h-4 text-emerald-500"/>
+                     <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">Verified Institutional Content</p>
+                 </div>
              </div>
         </div>
     );
@@ -294,58 +286,46 @@ const MessagesTab: React.FC = () => {
     const [selectedEnquiry, setSelectedEnquiry] = useState<MyEnquiry | null>(null);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<Communication | null>(null);
     
-    // Mobile View Logic
     const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        
-        // NOTE: Using the new 'get_my_messages' RPC for parents
-        const [enqResult, msgResult] = await Promise.all([
-            supabase.rpc('get_my_enquiries'),
-            supabase.rpc('get_my_messages') 
-        ]);
+        try {
+            const [enqResult, msgResult] = await Promise.all([
+                supabase.rpc('get_my_enquiries'),
+                supabase.rpc('get_my_messages') 
+            ]);
 
-        if (enqResult.error) {
-             console.error("Enquiries fetch error:", enqResult.error.message);
-        } else {
-             // Sort enquiries by last updated
-             const sorted = (enqResult.data as MyEnquiry[] || []).sort((a, b) => 
-                 new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime()
-             );
-             setEnquiries(sorted);
-        }
+            if (enqResult.error) throw enqResult.error;
+            if (msgResult.error) throw msgResult.error;
 
-        if (msgResult.error) {
-             console.error("Messages fetch error:", msgResult.error.message || msgResult.error);
-        } else {
-             // Map message_id to id and sort announcements by date
-             const mappedMessages = (msgResult.data as any[] || []).map(item => ({
-                 ...item,
-                 id: item.message_id
-             }));
-             const sorted = mappedMessages.sort((a: any, b: any) => 
-                 new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
-             );
-             setAnnouncements(sorted);
+            setEnquiries(enqResult.data as MyEnquiry[] || []);
+            
+            const mappedMessages = (msgResult.data as any[] || []).map(item => ({
+                ...item,
+                id: item.message_id
+            }));
+            setAnnouncements(mappedMessages);
+
+            // Auto-select first in desktop if nothing selected
+            if (window.innerWidth > 1024) {
+                 if (activeTab === 'inbox' && mappedMessages.length > 0 && !selectedAnnouncement) {
+                     setSelectedAnnouncement(mappedMessages[0]);
+                 } else if (activeTab === 'enquiries' && enqResult.data?.length > 0 && !selectedEnquiry) {
+                     setSelectedEnquiry(enqResult.data[0]);
+                 }
+            }
+
+        } catch (err: any) {
+            console.error("Communication center sync failure:", err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-    }, []);
+    }, [activeTab, selectedAnnouncement, selectedEnquiry]);
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
-
-    // Select first item on desktop load
-    useEffect(() => {
-        if (!loading && window.innerWidth >= 1024) {
-            if (activeTab === 'inbox' && announcements.length > 0 && !selectedAnnouncement) {
-                setSelectedAnnouncement(announcements[0]);
-            } else if (activeTab === 'enquiries' && enquiries.length > 0 && !selectedEnquiry) {
-                setSelectedEnquiry(enquiries[0]);
-            }
-        }
-    }, [loading, activeTab, announcements, enquiries]);
+    }, []); // Only once on mount to avoid loops, explicit refresh handled by children
 
     const handleSelectAnnouncement = (msg: Communication) => {
         setSelectedAnnouncement(msg);
@@ -360,149 +340,113 @@ const MessagesTab: React.FC = () => {
     const handleTabChange = (tab: Tab) => {
         setActiveTab(tab);
         setIsMobileDetailOpen(false);
-        if (window.innerWidth >= 1024) {
-            if (tab === 'inbox') {
-                setSelectedAnnouncement(announcements[0] || null);
-                setSelectedEnquiry(null);
-            } else {
-                setSelectedEnquiry(enquiries[0] || null);
-                setSelectedAnnouncement(null);
-            }
-        }
-    };
-    
-    const handleCloseDetail = () => {
-        setIsMobileDetailOpen(false);
-        // On desktop, we want to clear selection or just keep it but visually indicate closed state if needed.
-        // Here we clear it to return to 'placeholder' state on desktop or just close overlay on mobile.
-        if (activeTab === 'inbox') setSelectedAnnouncement(null);
-        else setSelectedEnquiry(null);
+        setSelectedAnnouncement(null);
+        setSelectedEnquiry(null);
+        // We'll re-fetch or rely on the effect above
     };
 
-    if (loading) return <div className="flex justify-center p-12"><Spinner size="lg" /></div>;
+    if (loading && announcements.length === 0 && enquiries.length === 0) return <div className="flex flex-col justify-center items-center py-32 space-y-4"><Spinner size="lg" /><p className="text-xs font-black text-muted-foreground uppercase tracking-widest animate-pulse">Syncing Communication Hub...</p></div>;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-9rem)] min-h-[600px] max-w-7xl mx-auto bg-background lg:bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-10rem)] min-h-[550px] bg-card border border-border rounded-[2.5rem] shadow-2xl overflow-hidden ring-1 ring-black/5 animate-in fade-in duration-500 pb-20 lg:pb-0">
             <div className="flex h-full">
                 
-                {/* --- LEFT PANE: LIST --- */}
-                <div className={`w-full lg:w-1/3 flex flex-col border-r border-border bg-card ${isMobileDetailOpen ? 'hidden lg:flex' : 'flex'}`}>
-                    {/* Tabs Header */}
-                    <div className="p-4 border-b border-border bg-card">
-                        <div className="flex p-1 bg-muted/50 rounded-xl">
+                {/* LIST PANE */}
+                <div className={`w-full lg:w-[380px] flex flex-col border-r border-border bg-card/30 backdrop-blur-xl ${isMobileDetailOpen ? 'hidden lg:flex' : 'flex'}`}>
+                    <div className="p-6 border-b border-border bg-muted/10">
+                        <div className="flex p-1.5 bg-muted/60 rounded-2xl border border-border/40 shadow-inner">
                             <button 
                                 onClick={() => handleTabChange('inbox')}
-                                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'inbox' ? 'bg-background text-primary shadow-sm ring-1 ring-black/5' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'inbox' ? 'bg-card text-primary shadow-lg ring-1 ring-black/5 scale-[1.02]' : 'text-muted-foreground hover:text-foreground'}`}
                             >
-                                Announcements
-                                {announcements.length > 0 && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
+                                Inbox
                             </button>
                             <button 
                                 onClick={() => handleTabChange('enquiries')}
-                                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'enquiries' ? 'bg-background text-primary shadow-sm ring-1 ring-black/5' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'enquiries' ? 'bg-card text-primary shadow-lg ring-1 ring-black/5 scale-[1.02]' : 'text-muted-foreground hover:text-foreground'}`}
                             >
-                                Enquiries
+                                Chat Logs
                             </button>
                         </div>
                     </div>
 
-                    {/* List Content */}
-                    <div className="flex-grow overflow-y-auto custom-scrollbar bg-muted/10">
+                    <div className="flex-grow overflow-y-auto custom-scrollbar bg-[#fafafa] dark:bg-black/5">
                         {activeTab === 'inbox' ? (
                             announcements.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-center px-6">
-                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                                        <MegaphoneIcon className="w-8 h-8 text-muted-foreground/40" />
+                                <div className="flex flex-col items-center justify-center h-full p-10 text-center opacity-30 grayscale">
+                                    <MegaphoneIcon className="w-16 h-16 mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-[0.2em]">Transmission Void</p>
+                                    <p className="text-xs mt-2 font-medium">No official broadcasts found for your profile.</p>
+                                </div>
+                            ) : announcements.map(msg => (
+                                <button 
+                                    key={msg.id} 
+                                    onClick={() => handleSelectAnnouncement(msg)}
+                                    className={`w-full text-left p-6 border-b border-border/60 transition-all hover:bg-white dark:hover:bg-white/5 group relative overflow-hidden ${selectedAnnouncement?.id === msg.id ? 'bg-white dark:bg-white/5 ring-2 ring-inset ring-primary shadow-xl z-10' : ''}`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className={`font-black text-sm uppercase tracking-wide truncate pr-4 ${selectedAnnouncement?.id === msg.id ? 'text-primary' : 'text-foreground'}`}>{msg.sender_name || 'Admin'}</h4>
+                                        <span className="text-[10px] font-bold text-muted-foreground/60 whitespace-nowrap uppercase">{formatTimeAgo(msg.sent_at)}</span>
                                     </div>
-                                    <p className="font-medium text-foreground">No announcements</p>
-                                    <p className="text-sm text-muted-foreground mt-1">School updates will appear here.</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-border">
-                                    {announcements.map(msg => (
-                                        <button 
-                                            key={msg.id} 
-                                            onClick={() => handleSelectAnnouncement(msg)}
-                                            className={`w-full text-left p-4 transition-all hover:bg-muted/40 relative group border-l-4 ${selectedAnnouncement?.id === msg.id ? 'bg-primary/5 border-l-primary' : 'border-l-transparent'}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
-                                                        <MegaphoneIcon className="w-4 h-4" />
-                                                    </span>
-                                                    <h4 className="font-bold text-sm text-foreground line-clamp-1">{msg.sender_name || 'School Admin'}</h4>
-                                                </div>
-                                                <span className="text-[10px] text-muted-foreground flex-shrink-0">{formatTimeAgo(msg.sent_at)}</span>
-                                            </div>
-                                            <p className="text-sm font-semibold text-foreground mt-2 mb-1 line-clamp-1">{msg.subject}</p>
-                                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{msg.body}</p>
-                                        </button>
-                                    ))}
-                                </div>
-                            )
+                                    <p className={`text-xs font-bold truncate mb-1.5 ${selectedAnnouncement?.id === msg.id ? 'text-foreground' : 'text-foreground/80'}`}>{msg.subject}</p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium">{msg.body}</p>
+                                    {selectedAnnouncement?.id === msg.id && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>}
+                                </button>
+                            ))
                         ) : (
                             enquiries.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-center px-6">
-                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                                        <SearchIcon className="w-8 h-8 text-muted-foreground/40" />
+                                <div className="flex flex-col items-center justify-center h-full p-10 text-center opacity-30 grayscale">
+                                    <SearchIcon className="w-16 h-16 mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-[0.2em]">Registry Empty</p>
+                                    <p className="text-xs mt-2 font-medium">You have no active enquiry sessions with the school.</p>
+                                </div>
+                            ) : enquiries.map(enq => (
+                                <button 
+                                    key={enq.id} 
+                                    onClick={() => handleSelectEnquiry(enq)}
+                                    className={`w-full text-left p-6 border-b border-border/60 transition-all hover:bg-white dark:hover:bg-white/5 group relative overflow-hidden ${selectedEnquiry?.id === enq.id ? 'bg-white dark:bg-white/5 ring-2 ring-inset ring-primary shadow-xl z-10' : ''}`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className={`font-black text-sm uppercase tracking-wide truncate pr-4 ${selectedEnquiry?.id === enq.id ? 'text-primary' : 'text-foreground'}`}>{enq.applicant_name}</h4>
+                                        <span className="text-[10px] font-bold text-muted-foreground/60 whitespace-nowrap uppercase">{formatTimeAgo(enq.last_updated)}</span>
                                     </div>
-                                    <p className="font-medium text-foreground">No enquiries found</p>
-                                    <p className="text-sm text-muted-foreground mt-1">Start a new enquiry for your child.</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-border">
-                                    {enquiries.map(enq => (
-                                        <button 
-                                            key={enq.id} 
-                                            onClick={() => handleSelectEnquiry(enq)}
-                                            className={`w-full text-left p-4 transition-all hover:bg-muted/40 relative border-l-4 ${selectedEnquiry?.id === enq.id ? 'bg-primary/5 border-l-primary' : 'border-l-transparent'}`}
-                                        >
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-sm text-foreground truncate">{enq.applicant_name}</h4>
-                                                <span className="text-[10px] text-muted-foreground flex-shrink-0">{formatTimeAgo(enq.last_updated)}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${statusColors[enq.status]}`}>
-                                                    {enq.status}
-                                                </span>
-                                                {enq.grade && <span className="text-xs text-muted-foreground">Grade {enq.grade}</span>}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                <ClockIcon className="w-3 h-3" /> 
-                                                Last updated {new Date(enq.last_updated).toLocaleDateString()}
-                                            </p>
-                                        </button>
-                                    ))}
-                                </div>
-                            )
+                                    <div className="flex items-center gap-3 mt-3">
+                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border shadow-sm ${statusColors[enq.status]}`}>
+                                            {enq.status}
+                                        </span>
+                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest bg-muted px-2 py-0.5 rounded-lg border border-border">Grade {enq.grade}</span>
+                                    </div>
+                                    {selectedEnquiry?.id === enq.id && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary"></div>}
+                                </button>
+                            ))
                         )}
                     </div>
                 </div>
 
-                {/* --- RIGHT PANE: DETAIL --- */}
-                <div className={`w-full lg:w-2/3 bg-card flex flex-col ${isMobileDetailOpen ? 'flex fixed inset-0 z-50' : 'hidden lg:flex'}`}>
+                {/* DETAIL PANE */}
+                <div className={`flex-grow bg-background flex flex-col ${isMobileDetailOpen ? 'fixed inset-0 z-[60] lg:static' : 'hidden lg:flex'}`}>
                     {activeTab === 'inbox' ? (
                         selectedAnnouncement ? (
-                            <AnnouncementDetail announcement={selectedAnnouncement} onClose={handleCloseDetail} />
+                            <AnnouncementDetail announcement={selectedAnnouncement} onClose={() => setIsMobileDetailOpen(false)} />
                         ) : (
-                            <div className="hidden lg:flex flex-col items-center justify-center h-full text-center p-10 bg-muted/10">
-                                <div className="w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                                    <BellIcon className="w-10 h-10 text-muted-foreground/40" />
+                            <div className="flex flex-col items-center justify-center h-full p-20 text-center animate-in fade-in zoom-in-95 duration-500">
+                                <div className="w-24 h-24 bg-muted/30 rounded-[2rem] flex items-center justify-center mb-8 border-2 border-dashed border-border group-hover:scale-105 transition-transform">
+                                    <MegaphoneIcon className="w-10 h-10 text-muted-foreground/30" />
                                 </div>
-                                <h3 className="text-xl font-bold text-foreground">Select an Announcement</h3>
-                                <p className="text-muted-foreground mt-2 max-w-xs">Choose a message from the list to view details.</p>
+                                <h3 className="text-2xl font-black text-foreground tracking-tight uppercase font-serif">Inbox Standby</h3>
+                                <p className="text-muted-foreground max-w-sm mx-auto mt-2 leading-relaxed">Select a broadcast from the left column to view the full announcement details and attachments.</p>
                             </div>
                         )
                     ) : (
                         selectedEnquiry ? (
-                            <ConversationView enquiry={selectedEnquiry} onBack={handleCloseDetail} refreshEnquiries={fetchData} />
+                            <ConversationView enquiry={selectedEnquiry} onBack={() => setIsMobileDetailOpen(false)} refreshEnquiries={fetchData} />
                         ) : (
-                            <div className="hidden lg:flex flex-col items-center justify-center h-full text-center p-10 bg-muted/10">
-                                <div className="w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                                    <SearchIcon className="w-10 h-10 text-muted-foreground/40" />
+                            <div className="flex flex-col items-center justify-center h-full p-20 text-center animate-in fade-in zoom-in-95 duration-500">
+                                <div className="w-24 h-24 bg-muted/30 rounded-[2rem] flex items-center justify-center mb-8 border-2 border-dashed border-border group-hover:scale-105 transition-transform">
+                                    <SearchIcon className="w-10 h-10 text-muted-foreground/30" />
                                 </div>
-                                <h3 className="text-xl font-bold text-foreground">Select an Enquiry</h3>
-                                <p className="text-muted-foreground mt-2 max-w-xs">Choose an enquiry to view the conversation status.</p>
+                                <h3 className="text-2xl font-black text-foreground tracking-tight uppercase font-serif">Enquiry Terminal</h3>
+                                <p className="text-muted-foreground max-w-sm mx-auto mt-2 leading-relaxed">Choose an enquiry session to review status updates and communicate directly with the school registrar.</p>
                             </div>
                         )
                     )}

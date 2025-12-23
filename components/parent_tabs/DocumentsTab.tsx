@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import Spinner from '../common/Spinner';
@@ -12,6 +11,7 @@ import { DownloadIcon } from '../icons/DownloadIcon';
 import { EyeIcon } from '../icons/EyeIcon';
 import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
 import { RefreshIcon } from '../icons/RefreshIcon';
+import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 
 // --- Types ---
 
@@ -26,7 +26,7 @@ interface RequirementWithDocs {
     id: number;
     admission_id: number;
     document_name: string;
-    status: 'Pending' | 'Submitted' | 'Accepted' | 'Rejected';
+    status: 'Pending' | 'Submitted' | 'Accepted' | 'Rejected' | 'Verified';
     notes_for_parent: string;
     rejection_reason: string;
     applicant_name: string;
@@ -44,10 +44,48 @@ interface DocumentsTabProps {
     onClearFocus?: () => void;
 }
 
+/**
+ * Robust error formatter to extract string messages from any error object.
+ * Prevents [object Object] from being shown to users.
+ */
+const formatError = (err: any): string => {
+    if (!err) return "An unknown synchronization error occurred.";
+    if (typeof err === 'string') {
+        if (err.includes("[object Object]")) return "An unexpected server response occurred.";
+        return err;
+    }
+    
+    // Check common error property paths and ensure they are strings
+    const rawMsg = err.message || err.error_description || err.details || err.hint;
+    if (typeof rawMsg === 'string' && !rawMsg.includes("[object Object]")) {
+        return rawMsg;
+    }
+    
+    // Supabase specific wrapped error
+    if (err.error) {
+        if (typeof err.error === 'string') return err.error;
+        if (err.error.message && typeof err.error.message === 'string') return err.error.message;
+    }
+
+    // Fallback to JSON if it's a plain object, else generic
+    try {
+        const str = JSON.stringify(err);
+        if (str && str !== '{}' && str !== '[]') return str;
+    } catch { }
+
+    const final = err.toString();
+    return final === '[object Object]' ? "An unexpected system exception occurred during the operation." : final;
+};
+
 // --- Status Badge Helper ---
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     const config = {
         'Accepted': { 
+            color: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800', 
+            icon: <CheckCircleIcon className="w-3.5 h-3.5"/>, 
+            label: 'Verified' 
+        },
+        'Verified': { 
             color: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800', 
             icon: <CheckCircleIcon className="w-3.5 h-3.5"/>, 
             label: 'Verified' 
@@ -65,7 +103,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         'Rejected': { 
             color: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800', 
             icon: <XCircleIcon className="w-3.5 h-3.5"/>, 
-            label: 'Action Needed' 
+            label: 'Correction Needed' 
         },
     };
     const style = config[status as keyof typeof config] || config['Pending'];
@@ -89,16 +127,14 @@ const DocumentCard: React.FC<{
     const [downloading, setDownloading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Sort to get the latest document
     const latestDoc = req.admission_documents && req.admission_documents.length > 0 
         ? req.admission_documents.sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0] 
         : null;
 
-    const isLocked = req.status === 'Accepted';
+    const isLocked = req.status === 'Accepted' || req.status === 'Verified';
     const isRejected = req.status === 'Rejected';
     const hasFile = !!latestDoc && !isRejected;
     
-    // Drag handlers
     const handleDrag = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -124,8 +160,8 @@ const DocumentCard: React.FC<{
     };
 
     const processUpload = async (file: File) => {
-        if (file.size > 5 * 1024 * 1024) {
-            alert("File is too large. Max size is 5MB.");
+        if (file.size > 10 * 1024 * 1024) {
+            alert("File is too large. Max size is 10MB.");
             return;
         }
         if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
@@ -134,41 +170,37 @@ const DocumentCard: React.FC<{
         }
 
         setIsUploading(true);
-        setUploadProgress(10); // Start visual progress
+        setUploadProgress(10);
 
         const timer = setInterval(() => {
             setUploadProgress(prev => Math.min(prev + 10, 90));
-        }, 200);
+        }, 100);
 
         try {
             await onUpload(file, req.id, req.admission_id);
             setUploadProgress(100);
         } catch (error) {
-            console.error(error);
-            alert("Upload failed. Please try again.");
+            console.error("Critical upload failure:", formatError(error));
         } finally {
             clearInterval(timer);
             setTimeout(() => {
                 setIsUploading(false);
                 setUploadProgress(0);
-            }, 800);
+            }, 500);
         }
     };
 
     const handleView = async () => {
         if (!latestDoc) return;
         try {
-            // Using getPublicUrl assuming public bucket or signedUrl if private.
-            // For security, storage usually requires signed URLs for private data.
-            // Since this is parent viewing their own, we use createSignedUrl
             const { data, error } = await supabase.storage
                 .from('admission-documents')
-                .createSignedUrl(latestDoc.storage_path, 3600); // 1 hour link
+                .createSignedUrl(latestDoc.storage_path, 3600);
 
             if (error || !data) throw error || new Error("Link generation failed");
             window.open(data.signedUrl, '_blank');
         } catch (err) {
-            console.error(err);
+            console.error("View error:", formatError(err));
             alert("Could not view document.");
         }
     };
@@ -191,8 +223,8 @@ const DocumentCard: React.FC<{
             link.click();
             document.body.removeChild(link);
         } catch (e: any) {
-            console.error("Download error:", e);
-            alert(`Download failed: ${e.message}`);
+            console.error("Download error:", formatError(e));
+            alert(`Download failed: ${formatError(e)}`);
         } finally {
             setDownloading(false);
         }
@@ -201,70 +233,69 @@ const DocumentCard: React.FC<{
     return (
         <div 
             className={`
-                relative rounded-xl border-2 transition-all duration-300 group overflow-hidden bg-card flex flex-col h-full
-                ${isDragOver ? 'border-primary bg-primary/5 scale-[1.02] shadow-lg' : 'border-border'}
-                ${isLocked ? 'border-emerald-500/20 bg-emerald-50/10' : ''}
-                ${isRejected ? 'border-red-500/30 bg-red-50/10' : ''}
-                ${!hasFile && !isLocked && !isRejected ? 'border-dashed border-border hover:border-primary/50 hover:bg-muted/30 hover:shadow-md' : 'shadow-sm hover:shadow-md'}
+                relative rounded-[2rem] border transition-all duration-500 group overflow-hidden bg-card flex flex-col h-full
+                ${isDragOver ? 'border-primary bg-primary/5 scale-[1.02] shadow-2xl' : 'border-border'}
+                ${isLocked ? 'border-emerald-500/30 bg-emerald-50/5' : ''}
+                ${isRejected ? 'border-red-500/30 bg-red-50/5' : ''}
+                ${!hasFile && !isLocked && !isRejected ? 'border-dashed border-border hover:border-primary/50 hover:bg-muted/30' : 'shadow-sm hover:shadow-xl'}
             `}
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
         >
-            {/* Progress Bar Overlay */}
             {isUploading && (
-                <div className="absolute top-0 left-0 h-1 bg-primary z-20 transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div>
+                <div className="absolute top-0 left-0 h-1 bg-primary z-20 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(var(--primary),0.5)]" style={{ width: `${uploadProgress}%` }}></div>
             )}
 
-            <div className="p-5 flex flex-col h-full">
-                <div className="flex justify-between items-start mb-4">
-                    <div className={`p-3 rounded-xl shadow-sm transition-colors ${isLocked ? 'bg-emerald-100 text-emerald-600' : isRejected ? 'bg-red-100 text-red-600' : 'bg-muted text-muted-foreground group-hover:text-foreground'}`}>
-                        <DocumentTextIcon className="w-6 h-6" />
+            <div className="p-8 flex flex-col h-full relative">
+                <div className="flex justify-between items-start mb-6">
+                    <div className={`p-4 rounded-2xl shadow-inner transition-all duration-500 ${isLocked ? 'bg-emerald-100 text-emerald-600' : isRejected ? 'bg-red-100 text-red-600' : 'bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10'}`}>
+                        <DocumentTextIcon className="w-7 h-7" />
                     </div>
                     <StatusBadge status={req.status} />
                 </div>
 
                 <div className="flex-grow">
-                    <h4 className="font-bold text-foreground text-sm mb-1.5">{req.document_name}</h4>
+                    <h4 className="font-black text-foreground text-lg mb-2 tracking-tight group-hover:text-primary transition-colors">{req.document_name}</h4>
                     {isRejected && req.rejection_reason ? (
-                         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2.5 mb-2 mt-2 animate-in fade-in slide-in-from-top-1">
-                             <p className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1.5 mb-1">
-                                 <AlertTriangleIcon className="w-3 h-3"/> Modification Required
+                         <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mb-4 animate-in fade-in slide-in-from-top-1">
+                             <p className="text-[10px] font-black text-red-600 uppercase flex items-center gap-1.5 mb-1.5 tracking-widest">
+                                 <AlertTriangleIcon className="w-3.5 h-3.5"/> Action Required
                              </p>
-                             <p className="text-xs text-red-800 dark:text-red-300 leading-tight">{req.rejection_reason}</p>
+                             <p className="text-xs text-red-800 dark:text-red-300 font-medium leading-relaxed italic">"{req.rejection_reason}"</p>
                          </div>
                     ) : (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                            {req.notes_for_parent || (hasFile ? `Uploaded: ${new Date(latestDoc?.uploaded_at!).toLocaleDateString()}` : "PDF, JPG or PNG (Max 5MB)")}
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium">
+                            {req.notes_for_parent || (hasFile ? `Last submission: ${new Date(latestDoc?.uploaded_at!).toLocaleDateString()}` : "Formats: PDF, JPG, PNG (Max 10MB)")}
                         </p>
                     )}
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-border/50 grid grid-cols-2 gap-2">
+                <div className="mt-8 pt-6 border-t border-border/50 grid grid-cols-2 gap-3">
                     {hasFile || isLocked ? (
                         <>
                             <button 
                                 onClick={handleView}
-                                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold bg-background border border-border hover:bg-muted text-foreground transition-colors hover:shadow-sm"
+                                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-background border border-border hover:bg-muted text-foreground transition-all shadow-sm active:scale-95 uppercase tracking-wider"
                             >
-                                <EyeIcon className="w-3.5 h-3.5 text-muted-foreground" /> View
+                                <EyeIcon className="w-4 h-4 text-muted-foreground" /> View
                             </button>
                             
                             {!isLocked ? (
                                 <button 
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold bg-background border border-border hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-all hover:shadow-sm"
+                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all shadow-sm active:scale-95 uppercase tracking-wider"
                                 >
-                                    <RefreshIcon className="w-3.5 h-3.5" /> Replace
+                                    <RefreshIcon className="w-4 h-4" /> Update
                                 </button>
                             ) : (
                                 <button 
                                     onClick={handleDownload}
                                     disabled={downloading}
-                                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold bg-background border border-border hover:bg-muted text-foreground transition-colors"
+                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black bg-background border border-border hover:bg-muted text-foreground transition-all uppercase tracking-wider"
                                 >
-                                    {downloading ? <Spinner size="sm"/> : <><DownloadIcon className="w-3.5 h-3.5 text-muted-foreground" /> Download</>}
+                                    {downloading ? <Spinner size="sm"/> : <><DownloadIcon className="w-4 h-4 text-muted-foreground" /> Save</>}
                                 </button>
                             )}
                         </>
@@ -272,11 +303,11 @@ const DocumentCard: React.FC<{
                         <button 
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
-                            className={`col-span-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold text-white transition-all shadow-sm active:scale-95
-                                ${isRejected ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-primary/90 shadow-primary/20'}
+                            className={`col-span-2 w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl text-xs font-black text-white transition-all shadow-lg active:scale-95 uppercase tracking-widest
+                                ${isRejected ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-primary/90 shadow-primary/25'}
                             `}
                         >
-                            {isUploading ? <Spinner size="sm" className="text-white"/> : <><UploadIcon className="w-3.5 h-3.5" /> {isRejected ? 'Re-upload Document' : 'Upload Document'}</>}
+                            {isUploading ? <Spinner size="sm" className="text-white"/> : <><UploadIcon className="w-4 h-4" /> {isRejected ? 'Correct & Upload' : 'Upload Document'}</>}
                         </button>
                     )}
                 </div>
@@ -312,7 +343,6 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ focusOnAdmissionId, onClear
 
             const grouped: Record<number, GroupedRequirementData> = {};
             
-            // Group flat list by admission_id
             (data as RequirementWithDocs[]).forEach(req => {
                 if (!grouped[req.admission_id]) {
                     grouped[req.admission_id] = {
@@ -321,19 +351,20 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ focusOnAdmissionId, onClear
                         requirements: []
                     };
                 }
-                // Ensure admission_documents is an array (RPC returns jsonb)
                 const docs = Array.isArray(req.admission_documents) ? req.admission_documents : [];
                 grouped[req.admission_id].requirements.push({ ...req, admission_documents: docs });
             });
 
             setGroupedRequirements(grouped);
 
-            // Auto-expand logic based on focus or default state
             if (focusOnAdmissionId) {
                 setExpandedChildIds(new Set([focusOnAdmissionId]));
+            } else if (Object.keys(grouped).length > 0 && expandedChildIds.size === 0) {
+                 const firstId = Object.keys(grouped)[0];
+                 setExpandedChildIds(new Set([Number(firstId)]));
             }
         } catch (err: any) {
-            setError(err.message);
+            setError(formatError(err));
         } finally {
             setLoading(false);
         }
@@ -343,12 +374,11 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ focusOnAdmissionId, onClear
         fetchData();
     }, [fetchData, refreshTrigger]);
 
-    // Handle clearing focus when unmounting or changing
     useEffect(() => {
         return () => {
             if (onClearFocus) onClearFocus();
         };
-    }, []);
+    }, [onClearFocus]);
 
     const toggleExpand = (id: number) => {
         setExpandedChildIds(prev => {
@@ -362,18 +392,19 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ focusOnAdmissionId, onClear
     const handleUpload = async (file: File, reqId: number, admId: number) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Not authenticated");
+            if (!user) throw new Error("Authentication session expired.");
 
             const fileExt = file.name.split('.').pop();
-            const filePath = `${user.id}/${admId}/${reqId}_${Date.now()}.${fileExt}`;
+            const filePath = `${user.id}/admission-${admId}/req-${reqId}_${Date.now()}.${fileExt}`;
 
+            // 1. Upload to Storage
             const { error: uploadError } = await supabase.storage
                 .from('admission-documents')
-                .upload(filePath, file);
+                .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
             if (uploadError) throw uploadError;
 
-            // Update requirement status to Submitted
+            // 2. Update status to 'Submitted'
             const { error: updateError } = await supabase
                 .from('document_requirements')
                 .update({ status: 'Submitted' })
@@ -381,7 +412,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ focusOnAdmissionId, onClear
             
             if (updateError) throw updateError;
             
-            // Record the document in admission_documents table
+            // 3. Insert document record
             const { error: docError } = await supabase
                 .from('admission_documents')
                 .insert({
@@ -395,58 +426,96 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ focusOnAdmissionId, onClear
             if (docError) throw docError;
 
             setRefreshTrigger(prev => prev + 1);
-            alert("Document uploaded successfully!");
+            alert("Document uploaded successfully. It is now awaiting admin verification.");
         } catch (error: any) {
-            console.error("Upload error:", error);
-            alert(`Upload failed: ${error.message}`);
-            throw error; // Propagate to DocumentCard for UI handling
+            console.error("Upload failure:", formatError(error));
+            alert(`Document processing failed: ${formatError(error)}`);
+            throw error; 
         }
     };
 
-    if (loading) return <div className="flex justify-center p-12"><Spinner size="lg" /></div>;
-    if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
+    if (loading && Object.keys(groupedRequirements).length === 0) return <div className="flex justify-center p-24"><Spinner size="lg" /></div>;
+    
+    if (error) return (
+        <div className="p-12 text-center bg-red-500/10 border border-red-500/20 rounded-[2rem] m-6">
+            <AlertTriangleIcon className="w-10 h-10 text-red-500 mx-auto mb-4"/>
+            <p className="text-red-700 font-bold text-lg">{error}</p>
+            <button onClick={() => fetchData()} className="mt-6 px-8 py-3 bg-red-600 text-white font-black rounded-xl text-sm shadow-lg active:scale-95 transition-all">Retry Sync</button>
+        </div>
+    );
 
     const admissionIds = Object.keys(groupedRequirements).map(Number);
 
     if (admissionIds.length === 0) {
         return (
-            <div className="text-center py-20 text-muted-foreground bg-muted/10 border-2 border-dashed border-border rounded-xl">
-                <DocumentTextIcon className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                <p className="font-medium text-foreground">No documents required yet.</p>
-                <p className="text-sm mt-1">Once you start an application, document requirements will appear here.</p>
+            <div className="text-center py-32 bg-muted/20 border-2 border-dashed border-border rounded-[3rem] animate-in fade-in zoom-in-95 duration-700">
+                <div className="w-20 h-20 bg-background rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-border">
+                    <DocumentTextIcon className="w-10 h-10 text-muted-foreground/30" />
+                </div>
+                <h3 className="text-2xl font-black text-foreground tracking-tight">Verification Vault Empty</h3>
+                <p className="text-muted-foreground max-w-sm mx-auto mt-2 leading-relaxed">
+                    Required documents for your children will appear here once an admission request is initiated by the school.
+                </p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-foreground">Document Management</h2>
-            <div className="space-y-4">
+        <div className="space-y-10">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                <div>
+                    <h2 className="text-4xl font-serif font-black text-foreground tracking-tight">Verification Vault</h2>
+                    <p className="text-muted-foreground mt-2 text-lg">Securely manage mandatory enrollment documentation.</p>
+                </div>
+                <div className="bg-primary/5 border border-primary/10 px-6 py-3 rounded-2xl flex items-center gap-3">
+                     <ShieldCheckIcon className="w-5 h-5 text-primary" />
+                     <span className="text-xs font-bold text-primary uppercase tracking-widest">AES-256 Cloud Storage Enabled</span>
+                </div>
+            </div>
+
+            <div className="space-y-6 pb-20">
                 {admissionIds.map(admId => {
                     const group = groupedRequirements[admId];
                     const isExpanded = expandedChildIds.has(admId);
+                    const verifiedCount = group.requirements.filter(r => r.status === 'Accepted' || r.status === 'Verified').length;
+                    const totalCount = group.requirements.length;
+                    const completion = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
                     
                     return (
-                        <div key={admId} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+                        <div key={admId} className="bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:border-primary/20">
                             <div 
-                                className="p-4 flex justify-between items-center bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors"
+                                className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6 cursor-pointer bg-muted/10 hover:bg-muted/30 transition-colors"
                                 onClick={() => toggleExpand(admId)}
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                        <DocumentTextIcon className="w-5 h-5" />
+                                <div className="flex items-center gap-6 w-full md:w-auto">
+                                    <div className="w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 rounded-2xl text-white flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
+                                        {group.applicantName.charAt(0)}
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-foreground">{group.applicantName}</h3>
-                                        <p className="text-xs text-muted-foreground">{group.requirements.length} Requirements</p>
+                                    <div className="min-w-0">
+                                        <h3 className="font-black text-2xl text-foreground tracking-tight truncate">{group.applicantName}</h3>
+                                        <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{totalCount} Required Files</p>
                                     </div>
                                 </div>
-                                <ChevronDownIcon className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+
+                                <div className="flex items-center gap-8 w-full md:w-auto">
+                                    <div className="flex-grow md:w-48">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Stewardship</span>
+                                            <span className={`text-[10px] font-black ${completion === 100 ? 'text-emerald-500' : 'text-primary'}`}>{completion}%</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden shadow-inner">
+                                            <div className={`h-full rounded-full transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] ${completion === 100 ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${completion}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className={`p-2.5 rounded-full transition-transform duration-500 ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : 'text-muted-foreground bg-muted'}`}>
+                                        <ChevronDownIcon className="w-6 h-6" />
+                                    </div>
+                                </div>
                             </div>
                             
                             {isExpanded && (
-                                <div className="p-6 border-t border-border bg-background">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                <div className="p-6 md:p-10 border-t border-border bg-background animate-in slide-in-from-top-4 duration-500">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                                         {group.requirements.map(req => (
                                             <DocumentCard 
                                                 key={req.id} 

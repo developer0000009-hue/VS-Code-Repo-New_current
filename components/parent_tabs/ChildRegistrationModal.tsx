@@ -1,181 +1,12 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { supabase } from '../../services/supabase';
-import { AdmissionApplication, DocumentRequirement } from '../../types';
+import { AdmissionApplication } from '../../types';
 import Spinner from '../common/Spinner';
-import { DocumentTextIcon } from '../icons/DocumentTextIcon';
-import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { XCircleIcon } from '../icons/XCircleIcon';
+import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { UploadIcon } from '../icons/UploadIcon';
-import { IdCardIcon } from '../icons/IdCardIcon';
-import { ClockIcon } from '../icons/ClockIcon';
 import { UserIcon } from '../icons/UserIcon';
-
-// --- Icons ---
-const CopyIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-4 w-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" />
-    </svg>
-);
-
-const CheckIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-4 w-4"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-);
-
-const PhotoIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className || "h-5 w-5"} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
-);
-
-// --- Constants ---
-const STANDARD_DOCS = [
-    { name: "Birth Certificate", icon: <DocumentTextIcon className="w-5 h-5" />, required: true },
-    { name: "Student Photograph", icon: <PhotoIcon className="w-5 h-5" />, required: true },
-    { name: "Parent ID Proof", icon: <IdCardIcon className="w-5 h-5" />, required: true },
-    { name: "Previous School Report Card", icon: <DocumentTextIcon className="w-5 h-5" />, required: false },
-    { name: "Transfer Certificate", icon: <DocumentTextIcon className="w-5 h-5" />, required: false },
-    { name: "Address Proof", icon: <DocumentTextIcon className="w-5 h-5" />, required: false },
-];
-
-// --- Sub-Component: Smart Document Card ---
-interface SmartDocumentCardProps {
-    label: string;
-    icon: React.ReactNode;
-    admissionId: number;
-    isRequired?: boolean;
-    existingReq?: DocumentRequirement;
-    onUploadComplete: () => void;
-}
-
-const SmartDocumentCard: React.FC<SmartDocumentCardProps> = ({ label, icon, admissionId, isRequired, existingReq, onUploadComplete }) => {
-    const [file, setFile] = useState<File | null>(null);
-    const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
-    const [progress, setProgress] = useState(0);
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    const currentStatus = existingReq?.status || 'Pending';
-    const isApproved = currentStatus === 'Accepted';
-    const isRejected = currentStatus === 'Rejected';
-    const displayStatus = status === 'success' ? 'Submitted' : currentStatus;
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const selectedFile = e.target.files[0];
-            
-            if (selectedFile.size > 5 * 1024 * 1024) { 
-                alert("File too large. Max size is 5MB.");
-                return;
-            }
-
-            setFile(selectedFile);
-            setStatus('uploading');
-            setProgress(0);
-
-            const interval = setInterval(() => {
-                setProgress(prev => Math.min(prev + 10, 90));
-            }, 200);
-
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) throw new Error("User not authenticated");
-
-                const fileExt = selectedFile.name.split('.').pop();
-                const safeDocName = label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-                const storagePath = `${user.id}/${admissionId}/${safeDocName}_${Date.now()}.${fileExt}`;
-
-                const { error: uploadError } = await supabase.storage.from('admission-documents').upload(storagePath, selectedFile);
-                if (uploadError) throw uploadError;
-
-                const { error: rpcError } = await supabase.rpc('submit_unsolicited_document', {
-                    p_admission_id: admissionId,
-                    p_document_name: label,
-                    p_file_name: selectedFile.name,
-                    p_storage_path: storagePath
-                });
-
-                if (rpcError) throw rpcError;
-
-                clearInterval(interval);
-                setProgress(100);
-                setStatus('success');
-                onUploadComplete();
-
-            } catch (err) {
-                console.error(err);
-                clearInterval(interval);
-                setStatus('error');
-            }
-        }
-    };
-
-    const handleTrigger = () => {
-        if (isApproved) return;
-        inputRef.current?.click();
-    };
-
-    return (
-        <div className={`
-            relative p-4 rounded-xl border-2 transition-all duration-300 group overflow-hidden
-            ${isApproved ? 'border-emerald-500/20 bg-emerald-50/30' : 
-              isRejected ? 'border-red-500/20 bg-red-50/30' :
-              displayStatus === 'Submitted' ? 'border-blue-500/20 bg-blue-50/30' :
-              'border-dashed border-border hover:border-primary/50 hover:bg-muted/30'}
-        `}>
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-lg transition-colors 
-                        ${isApproved ? 'bg-emerald-100 text-emerald-600' : 
-                          isRejected ? 'bg-red-100 text-red-600' :
-                          displayStatus === 'Submitted' ? 'bg-blue-100 text-blue-600' :
-                          'bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10'}`}>
-                        {icon}
-                    </div>
-                    <div>
-                        <p className={`text-sm font-bold flex items-center gap-2 ${isApproved ? 'text-emerald-700' : 'text-foreground'}`}>
-                            {label} 
-                            {isRequired && !isApproved && <span className="text-red-500 text-xs bg-red-100 px-1.5 py-0.5 rounded-full">Required</span>}
-                        </p>
-                        
-                        {isApproved && <p className="text-xs text-emerald-600 font-medium mt-0.5 flex items-center gap-1"><CheckCircleIcon className="w-3 h-3"/> Approved & Locked</p>}
-                        {isRejected && <p className="text-xs text-red-600 font-medium mt-0.5 flex items-center gap-1"><XCircleIcon className="w-3 h-3"/> Rejected: {existingReq?.rejection_reason}</p>}
-                        {displayStatus === 'Submitted' && !isApproved && !isRejected && <p className="text-xs text-blue-600 font-medium mt-0.5 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> Under Review</p>}
-                        {displayStatus === 'Pending' && <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG, PNG • Max 5MB</p>}
-                    </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2">
-                    {status === 'uploading' ? (
-                        <span className="text-xs font-bold text-primary animate-pulse">Uploading...</span>
-                    ) : isApproved ? (
-                        <span className="p-1.5 rounded-full bg-emerald-100 text-emerald-600"><CheckIcon className="w-4 h-4" /></span>
-                    ) : (
-                        <button 
-                            type="button" 
-                            onClick={handleTrigger}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors 
-                                ${isRejected ? 'text-red-600 border-red-200 hover:bg-red-50' : 
-                                  displayStatus === 'Submitted' ? 'text-muted-foreground border-border hover:text-primary hover:border-primary' : 
-                                  'text-primary border-primary/20 hover:bg-primary/10'}`}
-                        >
-                            {isRejected ? 'Re-upload' : displayStatus === 'Submitted' ? 'Replace' : 'Upload'}
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {status === 'uploading' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden rounded-b-xl">
-                    <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }}></div>
-                </div>
-            )}
-
-            <input ref={inputRef} type="file" onChange={handleFileChange} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
-        </div>
-    );
-};
+import { CameraIcon } from '../icons/CameraIcon';
 
 interface ChildRegistrationModalProps {
     child: AdmissionApplication | null;
@@ -185,332 +16,244 @@ interface ChildRegistrationModalProps {
 }
 
 const ChildRegistrationModal: React.FC<ChildRegistrationModalProps> = ({ child, onClose, onSave, currentUserId }) => {
-    const [step, setStep] = useState<'details' | 'documents' | 'success'>('details');
-    const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-    const [isCopied, setIsCopied] = useState(false);
-    
+    const [step, setStep] = useState<'details' | 'success'>('details');
     const [formData, setFormData] = useState({
-        applicant_name: '', grade: '', date_of_birth: '', gender: '', medical_info: '', emergency_contact: '',
+        applicant_name: child?.applicant_name || '',
+        grade: child?.grade || '',
+        date_of_birth: child?.date_of_birth || '',
+        gender: child?.gender || 'Male',
+        medical_info: child?.medical_info || '',
+        emergency_contact: child?.emergency_contact || '',
     });
-    const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
-    const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(child?.profile_photo_url || null);
     
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(child?.profile_photo_url || null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [parentContactInfo, setParentContactInfo] = useState<string>('');
-    const [currentAdmissionId, setCurrentAdmissionId] = useState<number | null>(child?.id || null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const [fetchedRequirements, setFetchedRequirements] = useState<DocumentRequirement[]>([]);
-    const [customDocName, setCustomDocName] = useState('');
-    const [refreshDocsTrigger, setRefreshDocsTrigger] = useState(0);
-
-    useEffect(() => {
-        if (child) {
-            setFormData({
-                applicant_name: child.applicant_name || '',
-                grade: child.grade || '',
-                date_of_birth: child.date_of_birth ? new Date(child.date_of_birth).toISOString().split('T')[0] : '',
-                gender: child.gender || '',
-                medical_info: child.medical_info || '',
-                emergency_contact: child.emergency_contact || '',
-            });
-            setCurrentAdmissionId(child.id);
-        }
-
-        const fetchParentInfo = async () => {
-            if (!currentUserId) return;
-            const [profileRes, parentProfileRes] = await Promise.all([
-                supabase.from('profiles').select('display_name, phone').eq('id', currentUserId).single(),
-                supabase.from('parent_profiles').select('relationship_to_student, secondary_parent_name, secondary_parent_relationship, secondary_parent_phone').eq('user_id', currentUserId).single()
-            ]);
-
-            if (profileRes.data) {
-                const mainProfile = profileRes.data;
-                const parentProfile = parentProfileRes.data; 
-                let contactString = `Primary: ${mainProfile.display_name} (${parentProfile?.relationship_to_student || 'Guardian'}), Phone: ${mainProfile.phone || 'N/A'}`;
-                if (parentProfile?.secondary_parent_name) {
-                    contactString += `\nSecondary: ${parentProfile.secondary_parent_name} (${parentProfile.secondary_parent_relationship || 'Guardian'}), Phone: ${parentProfile.secondary_parent_phone || 'N/A'}`;
-                }
-                setParentContactInfo(contactString);
-            }
-        };
-        fetchParentInfo();
-    }, [child, currentUserId]);
-
-    useEffect(() => {
-        if (step === 'documents' && currentAdmissionId) {
-            const fetchDocs = async () => {
-                const { data, error } = await supabase.rpc('parent_get_document_requirements');
-                if (!error && data) {
-                    const relevantDocs = (data as any[]).filter(d => d.admission_id === currentAdmissionId);
-                    setFetchedRequirements(relevantDocs);
-                }
-            };
-            fetchDocs();
-        }
-    }, [step, currentAdmissionId, refreshDocsTrigger]);
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setProfilePhotoFile(e.target.files[0]);
-            setProfilePhotoUrl(URL.createObjectURL(e.target.files[0]));
+            const file = e.target.files[0];
+            if (file.size > 2 * 1024 * 1024) {
+                alert("Photo size must be less than 2MB.");
+                return;
+            }
+            setPhotoFile(file);
+            setPhotoPreview(URL.createObjectURL(file));
         }
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleDetailsSubmit = async (e: React.FormEvent) => {
+    const handleSubmitDetails = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        let finalPhotoUrl = child?.profile_photo_url || null;
-
-        try {
-            if (profilePhotoFile) {
-                const fileExt = profilePhotoFile.name.split('.').pop();
-                const fileName = `${Date.now()}.${fileExt}`;
-                const filePath = `${currentUserId}/${fileName}`; 
-                const { error: uploadError } = await supabase.storage.from('profile-photos').upload(filePath, profilePhotoFile);
-                if (uploadError) throw uploadError;
-                const { data } = supabase.storage.from('profile-photos').getPublicUrl(filePath);
-                finalPhotoUrl = data.publicUrl;
-            }
-
-            if (currentAdmissionId) {
-                 const { error: updateError } = await supabase.rpc('update_admission', {
-                    p_admission_id: currentAdmissionId,
-                    p_applicant_name: formData.applicant_name,
-                    p_grade: formData.grade,
-                    p_date_of_birth: formData.date_of_birth || null,
-                    p_gender: formData.gender || null,
-                    p_profile_photo_url: finalPhotoUrl,
-                    p_medical_info: formData.medical_info || null,
-                    p_emergency_contact: formData.emergency_contact || null,
-                 });
-                 if (updateError) throw updateError;
-            } else {
-                 const { data: newId, error: createError } = await supabase.rpc('create_admission', {
-                    p_applicant_name: formData.applicant_name,
-                    p_grade: formData.grade,
-                    p_date_of_birth: formData.date_of_birth || null,
-                    p_gender: formData.gender || null,
-                    p_profile_photo_url: finalPhotoUrl,
-                    p_medical_info: formData.medical_info || null,
-                    p_emergency_contact: formData.emergency_contact || null,
-                    p_admission_id: null
-                 });
-                 if (createError) throw createError;
-                 setCurrentAdmissionId(newId);
-            }
-            setStep('documents');
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUploadComplete = () => {
-        setRefreshDocsTrigger(prev => prev + 1);
-    };
-
-    const handleDocumentsSubmit = async () => {
-        if (!currentAdmissionId) return;
-        setLoading(true);
         
+        let finalPhotoUrl = photoPreview;
+
         try {
-            const missing = STANDARD_DOCS.filter(d => {
-                if (!d.required) return false;
-                const req = fetchedRequirements.find(r => r.document_name === d.name);
-                return !req || (req.status !== 'Submitted' && req.status !== 'Accepted');
+            // 1. Upload Photo if changed
+            if (photoFile) {
+                const fileExt = photoFile.name.split('.').pop();
+                const filePath = `${currentUserId}/photos/${Date.now()}.${fileExt}`;
+                
+                const { error: uploadError } = await supabase.storage
+                    .from('admission-documents')
+                    .upload(filePath, photoFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: urlData } = supabase.storage
+                    .from('admission-documents')
+                    .getPublicUrl(filePath);
+                
+                finalPhotoUrl = urlData.publicUrl;
+            }
+
+            // 2. Call Hardened RPC (Schema v35)
+            // This RPC is SECURITY DEFINER and handles standard doc requirements setup.
+            const { data, error: rpcError } = await supabase.rpc('create_admission', {
+                p_applicant_name: formData.applicant_name,
+                p_grade: formData.grade,
+                p_date_of_birth: formData.date_of_birth || null,
+                p_gender: formData.gender,
+                p_profile_photo_url: finalPhotoUrl,
+                p_medical_info: formData.medical_info,
+                p_emergency_contact: formData.emergency_contact
             });
 
-            if (missing.length > 0) {
-                setError(`Missing required documents: ${missing.map(d => d.name).join(', ')}`);
-                setLoading(false);
-                return;
-            }
-
-            if (!child) {
-                const { data: codeData, error: codeError } = await supabase.rpc('generate_admission_share_code', {
-                    p_admission_id: currentAdmissionId,
-                    p_purpose: 'New Application Submission',
-                    p_code_type: 'Enquiry',
-                });
-                if (codeError) throw codeError;
-                setGeneratedCode(codeData);
-                setStep('success');
-            } else {
-                onSave();
-                onClose();
-            }
+            if (rpcError) throw rpcError;
+            
+            // 3. Success
+            setStep('success');
         } catch (err: any) {
-            setError(err.message);
+            console.error("Admission submission error:", err);
+            // Translate common RLS/DB errors into user-friendly messages
+            const msg = err.message || "Institutional synchronization failed.";
+            if (msg.includes("security policy")) {
+                setError("Security access mismatch. Please refresh the page and try again.");
+            } else {
+                setError(msg);
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const customRequirements = fetchedRequirements.filter(req => !STANDARD_DOCS.some(std => std.name === req.document_name));
+    const copyFromProfile = async () => {
+        try {
+            const { data: profile } = await supabase.from('profiles').select('display_name, phone').eq('id', currentUserId).single();
+            if (profile) {
+                setFormData(prev => ({
+                    ...prev,
+                    emergency_contact: `${profile.display_name} - ${profile.phone || 'No phone on record'}`
+                }));
+            }
+        } catch (e) {
+            console.error("Failed to copy profile info", e);
+        }
+    };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center items-center z-50 p-4 transition-opacity" onClick={onClose}>
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-border overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-[#1a1b1e] w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-white/5 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
                 
-                <div className="p-6 border-b border-border bg-muted/10 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-2xl font-bold text-foreground">{!child ? 'New Registration' : 'Edit Application'}</h2>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            {step === 'details' ? 'Step 1: Student Information' : step === 'documents' ? 'Step 2: Document Management' : 'Registration Complete'}
-                        </p>
+                {/* Header */}
+                <div className="p-8 pb-4 flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                            <CheckCircleIcon className="w-6 h-6"/>
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-serif font-bold text-white tracking-tight">New Registration</h2>
+                            <p className="text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-black mt-1">Institutional Student Enrollment</p>
+                        </div>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground"><XCircleIcon className="w-6 h-6"/></button>
+                    <button onClick={onClose} className="p-2.5 rounded-full hover:bg-white/5 text-white/50 transition-colors">
+                        <XCircleIcon className="w-6 h-6" />
+                    </button>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto custom-scrollbar bg-background">
+                <div className="flex-grow overflow-y-auto p-8 pt-4 custom-scrollbar">
+                    {error && (
+                        <div className="p-4 mb-6 bg-red-500/10 text-red-500 rounded-2xl text-sm border border-red-500/20 animate-in fade-in">
+                            <div className="flex items-center gap-2 font-bold mb-1">
+                                <XCircleIcon className="w-4 h-4" /> Policy Conflict Detected
+                            </div>
+                            {error}
+                        </div>
+                    )}
+                    
                     {step === 'details' && (
-                        <form id="details-form" onSubmit={handleDetailsSubmit} className="p-8 space-y-6">
-                            {error && <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm border border-destructive/20">{error}</div>}
+                        <form id="reg-form" onSubmit={handleSubmitDetails} className="space-y-8">
                             
-                            <div className="flex flex-col sm:flex-row gap-6">
-                                <div className="flex-shrink-0">
-                                    <label className="block text-sm font-medium text-foreground mb-2">Student Photo</label>
-                                    <div className="w-32 h-32 rounded-xl border-2 border-dashed border-border bg-muted/30 flex items-center justify-center overflow-hidden relative group">
-                                        {profilePhotoUrl ? <img src={profilePhotoUrl} alt="Preview" className="w-full h-full object-cover"/> : <UploadIcon className="w-8 h-8 text-muted-foreground"/>}
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <span className="text-white text-xs font-bold">Change</span>
+                            {/* Photo Section */}
+                            <div className="flex flex-col items-center justify-center space-y-4 py-2">
+                                <div 
+                                    className="relative group cursor-pointer"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <div className="w-32 h-32 rounded-[2.8rem] bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border-2 border-dashed border-white/10 flex items-center justify-center overflow-hidden group-hover:border-primary/50 transition-all duration-500 shadow-inner">
+                                        {photoPreview ? (
+                                            <img src={photoPreview} alt="Student Preview" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" />
+                                        ) : (
+                                            <UserIcon className="w-12 h-12 text-white/20 group-hover:text-primary/40 transition-colors" />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-[2px]">
+                                            <CameraIcon className="w-8 h-8 text-white" />
                                         </div>
-                                        <input type="file" onChange={handlePhotoChange} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*"/>
+                                    </div>
+                                    <div className="absolute -bottom-2 -right-2 bg-primary text-white p-2.5 rounded-2xl shadow-xl ring-4 ring-[#1a1b1e] transform group-hover:scale-110 transition-transform">
+                                        <UploadIcon className="w-4 h-4"/>
                                     </div>
                                 </div>
-                                <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    <div><label className="input-label">Full Name</label><input name="applicant_name" value={formData.applicant_name} onChange={handleChange} required className="input-premium"/></div>
-                                    <div><label className="input-label">Grade Applying For</label><select name="grade" value={formData.grade} onChange={handleChange} required className="input-premium"><option value="">Select...</option>{Array.from({length:12},(_,i)=>i+1).map(g=><option key={g} value={String(g)}>Grade {g}</option>)}</select></div>
-                                    <div><label className="input-label">Date of Birth</label><input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} className="input-premium"/></div>
-                                    <div><label className="input-label">Gender</label><select name="gender" value={formData.gender} onChange={handleChange} className="input-premium"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                                <div className="text-center">
+                                    <p className="text-xs font-bold text-white/60">Student Profile Photo</p>
+                                    <p className="text-[10px] text-white/20 mt-1 uppercase tracking-widest font-black">JPG, PNG (Max 2MB)</p>
+                                </div>
+                                <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2 relative group">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 block mb-2 group-focus-within:text-primary transition-colors">Full Legal Name</label>
+                                    <input required name="applicant_name" value={formData.applicant_name} onChange={handleChange} className="w-full p-4 bg-black/30 border border-white/5 rounded-2xl text-white outline-none focus:border-primary focus:bg-black/50 transition-all font-medium text-sm shadow-inner" placeholder="Student's name as per records" />
+                                </div>
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 block mb-2 group-focus-within:text-primary transition-colors">Target Grade</label>
+                                    <select required name="grade" value={formData.grade} onChange={handleChange} className="w-full p-4 bg-black/30 border border-white/5 rounded-2xl text-white outline-none focus:border-primary focus:bg-black/50 transition-all font-medium text-sm shadow-inner appearance-none cursor-pointer">
+                                        <option value="" disabled>Select Grade...</option>
+                                        {Array.from({length: 12}, (_, i) => i + 1).map(g => <option key={g} value={String(g)}>Grade {g}</option>)}
+                                    </select>
+                                </div>
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 block mb-2 group-focus-within:text-primary transition-colors">Date of Birth</label>
+                                    <input required type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} className="w-full p-4 bg-black/30 border border-white/5 rounded-2xl text-white outline-none focus:border-primary focus:bg-black/50 transition-all font-medium text-sm shadow-inner" />
+                                </div>
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 block mb-2 group-focus-within:text-primary transition-colors">Gender</label>
+                                    <select required name="gender" value={formData.gender} onChange={handleChange} className="w-full p-4 bg-black/30 border border-white/5 rounded-2xl text-white outline-none focus:border-primary focus:bg-black/50 transition-all font-medium text-sm shadow-inner appearance-none cursor-pointer">
+                                        <option>Male</option><option>Female</option><option>Other</option>
+                                    </select>
                                 </div>
                             </div>
-                            <div className="space-y-4">
-                                <div><label className="input-label">Medical Conditions / Allergies</label><textarea name="medical_info" value={formData.medical_info} onChange={handleChange} rows={2} className="input-premium"/></div>
-                                <div>
-                                    <div className="flex justify-between"><label className="input-label">Emergency Contact</label>{parentContactInfo && <button type="button" onClick={() => setFormData(p=>({...p, emergency_contact: parentContactInfo}))} className="text-xs text-primary font-bold hover:underline">Copy from Profile</button>}</div>
-                                    <textarea name="emergency_contact" value={formData.emergency_contact} onChange={handleChange} rows={2} className="input-premium"/>
+
+                            <div className="space-y-6">
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 block mb-2 group-focus-within:text-primary transition-colors">Medical Disclosure</label>
+                                    <textarea name="medical_info" value={formData.medical_info} onChange={handleChange} className="w-full p-5 bg-black/30 border border-white/5 rounded-[1.5rem] text-white outline-none focus:border-primary focus:bg-black/50 transition-all h-28 resize-none text-sm font-medium leading-relaxed shadow-inner" placeholder="List any allergies or medical requirements..." />
+                                </div>
+
+                                <div className="group">
+                                    <div className="flex justify-between items-center mb-2 px-1">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest group-focus-within:text-primary transition-colors">Emergency Contact</label>
+                                        <button type="button" onClick={copyFromProfile} className="text-[9px] font-black text-primary hover:underline uppercase tracking-widest">Copy from My Profile</button>
+                                    </div>
+                                    <textarea name="emergency_contact" value={formData.emergency_contact} onChange={handleChange} className="w-full p-5 bg-black/30 border border-white/5 rounded-[1.5rem] text-white outline-none focus:border-primary focus:bg-black/50 transition-all h-28 resize-none text-sm font-medium leading-relaxed shadow-inner" placeholder="Alternate guardian name and phone number..." />
                                 </div>
                             </div>
                         </form>
                     )}
 
-                    {step === 'documents' && currentAdmissionId && (
-                        <div className="p-8 space-y-8">
-                            {error && <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm border border-destructive/20">{error}</div>}
-                            
-                            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800 rounded-lg p-4 flex gap-3">
-                                <div className="p-1 bg-blue-100 dark:bg-blue-800 rounded text-blue-600 dark:text-blue-300"><DocumentTextIcon className="w-5 h-5"/></div>
-                                <div>
-                                    <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300">Document Management</h4>
-                                    <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">Upload required documents below. You can update these later from the "Documents" tab.</p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 border-b border-border pb-2">Standard Requirements</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {STANDARD_DOCS.map(doc => {
-                                        const req = fetchedRequirements.find(r => r.document_name === doc.name);
-                                        return (
-                                            <SmartDocumentCard 
-                                                key={doc.name} 
-                                                label={doc.name} 
-                                                icon={doc.icon} 
-                                                isRequired={doc.required} 
-                                                admissionId={currentAdmissionId}
-                                                existingReq={req}
-                                                onUploadComplete={handleUploadComplete}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {customRequirements.length > 0 && (
-                                <div>
-                                    <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 border-b border-border pb-2">Requested by School</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {customRequirements.map(req => (
-                                            <SmartDocumentCard 
-                                                key={req.id} 
-                                                label={req.document_name} 
-                                                icon={<DocumentTextIcon className="w-5 h-5"/>} 
-                                                admissionId={currentAdmissionId}
-                                                existingReq={req}
-                                                onUploadComplete={handleUploadComplete}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="p-4 rounded-xl border-2 border-dashed border-border flex items-center gap-3 bg-muted/20">
-                                <input 
-                                    type="text" 
-                                    placeholder="Upload an additional document (e.g. Vaccination Record)..." 
-                                    value={customDocName}
-                                    onChange={e => setCustomDocName(e.target.value)}
-                                    className="flex-grow bg-transparent border-none focus:ring-0 text-sm placeholder:text-muted-foreground/60"
-                                />
-                                <button 
-                                    disabled={!customDocName.trim()} 
-                                    onClick={() => { /* Implementation for custom upload trigger */ }}
-                                    className="text-xs font-bold bg-primary/10 text-primary px-3 py-1.5 rounded-lg disabled:opacity-50 hover:bg-primary/20 transition-colors"
-                                >
-                                    Select File
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
                     {step === 'success' && (
-                        <div className="flex flex-col items-center justify-center p-12 text-center h-full">
-                            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 animate-bounce shadow-lg shadow-green-500/20">
-                                <CheckCircleIcon className="w-10 h-10" />
+                        <div className="text-center py-12 animate-in zoom-in-95 duration-500">
+                            <div className="w-24 h-24 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_80px_rgba(16,185,129,0.2)] ring-8 ring-emerald-500/5">
+                                <CheckCircleIcon className="w-14 h-14" />
                             </div>
-                            <h3 className="text-3xl font-bold text-foreground">Application Submitted!</h3>
-                            <p className="text-muted-foreground mt-2 max-w-md">Your child's profile has been created. Use the code below for any enquiries with the school office.</p>
-                            
-                            <div className="mt-8 p-6 bg-muted/30 border-2 border-dashed border-primary/30 rounded-xl relative group cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all" onClick={() => {navigator.clipboard.writeText(generatedCode!); setIsCopied(true);}}>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Admission Code</p>
-                                <p className="text-4xl font-mono font-black text-primary tracking-widest">{generatedCode}</p>
-                                <div className="absolute inset-0 bg-background/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
-                                    <span className="font-bold text-sm text-primary flex items-center gap-2"><CopyIcon/> Click to Copy</span>
-                                </div>
-                            </div>
-                            {isCopied && <p className="text-green-600 text-sm font-bold mt-3">Copied to clipboard!</p>}
+                            <h3 className="text-3xl font-serif font-bold text-white tracking-tight">Submission Successful</h3>
+                            <p className="text-muted-foreground mt-4 max-w-sm mx-auto text-base leading-relaxed">
+                                Application for <strong className="text-white">{formData.applicant_name}</strong> has been secured. Our registrar will review the details shortly.
+                            </p>
+                            <button 
+                                onClick={() => { onSave(); onClose(); }} 
+                                className="mt-12 px-12 py-4 bg-primary text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all transform hover:-translate-y-1 active:scale-95"
+                            >
+                                Back to Dashboard
+                            </button>
                         </div>
                     )}
                 </div>
 
-                <div className="p-6 border-t border-border bg-muted/10 flex justify-between items-center">
-                    {step === 'success' ? (
-                        <button onClick={() => { onSave(); onClose(); }} className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-primary/90 transition-all shadow-lg">Done</button>
-                    ) : (
-                        <>
-                            <button onClick={() => step === 'documents' ? setStep('details') : onClose()} className="px-6 py-2.5 font-bold text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors">
-                                {step === 'details' ? 'Cancel' : 'Back'}
-                            </button>
-                            <button 
-                                onClick={() => step === 'details' ? document.getElementById('details-form')?.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})) : handleDocumentsSubmit()}
-                                disabled={loading}
-                                className="px-8 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center gap-2 transition-all transform active:scale-95"
-                            >
-                                {loading ? <Spinner size="sm" className="text-current"/> : step === 'details' ? 'Next: Documents' : (!child ? 'Submit Application' : 'Save Changes')}
-                            </button>
-                        </>
+                {/* Footer */}
+                <div className="p-8 border-t border-white/5 bg-black/40 flex justify-between items-center z-20">
+                    <button onClick={onClose} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors">Cancel</button>
+                    {step !== 'success' && (
+                        <button 
+                            form="reg-form"
+                            type="submit" 
+                            disabled={loading}
+                            className="px-10 py-4 bg-primary text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-2xl shadow-primary/25 hover:bg-primary/90 transition-all flex items-center gap-3 transform active:scale-95 disabled:opacity-50 disabled:cursor-wait"
+                        >
+                            {loading ? <Spinner size="sm" className="text-white"/> : 'Seal & Submit Application'}
+                        </button>
                     )}
                 </div>
             </div>
-            <style>{`.input-premium { display: block; width: 100%; padding: 0.75rem 1rem; border: 1px solid hsl(var(--input)); border-radius: 0.75rem; background-color: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 0.9rem; transition: all 0.2s; } .input-premium:focus { outline: none; border-color: hsl(var(--primary)); box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1); } .input-label { display: block; font-size: 0.75rem; font-weight: 800; color: hsl(var(--muted-foreground)); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }`}</style>
         </div>
     );
 };

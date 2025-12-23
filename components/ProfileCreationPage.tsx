@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Role,
@@ -40,88 +39,32 @@ const UserIcon: React.FC = () => (
     </svg>
 );
 
-const RefreshIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-        <path d="M3 3v5h5" />
-        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-        <path d="M16 16h5v5" />
-    </svg>
-);
-
-const InfoRow: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => {
-    if (value === null || value === undefined || value === '') return null;
-    return (
-        <div>
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <p className="text-foreground">{String(value)}</p>
-        </div>
-    );
-};
-
-const GenericProfileCard: React.FC<{
-    profile: UserProfile;
-    data: Partial<ProfileData>;
-    onEdit: () => void;
-}> = ({ profile, data, onEdit }) => {
-    const renderDataFields = () => {
-        const filteredData = Object.entries(data).filter(([key]) => !['id', 'user_id', 'created_at', 'updated_at', 'phone'].includes(key));
-        if (filteredData.length === 0) {
-            return <p className="text-sm text-muted-foreground">No additional profile details available.</p>;
-        }
-        return filteredData.map(([key, value]) => {
-            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            return <InfoRow key={key} label={label} value={value as string | number | null} />;
-        });
-    };
-
-    return (
-        <div className="bg-card-alt rounded-lg shadow-md overflow-hidden border border-border transition-shadow hover:shadow-lg h-full flex flex-col max-w-sm mx-auto">
-            <div className="h-40 bg-muted flex items-center justify-center">
-                <div className="h-24 w-24 p-4">
-                    <UserIcon />
-                </div>
-            </div>
-            <div className="p-4 flex-grow">
-                <h3 className="text-lg font-bold text-foreground">{profile.display_name}</h3>
-                <p className="text-sm text-muted-foreground">{profile.role}</p>
-                <div className="mt-4 pt-4 border-t border-border space-y-3 text-sm">
-                    {renderDataFields()}
-                </div>
-            </div>
-            <div className="p-4 mt-auto border-t border-border">
-                <button 
-                    onClick={onEdit}
-                    className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-sm font-bold py-2 px-3 rounded-md transition-colors"
-                >
-                    Edit Profile
-                </button>
-            </div>
-        </div>
-    );
-};
-
-// Robust error formatter
+/**
+ * Robust error formatter to extract string messages from any error object.
+ */
 const formatError = (err: any): string => {
     if (!err) return "An unknown error occurred.";
     if (typeof err === 'string') {
-        if (err.includes("[object Object]")) return "An unexpected error occurred. Please try again.";
+        if (err.includes("[object Object]")) return "An unexpected server response occurred.";
         return err;
     }
     
+    // Standard property extraction
     const message = err.message || err.error_description || err.details || err.hint;
     if (message && typeof message === 'string' && !message.includes("[object Object]")) {
         return message;
     }
     
+    // Deep search if common properties failed
+    if (err.error && typeof err.error === 'string') return err.error;
+    if (err.error?.message && typeof err.error.message === 'string') return err.error.message;
+    
     try {
         const json = JSON.stringify(err);
         if (json && json !== '{}' && json !== '[]') return json;
-    } catch {
-        // Ignore JSON errors
-    }
+    } catch { }
     
-    return "An unexpected system error occurred.";
+    return "The system encountered an unhandled institutional synchronization error.";
 };
 
 // Helper to parse full phone number into country code and local number
@@ -209,7 +152,7 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                 .from(tableName)
                 .select('*')
                 .eq('user_id', profile.id)
-                .single();
+                .maybeSingle();
             
             if (data && !error && isMounted.current) {
                 fetchedData = data;
@@ -350,14 +293,12 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
             const baseProfileUpdates = {
                 display_name: formData.display_name,
                 phone: formattedPhone,
-                // Only mark complete for non-admin roles (Admin has more steps in OnboardingFlow)
                 profile_completed: role !== BuiltInRoles.SCHOOL_ADMINISTRATION,
                 is_active: true,
-                // Ensure email is present to satisfy constraints on insert if needed
                 email: profile.email
             };
 
-            // 1. Upsert Base Profile to ensure existence (CRITICAL FIX for FK Violation)
+            // 1. Upsert Base Profile
             const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert({
@@ -367,7 +308,7 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
             
             if (profileError) throw profileError;
 
-            // 2. Update Role-Specific Tables Direct (Robustness Fix)
+            // 2. Update Role-Specific Tables Direct
             let roleError = null;
 
             if (role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
@@ -391,7 +332,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                     grade_range_end: formData.grade_range_end
                 };
                 
-                // CRITICAL FIX: Ensure onboarding_step advances to 'pricing' if this is initial setup
                 if (isInitialCreation) {
                     adminUpdates.onboarding_step = 'pricing';
                 }
@@ -450,7 +390,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                 roleError = error;
             }
             else if (role === BuiltInRoles.STUDENT) {
-                // If manual student profile (not linked via admission code)
                 const { error } = await supabase.from('student_profiles').upsert({
                     user_id: profile.id,
                     grade: formData.grade,
@@ -463,7 +402,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
 
             if (roleError) throw roleError;
 
-            // Success Handlers
             if (isMounted.current) {
                 setLoading(false);
                 if (isInitialCreation) {
@@ -505,7 +443,7 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                 p_gender: secondaryData.gender,
                 p_email: secondaryData.email,
                 p_phone: secondaryData.phone,
-                p_user_id: profile.id // link to current user
+                p_user_id: profile.id 
             });
 
             if (rpcError) throw rpcError;
@@ -521,7 +459,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
 
     return (
         <div className="w-full max-w-4xl mx-auto p-6 bg-background text-foreground animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
                     {showBackButton && (
@@ -536,7 +473,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                         </p>
                     </div>
                 </div>
-                {/* Edit/View Toggle if not initial creation */}
                 {!isInitialCreation && role !== BuiltInRoles.TEACHER && role !== BuiltInRoles.PARENT_GUARDIAN && (
                    <button onClick={() => setMode(mode === 'view' ? 'edit' : 'view')} className="text-sm font-bold text-primary hover:underline">
                        {mode === 'view' ? 'Edit Profile' : 'Cancel Editing'}
@@ -544,16 +480,13 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                 )}
             </div>
 
-            {/* Error/Success Messages */}
             {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg mb-6 text-sm font-medium">{error}</div>}
             {successMessage && <div className="bg-green-500/10 border border-green-500/20 text-green-600 p-4 rounded-lg mb-6 text-sm font-medium flex items-center gap-2"><CheckCircleIcon className="w-4 h-4"/> {successMessage}</div>}
 
-            {/* Main Content */}
             {isFetchingInitialData ? (
                 <div className="flex justify-center py-20"><Spinner size="lg" /></div>
             ) : (
                 <>
-                    {/* Role Specific Views/Forms */}
                     {role === BuiltInRoles.SCHOOL_ADMINISTRATION && (
                          <form onSubmit={handleSubmit}>
                              <SchoolAdminForm 
@@ -577,7 +510,7 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <ParentProfileCard profile={profile} data={formData} onEdit={() => setMode('edit')} />
                                     <SecondaryParentCard 
-                                        data={formData} // formData contains secondary parent fields
+                                        data={formData} 
                                         onAdd={() => setEditingSecondaryParent(true)} 
                                         onEdit={() => setEditingSecondaryParent(true)}
                                         onRemove={() => {
@@ -599,7 +532,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                                 </form>
                             )}
 
-                            {/* Secondary Parent Modal/Form */}
                             {editingSecondaryParent && (
                                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                                     <div className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border p-6">
@@ -634,7 +566,7 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                                     photoPreviewUrl={profilePhotoUrl}
                                     onPhotoChange={handlePhotoChange}
                                     currentUserId={profile.id}
-                                    isRestrictedView={!isInitialCreation} // Teachers can mostly only edit bio/photo after creation
+                                    isRestrictedView={!isInitialCreation} 
                                 />
                                 <div className="mt-8 flex justify-end gap-4">
                                     {!isInitialCreation && <button type="button" onClick={() => setMode('view')} className="px-6 py-3 bg-muted text-muted-foreground font-bold rounded-xl hover:bg-muted/80 transition-colors">Cancel</button>}
@@ -663,7 +595,6 @@ export const ProfileCreationPage: React.FC<ProfileCreationPageProps> = ({ profil
                     {role === BuiltInRoles.STUDENT && (
                          <form onSubmit={handleSubmit}>
                             <StudentForm formData={formData} handleChange={handleChange} profile={profile} />
-                            {/* Students typically just view unless it's initial setup handled by Wizard */}
                             {isInitialCreation && (
                                  <div className="mt-8 flex justify-end">
                                      <button type="submit" disabled={loading} className="px-8 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:bg-primary/90 transition-all disabled:opacity-50">

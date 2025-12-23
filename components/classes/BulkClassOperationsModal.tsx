@@ -65,13 +65,14 @@ const formatError = (err: any): string => {
     if (typeof err === 'object') {
         let context = "";
         if (err.row) context += `Row ${err.row}: `;
+        if (err.row_index) context += `Row ${err.row_index}: `;
         if (err.subject_code) context += `Subject [${err.subject_code}] `;
         if (err.class_name) context += `Class [${err.class_name}] `;
         if (err.teacher_email) context += `Teacher [${err.teacher_email}] `;
         if (err.student_email) context += `Student [${err.student_email}] `;
         
         const message = err.error || err.message || err.error_description || err.details || err.hint;
-        if (typeof message === 'string' && !message.includes("[object Object]")) {
+        if (message && typeof message === 'string' && !message.includes("[object Object]")) {
             return context ? `${context}${message}` : message;
         }
     }

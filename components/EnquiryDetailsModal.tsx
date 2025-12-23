@@ -34,6 +34,29 @@ const STATUS_CONFIG: Record<EnquiryStatus, { icon: React.ReactNode, label: strin
 
 const ORDERED_STATUSES: EnquiryStatus[] = ['New', 'Contacted', 'In Review', 'Completed'];
 
+/**
+ * Robust error formatting utility.
+ */
+const formatError = (err: any): string => {
+    if (!err) return "An unknown error occurred.";
+    if (typeof err === 'string') return err;
+    
+    const message = err.message || err.error_description || err.details || err.hint;
+    if (message && typeof message === 'string' && !message.includes("[object Object]")) {
+        return message;
+    }
+    
+    if (err.error && typeof err.error === 'string') return err.error;
+    if (err.error?.message && typeof err.error.message === 'string') return err.error.message;
+
+    try {
+        const json = JSON.stringify(err);
+        if (json && json !== '{}' && json !== '[]') return json;
+    } catch { }
+
+    return "An unexpected system error occurred while processing the enquiry details.";
+};
+
 // --- Helper Components ---
 
 const WorkflowStageSelector: React.FC<{ 
@@ -330,7 +353,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
             }
             return true;
         } catch (error: any) {
-            alert(`Failed to save: ${error.message}`);
+            alert(`Failed to save: ${formatError(error)}`);
             return false;
         } finally {
             setLoading(prev => ({ ...prev, saving: false }));
@@ -343,7 +366,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
         setLoading(prev => ({ ...prev, sending: true }));
         const { error } = await supabase.rpc('send_enquiry_message', { p_enquiry_id: enquiry.id, p_message: newMessage });
         if (error) {
-            alert(`Failed to send: ${error.message}`);
+            alert(`Failed to send message: ${formatError(error)}`);
         } else {
             setNewMessage('');
             await fetchTimeline();

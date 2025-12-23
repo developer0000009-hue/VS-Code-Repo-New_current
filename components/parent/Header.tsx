@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { UserProfile, Role, Communication } from '../../types';
 import { supabase } from '../../services/supabase';
 import ThemeSwitcher from '../common/ThemeSwitcher';
@@ -21,38 +20,64 @@ const Header: React.FC<HeaderProps> = ({ profile, onSelectRole, onSignOut, onPro
     const [loading, setLoading] = useState(false);
     const notifButtonRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(() => {
-        const fetchNotifications = async () => {
-            setLoading(true);
+    const fetchNotifications = useCallback(async () => {
+        setLoading(true);
+        try {
+            // CRITICAL FIX: The function get_my_messages is expected to return message_id, subject, etc.
             const { data, error } = await supabase.rpc('get_my_messages');
-            if (!error && data) {
-                // Map message_id to id
+            
+            if (error) {
+                console.warn("RPC: get_my_messages not found or errored. Check schema v16.2.0 installation.", error.message);
+                // Graceful fallback to prevent UI breakage
+                setNotifications([]);
+                return;
+            }
+
+            if (data) {
+                // Map message_id to id for consistency with the Communication type
                 const mappedData = data.map((item: any) => ({
                     ...item,
                     id: item.message_id
                 }));
                 setNotifications(mappedData);
-            } else if (error) {
-                console.error("Notification fetch error:", error.message || error);
             }
+        } catch (err) {
+            console.error("Critical error fetching notifications:", err);
+            setNotifications([]);
+        } finally {
             setLoading(false);
-        };
+        }
+    }, []);
+
+    useEffect(() => {
         fetchNotifications();
         
-        // Optional: Set up a realtime subscription here if needed
-    }, []);
+        // Listen for new communications in realtime if the table is enabled
+        const channel = supabase
+            .channel('public:communications')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'communications' }, () => {
+                fetchNotifications();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchNotifications]);
 
     const toggleNotifications = () => {
         setIsNotifOpen(!isNotifOpen);
     };
 
     return (
-        <header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
+        <header className="bg-card/80 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center flex-shrink-0">
-                        <SchoolIcon className="h-8 w-8 text-primary" />
-                        <span className="font-bold text-lg ml-3 hidden sm:block">Parent Portal</span>
+                <div className="flex items-center justify-between h-16 md:h-20">
+                    <div className="flex items-center flex-shrink-0 cursor-pointer group" onClick={() => window.location.hash = '#/'}>
+                        <div className="p-2 bg-primary/10 rounded-xl transition-colors group-hover:bg-primary/20">
+                            <SchoolIcon className="h-6 w-6 text-primary" />
+                        </div>
+                        <span className="font-serif font-bold text-xl ml-3 hidden sm:block tracking-tight text-foreground">Parent Portal</span>
                     </div>
                     
                     <div className="flex items-center gap-2 sm:gap-4 relative">
@@ -62,7 +87,8 @@ const Header: React.FC<HeaderProps> = ({ profile, onSelectRole, onSignOut, onPro
                             <button 
                                 ref={notifButtonRef}
                                 onClick={toggleNotifications}
-                                className={`p-2 rounded-full transition-colors relative ${isNotifOpen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                                className={`p-2.5 rounded-full transition-all relative ${isNotifOpen ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                                aria-label="Notifications"
                             >
                                 <BellIcon className="h-5 w-5" />
                                 {notifications.length > 0 && (
@@ -75,14 +101,14 @@ const Header: React.FC<HeaderProps> = ({ profile, onSelectRole, onSignOut, onPro
                                 onClose={() => setIsNotifOpen(false)}
                                 onViewAll={() => {
                                     setIsNotifOpen(false);
-                                    // Assuming navigation to messages tab handles this via parent dashboard state
-                                    const messagesTabBtn = document.querySelector('button[aria-label="Messages Tab"]'); // Or implement explicit nav callback
-                                    if(messagesTabBtn) (messagesTabBtn as HTMLElement).click();
+                                    // Navigation handled by ParentDashboard tabs
                                 }}
                                 notifications={notifications}
                                 isLoading={loading}
                             />
                         </div>
+                        
+                        <div className="h-8 w-px bg-border/50 mx-1 hidden md:block"></div>
                         
                         <ProfileDropdown
                             profile={profile}

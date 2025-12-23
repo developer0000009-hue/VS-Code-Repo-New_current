@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { AdmissionApplication, AdmissionStatus, DocumentRequirement, AdmissionDocument } from '../types';
@@ -39,6 +38,35 @@ const docStatusColors: { [key: string]: { text: string; bg: string; border: stri
 };
 
 const DOCUMENT_OPTIONS = ["Birth Certificate", "Previous School Report Card", "Address Proof", "Parent ID Proof", "Student Photograph", "Transfer Certificate"];
+
+/**
+ * Robust error formatting utility.
+ */
+const formatError = (err: any): string => {
+    if (!err) return "An unknown error occurred.";
+    if (typeof err === 'string') return err;
+    
+    // Check common error property paths and ensure they are strings
+    const rawMsg = err.message || err.error_description || err.details || err.hint;
+    if (typeof rawMsg === 'string' && !rawMsg.includes("[object Object]")) {
+        return rawMsg;
+    }
+    
+    // Supabase specific wrapped error
+    if (err.error) {
+        if (typeof err.error === 'string') return err.error;
+        if (err.error.message && typeof err.error.message === 'string') return err.error.message;
+    }
+
+    // Fallback to JSON if it's a plain object, else generic
+    try {
+        const str = JSON.stringify(err);
+        if (str && str !== '{}' && str !== '[]') return str;
+    } catch { }
+
+    const final = err.toString();
+    return final === '[object Object]' ? "An unexpected system error occurred during application processing." : final;
+};
 
 // --- Sub-Components ---
 
@@ -108,7 +136,7 @@ export const RequestDocumentsModal: React.FC<{ admissionId: number; applicantNam
             await supabase.rpc('request_admission_documents', { p_admission_id: admissionId, p_documents: Array.from(selected), p_note: note });
             onSuccess();
         } catch (err: any) {
-            alert(`Failed to request documents: ${err.message}`);
+            alert(`Failed to request documents: ${formatError(err)}`);
         } finally {
             setLoading(false);
         }
@@ -177,7 +205,7 @@ const AdmissionDetailModal: React.FC<{
             if (error) throw error;
             setDocs(data || []);
         } catch (err: any) {
-            console.error("Error fetching docs:", err);
+            console.error("Error fetching docs:", formatError(err));
         } finally {
             setDocLoading(false);
         }
@@ -239,8 +267,8 @@ const AdmissionDetailModal: React.FC<{
                 onUpdate();
             }
         } catch (err: any) {
-            console.error("Status update error:", err);
-            alert(`Error: ${err.message || "An unexpected error occurred."}`);
+            console.error("Status update error:", formatError(err));
+            alert(`Error: ${formatError(err)}`);
         } finally {
             setProcessing(false);
         }
@@ -252,7 +280,7 @@ const AdmissionDetailModal: React.FC<{
             
             const { error } = await supabase.from('document_requirements').update({ status, rejection_reason: reason }).eq('id', id);
             if (error) {
-                alert("Failed to update document status");
+                alert("Failed to update document status: " + formatError(error));
             } else {
                 setDocs(prev => prev.map(d => d.id === id ? { ...d, status: status as any, rejection_reason: reason || '' } : d));
             }
@@ -269,8 +297,8 @@ const AdmissionDetailModal: React.FC<{
                 throw new Error("Could not retrieve file URL.");
             }
         } catch (err: any) {
-            console.error("Preview error:", err);
-            alert(`Unable to open document: ${err.message || "Permissions error or file missing."}`);
+            console.error("Preview error:", formatError(err));
+            alert(`Unable to open document: ${formatError(err)}`);
         } finally {
             setFetchingFile(null);
         }
@@ -308,8 +336,8 @@ const AdmissionDetailModal: React.FC<{
             window.URL.revokeObjectURL(blobUrl);
             
         } catch (err: any) {
-            console.error("Download error:", err);
-            alert(`Download failed: ${err.message || "The file could not be retrieved due to a system restriction or connectivity issue."}`);
+            console.error("Download error:", formatError(err));
+            alert(`Download failed: ${formatError(err)}`);
         } finally {
             setFetchingFile(null);
         }
@@ -569,7 +597,7 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
                 setApplicants((data as AdmissionApplication[]).sort((a,b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()));
             }
         } catch (e) {
-            console.error(e);
+            console.error("Fetch error:", formatError(e));
         } finally {
             setLoading(false);
         }
