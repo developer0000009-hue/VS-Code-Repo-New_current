@@ -1,464 +1,444 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
-import { ShareCode, ShareCodeStatus, AdmissionApplication, ShareCodeType } from '../../types';
+import { ShareCode, AdmissionApplication, ShareCodeType } from '../../types';
 import Spinner from '../common/Spinner';
+import { KeyIcon } from '../icons/KeyIcon';
+import { CheckCircleIcon } from '../icons/CheckCircleIcon';
+import { TrashIcon } from '../icons/TrashIcon';
+import { ClockIcon } from '../icons/ClockIcon';
+import { RefreshIcon } from '../icons/RefreshIcon';
+import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
+import { InfoIcon } from '../icons/InfoIcon';
 import { MailIcon } from '../icons/MailIcon';
 import { DocumentTextIcon } from '../icons/DocumentTextIcon';
-import { TrashIcon } from '../icons/TrashIcon';
-import { CheckCircleIcon } from '../icons/CheckCircleIcon';
+import { ChevronRightIcon } from '../icons/ChevronRightIcon';
 import { XCircleIcon } from '../icons/XCircleIcon';
+import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
+import { UsersIcon } from '../icons/UsersIcon';
+import PremiumAvatar from '../common/PremiumAvatar';
 
-// --- Local Icons ---
-const CopyIcon: React.FC<{className?: string}> = ({className = "h-5 w-5"}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" />
-    </svg>
-);
-const CheckIcon: React.FC<{className?: string}> = ({className = "h-5 w-5"}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-);
-const ShareIcon: React.FC<{className?: string}> = ({className = "h-5 w-5"}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-    </svg>
-);
-const RefreshIcon: React.FC<{ className?: string }> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.18-3.185m-3.181 9.348a8.25 8.25 0 00-11.664 0l-3.18 3.185m3.181-9.348l-3.18-3.183a8.25 8.25 0 00-11.664 0l-3.18 3.185" />
-    </svg>
-);
-const SortIcon: React.FC<{ className?: string }> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
-    </svg>
-);
+/**
+ * Fortified Enterprise Error Resolver.
+ * Strips recursive pointers and ensures only primitive string payloads reach the UI state.
+ */
+const resolveSystemError = (err: any): string => {
+    if (!err) return "Protocol synchronization failed.";
+    
+    if (err.error === "HANDSHAKE_RESTRICTED") {
+        return err.details || "Access Denied: You do not have management precedence for this identity block.";
+    }
 
-const ClockIcon = ({className}:{className?:string}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-    </svg>
-);
+    if (typeof err === 'string') {
+        return (err.includes("[object Object]") || err === "{}") ? "Handshake protocol failure." : err;
+    }
+    
+    const candidates = [
+        err.message,
+        err.error_description,
+        err.details,
+        err.hint,
+        err.error?.message,
+        err.error
+    ];
 
-const statusConfig: { [key in ShareCodeStatus]: { text: string; bg: string; border: string; icon: React.ReactNode } } = {
-  'Active': { text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30', border: 'border-emerald-200 dark:border-emerald-800', icon: <CheckCircleIcon className="w-3 h-3"/> },
-  'Expired': { text: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-200 dark:border-slate-700', icon: <ClockIcon className="w-3 h-3"/> },
-  'Revoked': { text: 'text-red-700 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-900', icon: <XCircleIcon className="w-3 h-3"/> },
-  'Redeemed': { text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-900', icon: <CheckCircleIcon className="w-3 h-3"/> },
+    for (const val of candidates) {
+        if (typeof val === 'string' && val.trim() !== "" && !val.includes("[object Object]") && val !== "{}") {
+            if (val.includes("structure of query does not match")) return "REGISTRY MISMATCH: The institutional data schema has evolved. Refresh required.";
+            if (val.includes("permission denied")) return "AUTHORIZATION FAILURE: Your security token does not have access to this node.";
+            return val;
+        }
+        if (typeof val === 'object' && val !== null && val.message && typeof val.message === 'string') {
+            return val.message;
+        }
+    }
+
+    try {
+        const json = JSON.stringify(err);
+        if (json && json !== '{}' && !json.includes("[object Object]")) {
+            return json.length > 200 ? json.substring(0, 197) + "..." : json;
+        }
+    } catch { }
+
+    const raw = String(err);
+    return raw.includes("[object Object]") ? "An unparsable institutional node exception occurred." : raw;
 };
 
 const ShareCodesTab: React.FC = () => {
-  const [codes, setCodes] = useState<ShareCode[]>([]);
-  const [myApplications, setMyApplications] = useState<AdmissionApplication[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const [codes, setCodes] = useState<ShareCode[]>([]);
+    const [myApplications, setMyApplications] = useState<AdmissionApplication[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [focusedPermitId, setFocusedPermitId] = useState<number | null>(null);
+    const [copyFeedback, setCopyFeedback] = useState(false);
 
-  // Form State
-  const [selectedAdmission, setSelectedAdmission] = useState<string>('');
-  const [purpose, setPurpose] = useState('');
-  const [codeType, setCodeType] = useState<ShareCodeType>('Enquiry');
-  const [generating, setGenerating] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  
-  // UX State
-  const [isCopied, setIsCopied] = useState(false);
-  const [feedback, setFeedback] = useState<{type: 'success' | 'error', message: string} | null>(null);
-  const [revokingId, setRevokingId] = useState<number | null>(null);
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+    const [selectedAdmissionId, setSelectedAdmissionId] = useState<string>('');
+    const [permitType, setPermitType] = useState<ShareCodeType>('Enquiry');
+    const [memo, setMemo] = useState('');
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    const [appsRes, codesRes] = await Promise.all([
-        supabase.rpc('get_my_children_profiles'),
-        supabase.rpc('get_my_share_codes')
-    ]);
+    const fetchData = useCallback(async (isSilent = false) => {
+        if (!isSilent) setLoading(true);
+        setError(null);
+        try {
+            const [appsRes, codesRes] = await Promise.all([
+                supabase.rpc('get_my_children_profiles'),
+                supabase.rpc('get_my_share_codes')
+            ]);
 
-    if (appsRes.error) {
-      setError(`Failed to fetch profiles: ${appsRes.error.message}`);
-    } else {
-      setMyApplications(appsRes.data || []);
-      if (appsRes.data && appsRes.data.length > 0 && !selectedAdmission) {
-        setSelectedAdmission(String(appsRes.data[0].id));
-      }
-    }
+            if (appsRes.error) throw appsRes.error;
+            if (codesRes.error) throw codesRes.error;
+            
+            const applications = (appsRes.data || []) as AdmissionApplication[];
+            setMyApplications(applications);
+            setCodes((codesRes.data || []) as ShareCode[]);
+            
+            if (!selectedAdmissionId && applications.length > 0) {
+                setSelectedAdmissionId(applications[0].id.toString());
+            }
+        } catch (err: any) {
+            console.error("Registry Sync Failure:", err);
+            setError(resolveSystemError(err));
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedAdmissionId]);
 
-    if (codesRes.error) {
-      setError(`Failed to fetch codes: ${codesRes.error.message}`);
-    } else {
-      setCodes(codesRes.data || []);
-    }
+    useEffect(() => { fetchData(); }, [fetchData]);
 
-    setLoading(false);
-  }, [selectedAdmission]);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const sortedCodes = useMemo(() => {
-      return [...codes].sort((a, b) => {
-          const dateA = new Date(a.created_at || 0).getTime();
-          const dateB = new Date(b.created_at || 0).getTime();
-          return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-      });
-  }, [codes, sortOrder]);
-
-  const showFeedback = (type: 'success' | 'error', message: string) => {
-      setFeedback({ type, message });
-      setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const handleGenerateCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAdmission) {
-      showFeedback('error', 'Please select a child profile first.');
-      return;
-    }
-    
-    setGenerating(true);
-    setGeneratedCode(null);
-    setFeedback(null);
-
-    try {
-      const { data, error } = await supabase.rpc('generate_admission_share_code', {
-        p_admission_id: Number(selectedAdmission),
-        p_purpose: purpose,
-        p_code_type: codeType,
-      });
-
-      if (error) throw error;
-
-      setGeneratedCode(data);
-      
-      // Auto-copy
-      if (data) {
-          navigator.clipboard.writeText(data).then(() => {
-              setIsCopied(true);
-              setTimeout(() => setIsCopied(false), 2000);
-              showFeedback('success', 'Code generated and copied to clipboard!');
-          });
-      }
-      
-      setPurpose('');
-      await fetchData(); // Refresh history immediately
-
-    } catch (err: any) {
-      showFeedback('error', `Failed to generate code: ${err.message}`);
-    } finally {
-        setGenerating(false);
-    }
-  };
-  
-  const handleRevokeCode = async (id: number) => {
-    if (!window.confirm('Are you sure you want to revoke this access code? It will no longer be usable.')) {
-        return;
-    }
-
-    setRevokingId(id);
-    try {
-        const { error } = await supabase.rpc('revoke_my_share_code', { p_code_id: id });
-        if (error) throw error;
+    const handleGenerate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const admId = Number(selectedAdmissionId);
+        if (!admId || isNaN(admId) || actionLoading) return;
         
-        showFeedback('success', 'Access code revoked successfully.');
-        await fetchData();
-    } catch (err: any) {
-        showFeedback('error', `Unable to revoke code: ${err.message}`);
-    } finally {
-        setRevokingId(null);
-    }
-  };
-  
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code).then(() => {
-        setIsCopied(true);
-        showFeedback('success', 'Access code copied to clipboard!');
-        setTimeout(() => setIsCopied(false), 2000);
-    });
-  };
-  
-  const handleShareCode = (code: string) => {
-      if (navigator.share) {
-          navigator.share({ 
-              title: 'School Access Code', 
-              text: `Here is my secure access code for school verification: ${code}` 
-          }).catch(console.error);
-      } else {
-          handleCopyCode(code);
-      }
-  };
+        setActionLoading(true);
+        setError(null);
+        
+        try {
+            const { data, error: rpcError } = await supabase.rpc('generate_admission_share_code', {
+                p_admission_id: admId,
+                p_purpose: memo,
+                p_code_type: permitType,
+            });
 
-  const renderHistory = () => {
-    if (loading) return <div className="flex justify-center p-12"><Spinner size="lg" /></div>;
-    
-    if (codes.length === 0) return (
-        <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed border-border flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            if (rpcError) throw rpcError;
+
+            if (data?.success) {
+                setMemo('');
+                await fetchData(true);
+                if (data.id) setFocusedPermitId(data.id);
+            } else {
+                setError(data?.error || "Permit provision protocol rejected by authority.");
+            }
+        } catch (err: any) {
+            setError(resolveSystemError(err));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRevoke = async (id: number) => {
+        if (!confirm("TERMINATION PROTOCOL: Decommissioning this permit will immediately revoke institutional access. Proceed?")) return;
+        
+        setActionLoading(true);
+        try {
+            const { error: rpcError } = await supabase.rpc('revoke_my_share_code', { p_code_id: id });
+            if (rpcError) throw rpcError;
+            
+            await fetchData(true);
+            if (focusedPermitId === id) setFocusedPermitId(null);
+        } catch (err: any) {
+            setError(resolveSystemError(err));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleCopy = (code: string) => {
+        navigator.clipboard.writeText(code);
+        setCopyFeedback(true);
+        setTimeout(() => setCopyFeedback(false), 2000);
+    };
+
+    const focusedPermit = useMemo(() => (codes || []).find(c => c.id === focusedPermitId), [codes, focusedPermitId]);
+
+    if (loading && codes.length === 0 && !error) {
+        return (
+            <div className="flex flex-col items-center justify-center py-40 gap-6">
+                <Spinner size="lg" className="text-primary" />
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/20 animate-pulse">Syncing Neural Registry</p>
             </div>
-            <h3 className="text-lg font-bold text-foreground">No Access Codes</h3>
-            <p className="text-sm text-muted-foreground mt-2 max-w-xs">Generate a secure code to share your child's profile with the school administration.</p>
-        </div>
-    );
+        );
+    }
 
     return (
-        <div className="space-y-4">
-            {sortedCodes.map(code => (
-                <div key={code.id} className="group bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden">
-                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${code.status === 'Active' ? 'bg-emerald-500' : 'bg-muted'}`}></div>
-                    
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pl-3">
-                        <div className="flex-grow">
-                            <div className="flex items-center gap-3 mb-1">
-                                <span className="font-mono font-bold text-lg text-primary tracking-wide">{code.code}</span>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusConfig[code.status].bg} ${statusConfig[code.status].text} ${statusConfig[code.status].border}`}>
-                                    {statusConfig[code.status].icon} {code.status}
-                                </span>
-                            </div>
-                            <p className="font-semibold text-foreground text-sm">{code.applicant_name}</p>
-                            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                    {code.code_type === 'Enquiry' ? <MailIcon className="w-3 h-3"/> : <DocumentTextIcon className="w-3 h-3"/>}
-                                    {code.code_type}
-                                </span>
-                                <span>•</span>
-                                <span>Expires: {new Date(code.expires_at).toLocaleDateString()}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 self-end sm:self-center">
-                            <button 
-                                onClick={() => handleCopyCode(code.code)}
-                                className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
-                                title="Copy Code"
-                            >
-                                <CopyIcon className="w-4 h-4" />
-                            </button>
-                            {code.status === 'Active' && (
-                                <button 
-                                    onClick={() => handleRevokeCode(code.id)} 
-                                    disabled={revokingId === code.id}
-                                    className="p-2 hover:bg-red-50 text-muted-foreground hover:text-red-600 rounded-lg transition-colors"
-                                    title="Revoke Access"
-                                >
-                                    {revokingId === code.id ? <Spinner size="sm" className="text-red-600"/> : <TrashIcon className="w-4 h-4" />}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-  };
-
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6">
-            <div>
-                <h2 className="text-3xl font-serif font-bold tracking-tight text-foreground">Secure Access Codes</h2>
-                <p className="text-muted-foreground mt-2 text-lg">Generate temporary keys to share your child's profile safely.</p>
-            </div>
-            <button 
-                onClick={fetchData} 
-                disabled={loading}
-                className="text-sm font-bold text-primary hover:text-primary/80 flex items-center gap-2 bg-background px-4 py-2 rounded-xl border border-border hover:bg-muted transition-all shadow-sm active:scale-95"
-            >
-                <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh History
-            </button>
-        </div>
-        
-        {/* Feedback Toast */}
-        {feedback && (
-            <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 border ${feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                {feedback.type === 'success' ? <CheckCircleIcon className="w-5 h-5"/> : <XCircleIcon className="w-5 h-5"/>}
-                <span className="font-bold text-sm">{feedback.message}</span>
-            </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="max-w-[1600px] mx-auto space-y-12 animate-in fade-in duration-1000 pb-40 px-4">
             
-            {/* --- LEFT PANEL: CREATE --- */}
-            <div className="lg:col-span-5 space-y-6">
-                 <div className="bg-card p-6 rounded-2xl shadow-lg border border-border/60 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                    
-                    <div className="mb-6 relative z-10">
-                        <h3 className="font-bold text-xl text-foreground">Generate New Code</h3>
-                        <p className="text-sm text-muted-foreground mt-1">Create a time-limited access key.</p>
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-10">
+                <div className="max-w-3xl">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-inner border border-primary/20">
+                            <ShieldCheckIcon className="w-6 h-6"/>
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-primary tracking-[0.5em]">Authorization Terminal</span>
                     </div>
+                    <h2 className="text-5xl md:text-7xl font-serif font-black text-white tracking-tighter leading-none mb-6">Digital <span className="text-white/30">Permits.</span></h2>
+                    <p className="text-white/40 text-xl font-medium leading-relaxed font-serif italic border-l-2 border-white/10 pl-8 ml-2">
+                        Issue unique cryptographic access keys to institutional administrators to authorize the review of student records and verification vaults.
+                    </p>
+                </div>
+                <button 
+                    onClick={() => fetchData()} 
+                    className="p-4 rounded-[1.5rem] bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border border-white/5 shadow-xl group"
+                >
+                    <RefreshIcon className={`w-6 h-6 ${actionLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-700'}`} />
+                </button>
+            </div>
 
-                    <form onSubmit={handleGenerateCode} className="space-y-6 relative z-10">
-                        {/* Profile Select */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold uppercase text-muted-foreground tracking-wider">Select Child Profile</label>
-                            <div className="relative group">
-                                <select 
-                                    value={selectedAdmission} 
-                                    onChange={(e) => setSelectedAdmission(e.target.value)} 
-                                    required 
-                                    className="w-full p-3.5 bg-muted/30 border border-input rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none text-sm font-medium shadow-sm cursor-pointer hover:bg-muted/50" 
-                                    disabled={myApplications.length === 0}
-                                >
-                                    {myApplications.length === 0 ? <option disabled>No profiles found</option> : <option value="" disabled>Select Child...</option>}
-                                    {myApplications.map(app => <option key={app.id} value={app.id}>{app.applicant_name} (Grade {app.grade})</option>)}
-                                </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-muted-foreground group-hover:text-primary transition-colors">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            {error && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-6 rounded-[2.5rem] flex items-start gap-5 animate-in shake duration-500 shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
+                    <AlertTriangleIcon className="w-6 h-6 shrink-0 mt-0.5" />
+                    <div className="flex-grow">
+                        <p className="text-sm font-black uppercase tracking-widest mb-1">Handshake Restriction</p>
+                        <p className="text-sm font-medium leading-relaxed text-red-200/70 whitespace-pre-wrap">{error}</p>
+                    </div>
+                    <button onClick={() => setError(null)} className="p-2 hover:bg-red-500/20 rounded-full transition-colors text-red-500">
+                        <XCircleIcon className="w-5 h-5"/>
+                    </button>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-12 items-start">
+                <div className="xl:col-span-4 bg-[#0d0f14] border border-white/5 p-8 md:p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden ring-1 ring-white/5">
+                    <div className="absolute top-0 right-0 p-10 opacity-[0.02] pointer-events-none transform rotate-12"><KeyIcon className="w-64 h-64 text-white" /></div>
+                    
+                    <form onSubmit={handleGenerate} className="space-y-10 relative z-10">
+                        <div className="space-y-6">
+                            <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] block ml-1">Identity Selection</label>
+                            {myApplications.length === 0 ? (
+                                <div className="p-12 text-center border-2 border-dashed border-white/5 rounded-[2.5rem] bg-white/[0.01] group hover:border-primary/20 transition-all cursor-pointer" onClick={() => fetchData()}>
+                                    <UsersIcon className="w-10 h-10 mx-auto mb-4 text-white/10 group-hover:text-primary transition-colors" />
+                                    <p className="text-xs font-bold text-white/20 italic">No registered identities found.</p>
+                                    <p className="text-[9px] font-black uppercase text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Retry Handshake</p>
                                 </div>
-                            </div>
-                            {myApplications.length === 0 && !loading && (
-                                <p className="text-xs text-red-500 font-medium flex items-center gap-1 mt-1">
-                                    <XCircleIcon className="w-3 h-3"/> Please add a child profile first.
-                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {myApplications.map(app => (
+                                        <button
+                                            key={app.id}
+                                            type="button"
+                                            onClick={() => setSelectedAdmissionId(app.id.toString())}
+                                            className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-500 ${
+                                                selectedAdmissionId === app.id.toString() 
+                                                ? 'bg-primary/10 border-primary shadow-2xl scale-[1.02] ring-1 ring-primary/20' 
+                                                : 'bg-white/5 border-transparent hover:bg-white/[0.08]'
+                                            }`}
+                                        >
+                                            <PremiumAvatar src={app.profile_photo_url} name={app.applicant_name} size="sm" />
+                                            <div className="text-left min-w-0 flex-grow">
+                                                <div className="flex items-center gap-2">
+                                                    <p className={`font-black text-[11px] uppercase tracking-widest truncate ${selectedAdmissionId === app.id.toString() ? 'text-primary' : 'text-white/80'}`}>{app.applicant_name}</p>
+                                                    <div className="w-1 h-1 rounded-full bg-white/10"></div>
+                                                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/5 px-1.5 rounded border border-emerald-500/10">Hub Synced</span>
+                                                </div>
+                                                <p className="text-[9px] text-white/20 font-bold uppercase mt-0.5 tracking-wider">Grade {app.grade} Block</p>
+                                            </div>
+                                            {selectedAdmissionId === app.id.toString() && <CheckCircleIcon className="w-5 h-5 text-primary animate-in zoom-in" />}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
 
-                        {/* Access Type Toggle */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold uppercase text-muted-foreground tracking-wider mb-2">Access Type</label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setCodeType('Enquiry')} 
-                                    className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 flex flex-col gap-2 ${codeType === 'Enquiry' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10 shadow-sm' : 'border-border bg-card hover:border-blue-200 hover:bg-muted/30'}`}
-                                >
-                                    <div className={`p-2 rounded-lg w-fit ${codeType === 'Enquiry' ? 'bg-blue-500 text-white' : 'bg-muted text-muted-foreground'}`}>
-                                        <MailIcon className="w-5 h-5"/>
-                                    </div>
-                                    <div>
-                                        <span className={`block font-bold text-sm ${codeType === 'Enquiry' ? 'text-blue-700 dark:text-blue-400' : 'text-foreground'}`}>Enquiry</span>
-                                        <span className="block text-[10px] text-muted-foreground mt-0.5 leading-tight">Limited profile access for initial visits.</span>
-                                    </div>
-                                </button>
-
-                                <button 
-                                    type="button" 
-                                    onClick={() => setCodeType('Admission')} 
-                                    className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 flex flex-col gap-2 ${codeType === 'Admission' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/10 shadow-sm' : 'border-border bg-card hover:border-purple-200 hover:bg-muted/30'}`}
-                                >
-                                    <div className={`p-2 rounded-lg w-fit ${codeType === 'Admission' ? 'bg-purple-500 text-white' : 'bg-muted text-muted-foreground'}`}>
-                                        <DocumentTextIcon className="w-5 h-5"/>
-                                    </div>
-                                    <div>
-                                        <span className={`block font-bold text-sm ${codeType === 'Admission' ? 'text-purple-700 dark:text-purple-400' : 'text-foreground'}`}>Admission</span>
-                                        <span className="block text-[10px] text-muted-foreground mt-0.5 leading-tight">Full document sharing for enrollment.</span>
-                                    </div>
-                                </button>
+                        <div className="space-y-6">
+                            <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] block ml-1">Handshake Scope</label>
+                            <div className="grid grid-cols-1 gap-4">
+                                {[
+                                    { id: 'Enquiry', label: 'Discovery Mode', desc: 'Minimal metadata for initial campus visits.', icon: <MailIcon className="w-5 h-5"/> },
+                                    { id: 'Admission', label: 'Full Integrity', desc: 'Complete verified record & document access.', icon: <DocumentTextIcon className="w-5 h-5"/> }
+                                ].map(type => (
+                                    <button
+                                        key={type.id}
+                                        type="button"
+                                        onClick={() => setPermitType(type.id as ShareCodeType)}
+                                        className={`relative p-6 rounded-[2rem] border-2 text-left transition-all duration-500 group overflow-hidden ${
+                                            permitType === type.id 
+                                            ? 'bg-primary/5 border-primary shadow-2xl ring-4 ring-primary/5' 
+                                            : 'bg-white/5 border-white/5 hover:border-white/10'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4 mb-3">
+                                            <div className={`p-2.5 rounded-xl transition-colors duration-500 ${permitType === type.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-white/30'}`}>
+                                                {type.icon}
+                                            </div>
+                                            <h4 className={`text-sm font-black uppercase tracking-widest ${permitType === type.id ? 'text-primary' : 'text-white/60'}`}>{type.label}</h4>
+                                        </div>
+                                        <p className="text-[11px] text-white/30 leading-relaxed font-medium pl-12">{type.desc}</p>
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                        
-                        {/* Note Input */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold uppercase text-muted-foreground tracking-wider">Note <span className="font-normal text-muted-foreground/60 ml-1">(Optional)</span></label>
+
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] ml-1 block">Context Label</label>
                             <input 
-                                type="text" 
-                                placeholder="e.g. For Principal meeting" 
-                                value={purpose} 
-                                onChange={(e) => setPurpose(e.target.value)} 
-                                className="w-full p-3.5 bg-muted/30 border border-input rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm font-medium shadow-sm placeholder:text-muted-foreground/50" 
+                                type="text"
+                                value={memo}
+                                onChange={(e) => setMemo(e.target.value)}
+                                placeholder="e.g. Registrar Sync Session"
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm text-white font-medium focus:border-primary focus:bg-white/[0.08] outline-none transition-all shadow-inner placeholder:text-white/5"
                             />
                         </div>
 
                         <button 
                             type="submit" 
-                            disabled={generating || myApplications.length === 0} 
-                            className="w-full py-4 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 text-white font-bold rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all transform hover:-translate-y-0.5 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                            disabled={!selectedAdmissionId || actionLoading}
+                            className={`w-full py-6 rounded-[2rem] text-sm font-black uppercase tracking-[0.3em] transition-all duration-700 transform flex items-center justify-center gap-4 ${
+                                !selectedAdmissionId || actionLoading
+                                ? 'bg-white/5 text-white/10 border border-white/5 cursor-not-allowed shadow-none'
+                                : 'bg-primary text-white shadow-2xl shadow-primary/40 hover:-translate-y-1 active:scale-95'
+                            }`}
                         >
-                            {generating ? <Spinner size="sm" className="text-white" /> : 'Generate Secure Code'}
+                            {actionLoading ? <Spinner size="sm" className="text-white" /> : 'Provision Digital Key'}
                         </button>
                     </form>
                 </div>
-            </div>
 
-            {/* --- RIGHT PANEL: HISTORY & RESULT --- */}
-            <div className="lg:col-span-7 space-y-8">
-                
-                {/* Result Card */}
-                {generatedCode && (
-                    <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="bg-slate-900 text-white rounded-3xl shadow-2xl overflow-hidden border border-slate-800 relative">
-                            <div className="p-8 pb-6 text-center relative z-10 bg-gradient-to-b from-slate-800 to-slate-900 border-b border-slate-800">
-                                <div className="w-14 h-14 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20 animate-bounce">
-                                    <CheckCircleIcon className="w-8 h-8 text-white" />
+                <div className="xl:col-span-8 flex flex-col lg:flex-row gap-8 min-h-[600px]">
+                    <div className="lg:w-1/2 flex flex-col space-y-5">
+                        <div className="flex justify-between items-center px-4">
+                             <h3 className="text-xl font-serif font-black text-white tracking-tight uppercase">Permit <span className="text-white/30">Registry.</span></h3>
+                             <span className="text-[10px] font-black text-white/20 uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">{codes.length} Active Records</span>
+                        </div>
+
+                        <div className="space-y-3 overflow-y-auto max-h-[620px] custom-scrollbar pr-3">
+                            {codes.length === 0 ? (
+                                <div className="py-32 text-center border-2 border-dashed border-white/5 rounded-[3.5rem] bg-white/[0.01] opacity-40">
+                                    <KeyIcon className="w-16 h-16 mx-auto mb-6 text-white/20" />
+                                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 leading-relaxed px-12 text-center">Neural Registry Standby. No permits issued.</p>
                                 </div>
-                                <h3 className="text-2xl font-bold mb-1 text-white tracking-tight">Code Generated!</h3>
-                                <p className="text-slate-400 text-sm font-medium">Ready to share with school administration.</p>
-                            </div>
-                            
-                            <div className="p-8 relative z-10 bg-slate-900">
-                                <div 
-                                    className="border-2 border-dashed border-slate-700 bg-slate-800/50 rounded-2xl p-8 text-center mb-8 relative group cursor-pointer transition-colors hover:border-slate-600 hover:bg-slate-800" 
-                                    onClick={() => handleCopyCode(generatedCode)}
-                                >
-                                     <p className="text-xs text-slate-500 uppercase tracking-[0.2em] font-bold mb-3">Verification Code</p>
-                                     <div className="text-4xl sm:text-6xl font-mono font-black text-blue-400 tracking-widest select-all drop-shadow-lg">{generatedCode}</div>
-                                     <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl backdrop-blur-sm">
-                                         <span className="text-white font-bold text-sm flex items-center gap-2"><CopyIcon className="w-5 h-5"/> Click to Copy</span>
-                                     </div>
-                                </div>
-                                
-                                <div className="flex flex-col sm:flex-row gap-4">
-                                     <button 
-                                        type="button" 
-                                        onClick={() => handleCopyCode(generatedCode)} 
-                                        className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${isCopied ? 'bg-emerald-600 text-white cursor-default ring-2 ring-emerald-500 ring-offset-2 ring-offset-slate-900' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30 hover:-translate-y-0.5'}`} 
-                                        disabled={isCopied}
-                                    >
-                                        {isCopied ? <CheckIcon className="w-5 h-5" /> : <CopyIcon className="w-5 h-5" />}{isCopied ? 'Copied!' : 'Copy Code'}
-                                    </button>
+                            ) : (
+                                codes.map(code => (
                                     <button 
-                                        type="button" 
-                                        onClick={() => handleShareCode(generatedCode)} 
-                                        className="flex-1 py-3.5 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white transition-all flex items-center justify-center gap-2 border border-slate-700 hover:border-slate-600"
+                                        key={code.id}
+                                        onClick={() => setFocusedPermitId(code.id)}
+                                        className={`w-full text-left p-6 rounded-[2.5rem] border transition-all duration-500 group relative overflow-hidden active:scale-[0.98] ${
+                                            focusedPermitId === code.id 
+                                            ? 'bg-[#1a1d24] border-primary/40 shadow-2xl ring-2 ring-primary/10 z-10' 
+                                            : 'bg-[#0d0f14] border-white/5 hover:border-white/10'
+                                        } ${code.status !== 'Active' ? 'opacity-40 grayscale blur-[0.5px]' : ''}`}
                                     >
-                                        <ShareIcon className="w-5 h-5" /> Share
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <PremiumAvatar src={code.profile_photo_url} name={code.applicant_name} size="sm" className="border border-white/10"/>
+                                                <h4 className={`font-serif font-bold text-lg text-white transition-colors ${focusedPermitId === code.id ? 'text-primary' : 'group-hover:text-primary'}`}>{code.applicant_name}</h4>
+                                            </div>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${code.status === 'Active' ? 'text-emerald-400' : 'text-white/20'}`}>{code.status}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                                                code.code_type === 'Admission' 
+                                                ? 'bg-purple-50/10 text-purple-400 border-purple-500/20' 
+                                                : 'bg-blue-50/10 text-blue-400 border-blue-500/20'
+                                            }`}>
+                                                {code.code_type} Scope
+                                            </span>
+                                            <span className="text-[9px] font-mono font-bold text-white/20 uppercase truncate max-w-[150px]">{code.purpose || 'Institutional Handshake'}</span>
+                                        </div>
+                                        {focusedPermitId === code.id && (
+                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 animate-in slide-in-from-right-4 duration-300">
+                                                <ChevronRightIcon className="w-7 h-7 text-primary" />
+                                            </div>
+                                        )}
                                     </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="lg:w-1/2 bg-[#0d0f14] border border-white/5 rounded-[3.5rem] p-10 flex flex-col shadow-3xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-indigo-600 to-primary opacity-40"></div>
+                        
+                        {focusedPermit ? (
+                            <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                <div className="flex-grow space-y-10">
+                                    <div className="flex items-center gap-6">
+                                        <PremiumAvatar src={focusedPermit.profile_photo_url} name={focusedPermit.applicant_name} size="md" />
+                                        <div>
+                                            <h3 className="text-3xl font-serif font-black text-white tracking-tighter leading-none uppercase">{focusedPermit.applicant_name}</h3>
+                                            <p className="text-xs font-black text-indigo-400 uppercase tracking-widest mt-2">Neural Link: #{focusedPermit.id}</p>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        className="bg-black/40 border border-white/10 rounded-[2.5rem] p-10 text-center shadow-inner group/code cursor-pointer active:scale-95 transition-all relative overflow-hidden" 
+                                        onClick={() => handleCopy(focusedPermit.code)}
+                                    >
+                                        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] mb-5">Provisioned Secret</p>
+                                        <span className="font-mono font-black text-4xl text-white tracking-[0.25em] drop-shadow-xl group-hover/code:text-primary transition-colors">
+                                            {focusedPermit.code}
+                                        </span>
+                                        <p className={`text-[9px] font-black uppercase mt-6 transition-colors ${copyFeedback ? 'text-emerald-500' : 'text-white/20'}`}>
+                                            {copyFeedback ? 'Sync Complete' : 'Click to Synchronize'}
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-6 px-4">
+                                        <div className="flex items-center gap-5">
+                                            <div className="p-3 bg-white/5 rounded-2xl text-white/30 border border-white/5 shadow-sm transition-colors group-hover:text-primary"><InfoIcon className="w-5 h-5"/></div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Temporal Boundary</p>
+                                                <p className="text-sm font-bold text-white/80">{new Date(focusedPermit.expires_at).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-5">
+                                            <div className="p-3 bg-white/5 rounded-2xl text-white/30 border border-white/5 shadow-sm transition-colors group-hover:text-primary"><ClockIcon className="w-5 h-5"/></div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Active State</p>
+                                                <p className={`text-sm font-black uppercase tracking-widest ${focusedPermit.status === 'Active' ? 'text-emerald-500' : 'text-white/20'}`}>{focusedPermit.status}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="text-[10px] text-slate-500 text-center mt-6 uppercase tracking-wider font-medium flex items-center justify-center gap-2">
-                                    <ClockIcon className="w-3 h-3"/> Valid for 7 days
+
+                                <div className="mt-auto pt-10 border-t border-white/5">
+                                    <div className="flex gap-4">
+                                        {focusedPermit.status === 'Active' && (
+                                            <button 
+                                                onClick={() => handleRevoke(focusedPermit.id)}
+                                                disabled={actionLoading}
+                                                className="flex-1 py-5 rounded-2xl bg-red-500/10 hover:bg-red-50 text-red-500 hover:text-white font-black text-[11px] uppercase tracking-[0.25em] transition-all border border-red-500/20 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
+                                            >
+                                                {actionLoading ? <Spinner size="sm" className="text-current" /> : <><TrashIcon className="w-4 h-4"/> Decommission</>}
+                                            </button>
+                                        )}
+                                        <button 
+                                            onClick={() => handleCopy(focusedPermit.code)}
+                                            className="flex-1 py-5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-black text-[11px] uppercase tracking-[0.25em] transition-all border border-white/10 shadow-lg"
+                                        >
+                                            Secure Share
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center px-12 animate-in fade-in duration-1000">
+                                <div className="w-24 h-24 bg-white/5 rounded-[3rem] flex items-center justify-center mb-8 border border-white/10 shadow-2xl relative group">
+                                    <ShieldCheckIcon className="w-10 h-10 text-white/20 relative z-10 transition-all group-hover:scale-110" />
+                                    <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                                <h3 className="text-2xl font-serif font-black text-white mb-3 uppercase tracking-tight">Handshake Review</h3>
+                                <p className="text-sm text-white/20 leading-relaxed font-medium max-w-xs">
+                                    Select an entry from the registry to inspect its cryptographic metadata, temporal constraints, and sync scope.
                                 </p>
                             </div>
-                        </div>
+                        )}
                     </div>
-                )}
-
-                {/* History List */}
-                <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-lg text-foreground">History</h3>
-                            {codes.length > 0 && <span className="text-xs font-bold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border border-border">{codes.length}</span>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-muted-foreground uppercase">Sort:</span>
-                            <div className="relative">
-                                <select 
-                                    value={sortOrder} 
-                                    onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
-                                    className="appearance-none bg-card border border-input rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-sm"
-                                >
-                                    <option value="newest">Newest First</option>
-                                    <option value="oldest">Oldest First</option>
-                                </select>
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                                    <SortIcon className="w-3 h-3"/>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {renderHistory()}
                 </div>
+
             </div>
         </div>
-    </div>
-  );
+    );
 };
 
 export default ShareCodesTab;

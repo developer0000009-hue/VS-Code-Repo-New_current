@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { UserProfile, Course } from '../../types';
@@ -26,20 +25,35 @@ interface CreateClassWizardProps {
 
 const STEPS = ['Basic Details', 'Faculty', 'Capacity', 'Subjects', 'Review'];
 
-// Error formatter helper
+/**
+ * Robust error formatting utility to prevent [object Object].
+ */
 const formatError = (err: any): string => {
     if (!err) return "An unknown error occurred.";
     if (typeof err === 'string') {
-         if (err.includes("[object Object]")) return "An unexpected error occurred.";
-         return err;
+         return (err === "[object Object]" || err === "{}") ? "Protocol error." : err;
     }
-    const message = err.message || err.error_description || err.details || err.hint;
-    if (message && typeof message === 'string') return message;
+    
+    const candidates = [
+        err.message,
+        err.error_description,
+        err.details,
+        err.hint,
+        err.error?.message,
+        err.error
+    ];
+
+    for (const val of candidates) {
+        if (typeof val === 'string' && val !== "[object Object]" && val !== "{}") return val;
+        if (typeof val === 'object' && val?.message && typeof val.message === 'string') return val.message;
+    }
+    
     try {
-        return JSON.stringify(err);
-    } catch {
-        return "An error occurred.";
-    }
+        const json = JSON.stringify(err);
+        if (json && json !== '{}' && json !== '[]' && !json.includes("[object Object]")) return json;
+    } catch { }
+
+    return "An unexpected error occurred.";
 };
 
 const CreateClassWizard: React.FC<CreateClassWizardProps> = ({ onClose, onSuccess, branchId }) => {
@@ -331,7 +345,7 @@ const CreateClassWizard: React.FC<CreateClassWizardProps> = ({ onClose, onSucces
                             <p className="text-xs text-muted-foreground font-medium mt-0.5">Step {currentStep + 1}: {STEPS[currentStep]}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"><XIcon className="w-5 h-5"/></button>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><XIcon className="w-5 h-5"/></button>
                 </div>
 
                 {/* Stepper */}

@@ -33,7 +33,6 @@ const Header: React.FC<HeaderProps> = ({ profile, onSwitchRole, onSignOut, onPro
                         <ProfileDropdown
                             profile={profile}
                             onSignOut={onSignOut}
-                            onSwitchRole={onSwitchRole}
                             onProfileClick={onProfileClick}
                             onSelectRole={onSelectRole}
                         />

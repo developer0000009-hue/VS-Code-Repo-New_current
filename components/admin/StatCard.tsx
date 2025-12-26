@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 
 interface StatCardProps {
@@ -17,7 +16,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, colorCla
         if (isNaN(numericValue)) return;
 
         let start = 0;
-        const duration = 1500;
+        const duration = 2000; // Slower, more premium feel
         const startTime = Date.now();
 
         const animate = () => {
@@ -25,7 +24,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, colorCla
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
             
-            const easedProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+            // Premium exponential easing
+            const easedProgress = 1 - Math.pow(1 - progress, 4); 
             
             setDisplayValue(easedProgress * numericValue);
 
@@ -50,24 +50,26 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, colorCla
     const isPositive = trend.includes('+') || trend === 'Stable';
     
     return (
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group">
-            <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-xl ${colorClass} transition-transform duration-300 group-hover:scale-110 shadow-inner`}>
+        <div className="bg-card border border-white/5 rounded-[2rem] p-7 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1.5 group relative overflow-hidden ring-1 ring-black/5">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/[0.02] to-transparent rounded-bl-full pointer-events-none transition-transform group-hover:scale-125 duration-700"></div>
+            
+            <div className="flex justify-between items-start mb-6 relative z-10">
+                <div className={`p-3.5 rounded-2xl ${colorClass} transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-xl ring-1 ring-white/10`}>
                     {icon}
                 </div>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                    trend === 'Stable' ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' :
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all duration-300 ${
+                    trend === 'Stable' ? 'bg-white/5 text-white/30 border-white/5' :
                     isPositive 
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800' 
-                    : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
+                    : 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]'
                 }`}>
                     {trend !== 'Stable' && (isPositive ? '↑' : '↓')} {trend}
                 </span>
             </div>
             
-            <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 opacity-80">{title}</p>
-                <h3 className="text-3xl font-extrabold text-foreground tracking-tight">{formattedValue}</h3>
+            <div className="relative z-10">
+                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-2">{title}</p>
+                <h3 className="text-4xl font-black text-white tracking-tighter leading-none">{formattedValue}</h3>
             </div>
         </div>
     );

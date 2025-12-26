@@ -16,22 +16,18 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
-
     const [invoices, setInvoices] = useState<any[]>([]);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
     const [amount, setAmount] = useState<string>('');
-    const [method, setMethod] = useState('Digital');
-    const [reference, setReference] = useState('');
+    const [method, setMethod] = useState('Digital Gateway');
 
     useEffect(() => {
         const fetchInvoices = async () => {
             const { data } = await supabase.rpc('get_payable_invoices_for_student', { p_student_id: studentId });
-            if (data) {
+            if (data && data.length > 0) {
                 setInvoices(data);
-                if (data.length > 0) {
-                    setSelectedInvoiceId(data[0].id.toString());
-                    setAmount(data[0].amount_due.toString());
-                }
+                setSelectedInvoiceId(data[0].id.toString());
+                setAmount(data[0].amount_due.toString());
             }
         };
         fetchInvoices();
@@ -39,94 +35,85 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ studentId, stud
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payAmount = parseFloat(amount);
-        
-        if (isNaN(payAmount) || payAmount <= 0) {
-            setError("Invalid payment amount.");
-            return;
-        }
-
         setLoading(true);
         setError(null);
-        
         try {
-            const { error: rpcError } = await supabase.rpc('record_fee_payment', {
+            const { error } = await supabase.rpc('record_fee_payment', {
                 p_invoice_id: parseInt(selectedInvoiceId),
-                p_amount: payAmount,
+                p_amount: parseFloat(amount),
                 p_method: method,
-                p_reference: reference
+                p_reference: 'Admin Portal Manual Record'
             });
-            if (rpcError) throw rpcError;
-            
+            if (error) throw error;
             setSuccess(true);
-            setTimeout(() => {
-                onSuccess();
-            }, 1500);
+            setTimeout(onSuccess, 1500);
         } catch (err: any) {
-            setError(err.message || "Financial transaction rejected by institutional gateway.");
+            setError(err.message || "Protocol rejection by financial node.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
-            <div className="bg-card w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-white/10 overflow-hidden ring-1 ring-black/5" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in" onClick={onClose}>
+            <div 
+                className="bg-card w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl border-x border-t sm:border border-white/10 overflow-hidden flex flex-col animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-10 duration-500" 
+                onClick={e => e.stopPropagation()}
+            >
                 {success ? (
-                    <div className="p-12 text-center space-y-6 animate-in zoom-in-95">
-                        <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20 animate-bounce">
+                    <div className="p-12 text-center space-y-6">
+                        <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg animate-bounce">
                             <CheckCircleIcon className="w-10 h-10"/>
                         </div>
-                        <h3 className="text-2xl font-black tracking-tight">Reconciliation Secured</h3>
-                        <p className="text-muted-foreground text-sm leading-relaxed">The payment has been successfully allocated to the student's ledger and the invoice has been adjusted.</p>
+                        <h3 className="text-2xl font-black text-foreground">Payment Secured</h3>
+                        <p className="text-muted-foreground text-sm">Transactional identity synchronized with master ledger.</p>
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="flex flex-col">
-                        <div className="p-8 border-b border-border bg-muted/20 flex justify-between items-center">
+                        <div className="p-6 md:p-8 border-b border-border bg-muted/20 flex justify-between items-center">
                             <div>
-                                <h3 className="text-xl font-bold">Process Transaction</h3>
-                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mt-1">Student: {studentName}</p>
+                                <h3 className="text-xl font-bold text-foreground">Record Transaction</h3>
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mt-1 truncate max-w-[250px]">Entity: {studentName}</p>
                             </div>
-                            <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-all"><XIcon className="w-5 h-5"/></button>
+                            <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground"><XIcon className="w-5 h-5"/></button>
                         </div>
 
-                        <div className="p-8 space-y-6">
-                            {error && <div className="p-4 bg-red-500/10 text-red-500 rounded-2xl text-xs font-bold border border-red-500/20 animate-in shake">{error}</div>}
+                        <div className="p-6 md:p-8 space-y-6">
+                            {error && <div className="p-4 bg-red-500/10 text-red-500 rounded-xl text-xs font-bold border border-red-500/20">{error}</div>}
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Allocate to Specific Invoice</label>
-                                <select value={selectedInvoiceId} onChange={e => setSelectedInvoiceId(e.target.value)} className="w-full p-4 rounded-2xl bg-muted/40 border border-border font-bold text-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer">
-                                    {invoices.map(inv => <option key={inv.id} value={inv.id}>{inv.description} (Due: ${inv.amount_due})</option>)}
-                                    {invoices.length === 0 && <option disabled>No actionable invoices found</option>}
+                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Allocate to Ledger</label>
+                                <select 
+                                    value={selectedInvoiceId} 
+                                    onChange={e => setSelectedInvoiceId(e.target.value)} 
+                                    className="w-full p-4 rounded-2xl bg-muted/30 border border-border font-bold text-sm focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                                >
+                                    {invoices.map(inv => <option key={inv.id} value={inv.id}>{inv.description} (${inv.amount_due} due)</option>)}
+                                    {invoices.length === 0 && <option disabled>No actionable invoices</option>}
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Payment Amount</label>
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Monetary Volume</label>
                                     <div className="relative">
                                         <DollarSignIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary"/>
-                                        <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full p-4 pl-11 rounded-2xl bg-muted/40 border border-border font-mono font-bold text-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all" />
+                                        <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full p-4 pl-11 rounded-2xl bg-muted/30 border border-border font-mono font-black text-sm outline-none" />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Execution Method</label>
-                                    <select value={method} onChange={e => setMethod(e.target.value)} className="w-full p-4 rounded-2xl bg-muted/40 border border-border font-bold text-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer">
-                                        <option>Digital Gateway</option><option>Cash Receipt</option><option>Bank Draft / Cheque</option>
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Execution Channel</label>
+                                    <select value={method} onChange={e => setMethod(e.target.value)} className="w-full p-4 rounded-2xl bg-muted/30 border border-border font-bold text-sm outline-none">
+                                        <option>Digital Gateway</option><option>Cash Desk</option><option>Bank Draft</option>
                                     </select>
                                 </div>
                             </div>
-                            
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">System Reference ID</label>
-                                <input value={reference} onChange={e => setReference(e.target.value)} placeholder="Enter banking or internal reference..." className="w-full p-4 rounded-2xl bg-muted/40 border border-border font-bold text-sm outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-inner" />
-                            </div>
                         </div>
 
-                        <div className="p-8 bg-muted/20 border-t border-border flex justify-end gap-4">
-                            <button type="button" onClick={onClose} className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
-                            <button type="submit" disabled={loading || !selectedInvoiceId} className="px-10 py-3.5 bg-primary text-white font-black text-xs rounded-2xl shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 transform active:scale-95 disabled:opacity-50 uppercase tracking-[0.2em]">
-                                {loading ? <Spinner size="sm" className="text-white" /> : 'Confirm Payment'}
+                        <div className="p-6 md:p-8 bg-muted/20 border-t border-border flex flex-col md:flex-row justify-end gap-4">
+                            <button type="button" onClick={onClose} className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-muted-foreground order-2 md:order-1">Discard</button>
+                            <button type="submit" disabled={loading || !selectedInvoiceId} className="w-full md:w-auto px-10 py-4 bg-primary text-white font-black text-xs rounded-2xl shadow-xl shadow-primary/30 hover:bg-primary/90 transition-all transform active:scale-95 disabled:opacity-50 uppercase tracking-[0.2em] order-1 md:order-2">
+                                {loading ? <Spinner size="sm" className="text-white" /> : 'Confirm Protocol'}
                             </button>
                         </div>
                     </form>

@@ -35,23 +35,34 @@ const STATUS_CONFIG: Record<EnquiryStatus, { icon: React.ReactNode, label: strin
 const ORDERED_STATUSES: EnquiryStatus[] = ['New', 'Contacted', 'In Review', 'Completed'];
 
 /**
- * Robust error formatting utility.
+ * Robust error formatting utility to prevent [object Object].
  */
 const formatError = (err: any): string => {
     if (!err) return "An unknown error occurred.";
-    if (typeof err === 'string') return err;
-    
-    const message = err.message || err.error_description || err.details || err.hint;
-    if (message && typeof message === 'string' && !message.includes("[object Object]")) {
-        return message;
+    if (typeof err === 'string') {
+        return (err === "[object Object]" || err === "{}") ? "Mapping protocol failed." : err;
     }
     
-    if (err.error && typeof err.error === 'string') return err.error;
-    if (err.error?.message && typeof err.error.message === 'string') return err.error.message;
+    // Check common error fields
+    const candidates = [
+        err.message,
+        err.error_description,
+        err.details,
+        err.hint,
+        err.error?.message,
+        err.error
+    ];
+
+    for (const val of candidates) {
+        if (typeof val === 'string' && val !== "[object Object]" && val !== "{}") return val;
+        if (typeof val === 'object' && val?.message && typeof val.message === 'string') return val.message;
+    }
 
     try {
-        const json = JSON.stringify(err);
-        if (json && json !== '{}' && json !== '[]') return json;
+        const str = JSON.stringify(err);
+        if (str && str !== '{}' && str !== '[]' && !str.includes("[object Object]")) {
+            return str;
+        }
     } catch { }
 
     return "An unexpected system error occurred while processing the enquiry details.";

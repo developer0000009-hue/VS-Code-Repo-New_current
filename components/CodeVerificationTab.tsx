@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { VerifiedShareCodeData } from '../types';
@@ -8,6 +7,10 @@ import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { XIcon } from './icons/XIcon';
 import { SearchIcon } from './icons/SearchIcon';
 import { ArrowRightIcon } from './icons/ArrowRightIcon';
+import { UsersIcon } from './icons/UsersIcon';
+import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
+// Fix: Import missing AlertTriangleIcon
+import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 
 interface InfoRowProps {
     label: string;
@@ -17,7 +20,7 @@ interface InfoRowProps {
 
 const InfoRow: React.FC<InfoRowProps> = ({ label, value, valueClassName = "text-foreground font-medium" }) => (
     <div>
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 opacity-80">{label}</p>
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mb-1.5 opacity-60">{label}</p>
         <p className={`text-sm ${valueClassName}`}>{value || '—'}</p>
     </div>
 );
@@ -33,7 +36,6 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId }) =
     const [verifiedData, setVerifiedData] = useState<VerifiedShareCodeData | null>(null);
     const [importSuccessMessage, setImportSuccessMessage] = useState<React.ReactNode | null>(null);
 
-    // Reset state when branch changes
     useEffect(() => {
         setVerifiedData(null);
         setImportSuccessMessage(null);
@@ -42,186 +44,207 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId }) =
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!code.trim()) return;
+        const cleanCode = code.trim().toUpperCase();
+        if (!cleanCode) return;
         
         setLoading(true);
         setError(null);
         setVerifiedData(null);
         setImportSuccessMessage(null);
 
-        const { data, error: rpcError } = await supabase.rpc('admin_verify_share_code', { p_code: code.trim().toUpperCase() });
+        try {
+            // Verification Protocol: Checks validity, ownership, and scope
+            const { data, error: rpcError } = await supabase.rpc('admin_verify_share_code', { 
+                p_code: cleanCode 
+            });
 
-        if (rpcError) {
-            setError(`Error: ${rpcError.message}`);
-        } else if (data.error) {
-            setError(data.error);
-        } else {
-            setVerifiedData(data);
+            if (rpcError) throw rpcError;
+            
+            if (data.error) {
+                setError(data.error);
+            } else if (!data.found) {
+                setError("Cryptographic token not found or has been decommissioned.");
+            } else {
+                setVerifiedData(data);
+            }
+        } catch (err: any) {
+            setError(`Handshake Failed: ${err.message || "Institutional server timed out."}`);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
     
     const handleImport = async () => {
         if (!verifiedData) return;
         if (!branchId) {
-            setError("No active branch selected. Please select a branch from the top menu first.");
+            setError("BRANCH CONTEXT MISSING: Select an active campus node before initiating record import.");
             return;
         }
 
         setLoading(true);
         setError(null);
         
-        const { error: rpcError } = await supabase.rpc('admin_import_record_from_share_code', { 
-            p_admission_id: verifiedData.admission_id,
-            p_code_type: verifiedData.code_type,
-            p_branch_id: branchId
-        });
+        try {
+            const { error: rpcError } = await supabase.rpc('admin_import_record_from_share_code', { 
+                p_admission_id: verifiedData.admission_id,
+                p_code_type: verifiedData.code_type,
+                p_branch_id: branchId
+            });
 
-        if (rpcError) {
-             setError(`Import failed: ${rpcError.message}`);
-        } else {
-            const destinationTab = verifiedData.code_type === 'Enquiry' ? 'Enquiries' : 'Admissions';
+            if (rpcError) throw rpcError;
+
+            const destinationTab = verifiedData.code_type === 'Enquiry' ? 'Enquiry Logs' : 'Admission Vault';
             setImportSuccessMessage(
-                <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
-                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full text-green-600"><CheckCircleIcon className="w-6 h-6" /></div>
+                <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left bg-emerald-500/10 p-6 rounded-[2rem] border border-emerald-500/20 shadow-xl animate-in zoom-in-95">
+                    <div className="p-3 bg-emerald-500 rounded-2xl text-white shadow-lg shadow-emerald-500/30">
+                        <CheckCircleIcon className="w-8 h-8" />
+                    </div>
                     <div>
-                        <p className="font-bold text-green-700 dark:text-green-400">Import Successful!</p>
-                        <p className="text-sm text-green-600/80 dark:text-green-300/80">Record added to <strong>{destinationTab}</strong>. You can now process it.</p>
+                        <p className="font-black text-emerald-600 uppercase tracking-widest text-xs">Identity Synchronized</p>
+                        <p className="text-sm text-muted-foreground mt-1 font-medium leading-relaxed">
+                            Encrypted payload for <strong>{verifiedData.applicant_name}</strong> successfully integrated into the <strong>{destinationTab}</strong>.
+                        </p>
                     </div>
                 </div>
             );
             setVerifiedData(null); 
             setCode('');
+        } catch (err: any) {
+            setError(`Import Protocol Failure: ${err.message || "Database synchronization failed."}`);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-12 py-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-4xl mx-auto space-y-12 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-40">
             
-            {/* Header Section */}
-            <div className="text-center space-y-3">
-                <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner ring-1 ring-primary/5 rotate-3">
-                    <KeyIcon className="w-10 h-10 text-primary" />
+            {/* Header: Operational Intent */}
+            <div className="text-center space-y-4">
+                <div className="w-24 h-24 bg-primary/10 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner ring-1 ring-primary/5 transform rotate-3 hover:rotate-0 transition-transform duration-700 group">
+                    <ShieldCheckIcon className="w-12 h-12 text-primary group-hover:scale-110 transition-transform" />
                 </div>
-                <h2 className="text-4xl font-serif font-extrabold text-foreground tracking-tight">Parent Verification</h2>
-                <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
-                    Enter the secure <strong>Share Code</strong> provided by the parent to fetch and import their application data instantly.
+                <h2 className="text-5xl font-serif font-black text-foreground tracking-tighter uppercase">Identity Handshake</h2>
+                <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed font-medium">
+                    Initialize a secure record import by entering the parent-provisioned <strong>Digital Permit Key</strong>.
                 </p>
             </div>
 
-            {/* Verification Input Section */}
+            {/* Verification Console */}
             <div className="max-w-xl mx-auto relative">
                 <form onSubmit={handleVerify} className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
-                        <SearchIcon className="h-6 w-6" />
+                    <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
+                        <KeyIcon className="h-6 w-6" />
                     </div>
                     <input
                         type="text"
-                        placeholder="Enter Code (e.g. ENQ-A1B2C3)"
+                        placeholder="ENTER PERMIT KEY (E.G. ADM-1A2B3C)"
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
-                        className="w-full bg-card border-2 border-border/60 hover:border-primary/30 rounded-2xl pl-14 pr-32 py-5 text-xl font-mono font-bold tracking-wider focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all shadow-lg shadow-black/5 uppercase placeholder:text-muted-foreground/30 text-foreground"
+                        className="w-full bg-card border-2 border-border/60 hover:border-primary/40 rounded-[2rem] pl-16 pr-36 py-6 text-2xl font-mono font-black tracking-[0.2em] focus:ring-8 focus:ring-primary/5 focus:border-primary outline-none transition-all shadow-2xl shadow-black/5 uppercase placeholder:text-muted-foreground/20 text-foreground"
                         autoFocus
                     />
                     <button 
                         type="submit" 
                         disabled={loading || !code.trim()}
-                        className="absolute right-2 top-2 bottom-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-2"
+                        className="absolute right-3 top-3 bottom-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black px-8 rounded-2xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-3 uppercase tracking-widest text-xs"
                     >
                         {loading && !verifiedData ? <Spinner size="sm" className="text-current" /> : <>Verify <ArrowRightIcon className="w-4 h-4"/></>}
                     </button>
                 </form>
 
-                {/* Status Messages */}
-                <div className="mt-6 space-y-4">
+                {/* Status Interface */}
+                <div className="mt-8 space-y-4">
                     {!branchId && (
-                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 px-6 py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 animate-in fade-in slide-in-from-top-1 text-center">
-                            <span className="text-xl">⚠️</span> Warning: No active branch selected. You cannot import records until a branch is chosen.
+                        <div className="bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-400 px-8 py-5 rounded-3xl text-sm font-bold flex items-center justify-center gap-4 animate-in slide-in-from-top-2 text-center shadow-xl">
+                            {/* Fix: use AlertTriangleIcon correctly */}
+                            <AlertTriangleIcon className="w-6 h-6 flex-shrink-0 animate-pulse" />
+                            <span className="leading-relaxed uppercase tracking-wide">Workstation Context Required: Node selection mandatory before permit resolution.</span>
                         </div>
                     )}
 
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 px-6 py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 animate-in fade-in slide-in-from-top-1 text-center shadow-sm">
-                            <XIcon className="w-5 h-5" /> {error}
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 px-8 py-5 rounded-3xl text-sm font-bold flex items-center justify-center gap-4 animate-in shake duration-500 text-center shadow-xl">
+                            <XIcon className="w-6 h-6 flex-shrink-0" /> <span className="uppercase tracking-wide">{error}</span>
                         </div>
                     )}
                     
                     {importSuccessMessage && (
-                        <div className="bg-green-500/10 border border-green-500/20 px-6 py-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-1 flex justify-center">
+                        <div className="animate-in fade-in slide-in-from-top-4 flex justify-center">
                             {importSuccessMessage}
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Results Section */}
+            {/* Results Deck */}
             {verifiedData && (
-                <div className="animate-in slide-in-from-bottom-8 duration-500 fade-in">
-                    <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-xl ring-1 ring-black/5 relative group">
-                        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <div className="animate-in slide-in-from-bottom-12 duration-700 fade-in">
+                    <div className="bg-card border border-border rounded-[3rem] overflow-hidden shadow-3xl ring-1 ring-black/10 relative group">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600"></div>
                         
-                        <div className="p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-10 relative">
-                            {/* Applicant Column */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <span className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center font-bold text-sm border-2 border-background shadow-sm">
+                        <div className="p-10 md:p-14 grid grid-cols-1 md:grid-cols-2 gap-16 relative">
+                            {/* Applicant Data Segment */}
+                            <div className="space-y-8">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-black text-sm border border-blue-500/20 shadow-inner">
                                         {(verifiedData.applicant_name || 'A').charAt(0)}
-                                    </span>
-                                    <h4 className="text-sm font-extrabold text-muted-foreground uppercase tracking-widest">Applicant Details</h4>
-                                </div>
-                                <div className="space-y-5 pl-3 border-l-2 border-border ml-5">
-                                    <InfoRow label="Full Name" value={verifiedData.applicant_name} valueClassName="text-2xl font-black text-foreground tracking-tight" />
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <InfoRow label="Target Grade" value={verifiedData.grade} valueClassName="text-base font-bold bg-muted px-2 py-0.5 rounded w-fit"/>
-                                        <InfoRow label="Gender" value={verifiedData.gender} />
                                     </div>
-                                    <InfoRow label="Date of Birth" value={new Date(verifiedData.date_of_birth).toLocaleDateString(undefined, {dateStyle: 'long'})} />
+                                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em]">Target Identity</h4>
+                                </div>
+                                <div className="space-y-6 pl-4 border-l-2 border-white/5 ml-6">
+                                    <InfoRow label="Legal Name" value={verifiedData.applicant_name} valueClassName="text-3xl font-serif font-black text-foreground tracking-tighter uppercase" />
+                                    <div className="grid grid-cols-2 gap-8">
+                                        <InfoRow label="Academic Grade" value={verifiedData.grade} valueClassName="text-lg font-black bg-indigo-500/10 px-3 py-1 rounded-lg w-fit text-indigo-400 border border-indigo-500/20"/>
+                                        <InfoRow label="Identity Gender" value={verifiedData.gender} />
+                                    </div>
+                                    <InfoRow label="Temporal Birth Record" value={new Date(verifiedData.date_of_birth).toLocaleDateString(undefined, {dateStyle: 'long'})} />
                                 </div>
                             </div>
 
-                            {/* Parent Column */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 mb-2">
-                                     <span className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex items-center justify-center font-bold text-sm border-2 border-background shadow-sm">
+                            {/* Guardian Data Segment */}
+                            <div className="space-y-8">
+                                <div className="flex items-center gap-4 mb-4">
+                                     <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-black text-sm border border-purple-500/20 shadow-inner">
                                         {(verifiedData.parent_name || 'P').charAt(0)}
-                                    </span>
-                                    <h4 className="text-sm font-extrabold text-muted-foreground uppercase tracking-widest">Guardian Info</h4>
+                                    </div>
+                                    <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em]">Handshake Arbiter</h4>
                                 </div>
-                                <div className="space-y-5 pl-3 border-l-2 border-border ml-5">
-                                    <InfoRow label="Guardian Name" value={verifiedData.parent_name} valueClassName="text-xl font-bold text-foreground" />
-                                    <InfoRow label="Email Address" value={verifiedData.parent_email} />
-                                    <InfoRow label="Phone Number" value={verifiedData.parent_phone} />
+                                <div className="space-y-6 pl-4 border-l-2 border-white/5 ml-6">
+                                    <InfoRow label="Guardian Name" value={verifiedData.parent_name} valueClassName="text-2xl font-bold text-foreground tracking-tight" />
+                                    <InfoRow label="Institutional Contact" value={verifiedData.parent_email} />
+                                    <InfoRow label="Mobile Telemetry" value={verifiedData.parent_phone} />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Footer Action */}
-                        <div className="bg-muted/30 px-8 py-6 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-background border border-border rounded-lg text-xs font-mono font-bold text-muted-foreground">
-                                    {verifiedData.code_type.toUpperCase()} RECORD
+                        {/* Control Dock */}
+                        <div className="bg-muted/30 px-10 py-8 border-t border-border flex flex-col sm:flex-row justify-between items-center gap-8 backdrop-blur-xl">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-background border border-border rounded-2xl text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em] shadow-inner">
+                                    {verifiedData.code_type} DATA_BLOCK
                                 </div>
-                                <span className="text-xs text-muted-foreground font-medium">Ready for import to {verifiedData.code_type === 'Enquiry' ? 'Enquiries' : 'Admissions'}</span>
+                                <div className="h-6 w-px bg-border hidden sm:block"></div>
+                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest animate-pulse">Ready for system synchronization</span>
                             </div>
 
                             {verifiedData.already_imported ? (
-                                <div className="px-5 py-2.5 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-500/20 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm">
-                                    <CheckCircleIcon className="w-5 h-5" /> Already Imported
+                                <div className="px-8 py-4 bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.25em] flex items-center gap-3 shadow-inner">
+                                    <CheckCircleIcon className="w-5 h-5 opacity-60" /> Redundant Synchronization Detected
                                 </div>
                             ) : (
                                 <button
                                     onClick={handleImport}
                                     disabled={!branchId || loading}
                                     className={`
-                                        px-8 py-3 rounded-xl font-bold text-sm text-white shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 active:scale-95
+                                        px-14 py-5 rounded-[2rem] font-black text-sm uppercase tracking-[0.3em] text-white shadow-2xl transition-all flex items-center gap-4 transform active:scale-95
                                         ${!branchId 
-                                            ? 'bg-muted-foreground/30 cursor-not-allowed shadow-none' 
-                                            : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25'
+                                            ? 'bg-muted-foreground/20 cursor-not-allowed shadow-none grayscale opacity-30' 
+                                            : 'bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 shadow-emerald-500/30 hover:-translate-y-1'
                                         }
                                     `}
                                 >
-                                    {loading ? <Spinner size="sm" className="text-white"/> : <><CheckCircleIcon className="w-5 h-5"/> Confirm Import</>}
+                                    {loading ? <Spinner size="sm" className="text-white"/> : <><ShieldCheckIcon className="w-6 h-6"/> Seal & Integrate</>}
                                 </button>
                             )}
                         </div>

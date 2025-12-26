@@ -108,7 +108,7 @@ const StudentSwitcher: React.FC<Omit<StudentHeaderProps, 'pageTitle' | 'onMenuCl
 
 
 const StudentHeader: React.FC<StudentHeaderProps> = (props) => {
-    const { profile, onSignOut, onSwitchRole, onSelectRole, onMenuClick, pageTitle, isParentView } = props;
+    const { profile, onSignOut, onSelectRole, onMenuClick, pageTitle, isParentView } = props;
 
     return (
         <header className="bg-card/80 backdrop-blur-md border-b border-border h-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 z-30 sticky top-0 transition-all">
@@ -145,7 +145,6 @@ const StudentHeader: React.FC<StudentHeaderProps> = (props) => {
                     <ProfileDropdown
                         profile={profile}
                         onSignOut={onSignOut}
-                        onSwitchRole={onSwitchRole}
                         onSelectRole={onSelectRole} // Vital for "Add Role" functionality
                     />
                 </div>

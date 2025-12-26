@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { StudentDashboardData, SubmissionStatus, StudentAssignment, StudyMaterial } from '../../types';
@@ -38,7 +37,7 @@ const SyllabusModal: React.FC<{ subject: string; courseClass: string; onClose: (
             `;
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3-flash-preview',
                 contents: prompt,
             });
 
@@ -202,20 +201,20 @@ const fileTypeIcons: { [key: string]: React.ReactNode } = {
 const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUserId }) => {
     const [viewingSyllabusFor, setViewingSyllabusFor] = useState<string | null>(null);
     const [submittingAssignment, setSubmittingAssignment] = useState<StudentAssignment | null>(null);
-    const [localStudyMaterials, setLocalStudyMaterials] = useState<StudyMaterial[]>(Array.isArray(data.studyMaterials) ? data.studyMaterials : []);
+    const [localStudyMaterials, setLocalStudyMaterials] = useState<StudyMaterial[]>(Array.isArray(data?.studyMaterials) ? data.studyMaterials : []);
     const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
 
     useEffect(() => {
-        setLocalStudyMaterials(Array.isArray(data.studyMaterials) ? data.studyMaterials : []);
-    }, [data.studyMaterials]);
+        setLocalStudyMaterials(Array.isArray(data?.studyMaterials) ? data.studyMaterials : []);
+    }, [data?.studyMaterials]);
 
     const subjects = useMemo(() => {
         const subjectSet = new Set<string>();
-        data.timetable.forEach(item => subjectSet.add(item.subject));
-        data.assignments.forEach(item => subjectSet.add(item.subject));
-        (Array.isArray(data.studyMaterials) ? data.studyMaterials : []).forEach(item => subjectSet.add(item.subject));
+        (data?.timetable ?? []).forEach(item => subjectSet.add(item.subject));
+        (data?.assignments ?? []).forEach(item => subjectSet.add(item.subject));
+        (Array.isArray(data?.studyMaterials) ? data.studyMaterials : []).forEach(item => subjectSet.add(item.subject));
         return Array.from(subjectSet).sort();
-    }, [data.timetable, data.assignments, data.studyMaterials]);
+    }, [data?.timetable, data?.assignments, data?.studyMaterials]);
     
     const groupedMaterials = useMemo(() => {
         return (localStudyMaterials || []).reduce((acc: Record<string, StudyMaterial[]>, material) => {
@@ -257,7 +256,7 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
         const { error } = await supabase.rpc('toggle_bookmark_material', { p_material_id: materialId });
         if (error) {
             console.error('Failed to toggle bookmark:', error);
-            setLocalStudyMaterials(originalMaterials); // Revert on error
+            setLocalStudyMaterials(originalMaterials); 
             alert('Failed to update bookmark.');
         } else {
             onRefresh(); 
@@ -266,7 +265,6 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
 
     return (
         <div className="space-y-12">
-            {/* --- My Subjects Section --- */}
             <section>
                 <div className="flex items-center gap-3 mb-4">
                     <AcademicCapIcon className="w-7 h-7 text-primary" />
@@ -288,7 +286,6 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
                 </div>
             </section>
 
-            {/* --- Study Resources Section --- */}
             <section>
                 <div className="flex items-center gap-3 mb-4">
                     <BookOpenIcon className="w-7 h-7 text-primary" />
@@ -334,21 +331,18 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
                 )}
             </section>
 
-            {/* --- Assignments Section --- */}
             <section>
                 <div className="flex items-center gap-3 mb-4">
                     <ChecklistIcon className="w-7 h-7 text-primary" />
                     <h2 className="text-2xl font-bold text-foreground">My Assignments</h2>
                 </div>
-                {data.assignments.length > 0 ? (
+                {(data?.assignments ?? []).length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {data.assignments.map(assignment => {
-                            // Explicitly type status to allow 'Overdue' which is computed locally
                             let status: SubmissionStatus | 'Overdue' = assignment.status;
                             const now = new Date();
                             const due = new Date(assignment.due_date);
                             
-                            // Client-side overdue check if backend didn't mark it
                             if (status === 'Not Submitted' && due < now) {
                                 status = 'Overdue';
                             }
@@ -383,7 +377,6 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
 
                                     <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
                                         <span>Due: {new Date(assignment.due_date).toLocaleString()}</span>
-                                        {/* Allow late submission if not graded */}
                                         {(status === 'Not Submitted' || status === 'Late' || status === 'Overdue') ? (
                                             <button onClick={() => setSubmittingAssignment(assignment)} className="bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg font-bold transition-colors">
                                                 {status === 'Overdue' ? 'Submit Late' : 'Submit'}
@@ -414,7 +407,7 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
             {viewingSyllabusFor && (
                 <SyllabusModal 
                     subject={viewingSyllabusFor} 
-                    courseClass={data.profile.grade} 
+                    courseClass={data?.profile?.grade || ''} 
                     onClose={() => setViewingSyllabusFor(null)} 
                 />
             )}
@@ -424,7 +417,7 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
                     onClose={() => setSubmittingAssignment(null)}
                     onSuccess={() => {
                         setSubmittingAssignment(null);
-                        onRefresh(); // Refresh dashboard data to reflect new submission status
+                        onRefresh(); 
                     }}
                     currentUserId={currentUserId}
                 />

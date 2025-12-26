@@ -117,13 +117,14 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
 
     const renderContent = () => {
         switch (activeComponent) {
-            case 'Dashboard': return <DashboardOverview schoolProfile={schoolData} currentBranch={currentBranch} profile={profile} onNavigateToBranches={() => setActiveComponent('Branches')} />;
+            // Fix: Updated DashboardOverview usage to use generic onNavigate prop instead of onNavigateToBranches
+            case 'Dashboard': return <DashboardOverview schoolProfile={schoolData} currentBranch={currentBranch} profile={profile} onNavigate={setActiveComponent} />;
             case 'Profile': return <ProfileCreationPage profile={profile} role={profile.role!} onComplete={onProfileUpdate} onBack={() => setActiveComponent('Dashboard')} showBackButton={true} />;
             case 'Branches': return <BranchManagementTab isHeadOfficeAdmin={isHeadOfficeAdmin} branches={branches} isLoading={loadingData} error={dataError} onBranchUpdate={fetchDashboardData} onSelectBranch={setCurrentBranchId} schoolProfile={schoolData} />;
             case 'Admissions': return <AdmissionsTab branchId={currentBranchId} />;
             case 'Enquiries': return <EnquiryTab branchId={currentBranchId} onNavigate={setActiveComponent} />;
             case 'Code Verification': return <CodeVerificationTab branchId={currentBranchId} />;
-            case 'Student Management': return <StudentManagementTab />;
+            case 'Student Management': return <StudentManagementTab branchId={currentBranchId} />;
             case 'Teacher Management': return <TeachersManagementTab profile={profile} branchId={currentBranchId} />;
             case 'Classes': return <ClassesTab branchId={currentBranchId} />;
             case 'Courses': return <CoursesTab profile={profile} />;
@@ -136,7 +137,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
             case 'Meetings': return <MeetingsTab />;
             case 'Homework': return <HomeworkTab />;
             case 'Facility Management': return <FacilityManagementTab />;
-            default: return <DashboardOverview schoolProfile={schoolData} currentBranch={currentBranch} profile={profile} onNavigateToBranches={() => setActiveComponent('Branches')} />;
+            default: return <DashboardOverview schoolProfile={schoolData} currentBranch={currentBranch} profile={profile} onNavigate={setActiveComponent} />;
         }
     };
 

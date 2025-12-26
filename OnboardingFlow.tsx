@@ -11,34 +11,34 @@ import { SchoolIcon } from './components/icons/SchoolIcon';
 import ProfileDropdown from './components/common/ProfileDropdown';
 import Stepper from './components/common/Stepper';
 
-/**
- * Robust error message extractor.
- * Guarantees a string return and prevents [object Object] displays.
- */
 const formatError = (err: any): string => {
-    if (!err) return "Institutional synchronization failed.";
-    if (typeof err === 'string') return err;
+    if (!err) return "Synchronization failed.";
     
-    // Check common error property paths
-    const message = err.message || err.error_description || err.details || err.hint;
-    if (message && typeof message === 'string' && !message.includes("[object Object]")) {
-        return message;
+    if (typeof err === 'string') {
+        const isJunk = err === "[object Object]" || err === "{}" || err === "null" || err === "undefined";
+        return isJunk ? "An internal system exception occurred." : err;
     }
     
-    // Check nested Supabase error object
-    if (err.error) {
-        if (typeof err.error === 'string') return err.error;
-        if (err.error.message && typeof err.error.message === 'string') return err.error.message;
+    const candidates = [
+        err.message, 
+        err.error_description, 
+        err.details, 
+        err.hint, 
+        err.error?.message,
+        err.error
+    ];
+    
+    for (const val of candidates) {
+        if (typeof val === 'string' && val !== "[object Object]" && val !== "{}") return val;
+        if (typeof val === 'object' && val?.message && typeof val.message === 'string') return val.message;
     }
-
-    // Attempt JSON stringification for debugging if it's a plain object
+    
     try {
         const str = JSON.stringify(err);
-        if (str && str !== '{}' && str !== '[]') return str;
+        if (str && str !== '{}' && str !== '[]' && !str.includes("[object Object]")) return str;
     } catch { }
-
-    const final = String(err);
-    return final === '[object Object]' ? "An unexpected system error occurred during setup." : final;
+    
+    return "An unexpected system exception occurred during setup.";
 };
 
 interface OnboardingFlowProps {
@@ -83,6 +83,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
             const dbStep = onboardingStep;
             if (dbStep && ['profile', 'pricing', 'branches'].includes(dbStep)) {
                 setStep(dbStep as any);
+            } else if (dbStep === 'completed' || profile.profile_completed) {
+                onComplete();
             } else {
                 setStep('profile');
             }
@@ -108,21 +110,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
         setLoading(true);
         
         try {
-            if (role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
-                // Initialize School Admin workflow via Secured RPC
-                const { error } = await supabase.rpc('initialize_school_admin');
-                if (error) throw error;
-                
-                if (isMounted.current) setStep('profile');
-            } else {
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({ role: role, profile_completed: false })
-                    .eq('id', profile.id);
-
-                if (updateError) throw updateError;
-                if (isMounted.current) setStep('profile');
-            }
+            // switch_active_role now automatically detects if a profile is reusable
+            const { data, error } = await supabase.rpc('switch_active_role', { p_target_role: role });
+            if (error) throw error;
 
             if (onStepChange) {
                 await onStepChange();
@@ -130,9 +120,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
             
             setSelectedRole(role);
 
+            // If the RPC restored a profile, we immediately complete onboarding
+            if (data?.profile_restored) {
+                onComplete();
+            }
+
         } catch (err: any) {
-            console.error('Role selection failed:', err);
-            alert(`Role selection failed: ${formatError(err)}`);
+            const formatted = formatError(err);
+            console.error('Role selection failed: ' + formatted, err);
+            alert(`Setup Failed: ${formatted}`);
+            
             if (isMounted.current) {
                 setStep('role');
                 setLoading(false);
@@ -141,20 +138,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
         }
     };
 
-    /**
-     * PROACTIVE ADVANCEMENT: Predictions for UI steps to eliminate network lag feel.
-     */
     const handleStepAdvance = async () => {
         if (!isMounted.current) return;
-        
-        // Optimistic UI transition based on known flow
-        if (step === 'profile') setStep('pricing');
-        else if (step === 'pricing') setStep('branches');
-
-        // Trigger parent sync for global profile object consistency
-        if (onStepChange) {
-            await onStepChange();
-        }
+        if (onStepChange) await onStepChange();
     };
 
     const handleFinalize = async () => {
@@ -164,7 +150,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
             if (error) throw error;
             if (isMounted.current) await onComplete();
         } catch (error: any) {
-            alert("Error finalizing institutional setup: " + formatError(error));
+            alert("Protocol Violation: " + formatError(error));
         } finally {
             if (isMounted.current) setLoading(false);
         }
@@ -243,10 +229,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                 <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         <div className="flex items-center flex-shrink-0 cursor-pointer" onClick={() => step !== 'role' && handleBack()}>
-                            <div className="p-2 bg-primary/10 rounded-xl mr-3">
+                            <div className="p-2 bg-primary/10 rounded-xl mr-3 shadow-inner">
                                 <SchoolIcon className="h-6 w-6 text-primary" />
                             </div>
-                            <span className="font-serif font-bold text-lg hidden sm:block text-foreground">Institutional Setup</span>
+                            <span className="font-serif font-bold text-lg hidden sm:block text-foreground tracking-tight">Institutional Setup</span>
                         </div>
                         
                         {selectedRole === BuiltInRoles.SCHOOL_ADMINISTRATION && step !== 'role' && (

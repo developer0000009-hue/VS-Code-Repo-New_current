@@ -44,11 +44,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
     useEffect(() => {
         const initializeView = async () => {
             setLoading(true);
-            // Use profile.id directly instead of supabase.auth.getUser()
             if (!profile.id) { setLoading(false); setError("User ID not available."); return; }
 
-            // Check if the current user has a parent profile. This is the definitive way to know it's a parent.
-            const { count, error: parentProfileError } = await supabase.from('parent_profiles').select('user_id', { count: 'exact', head: true }).eq('user_id', profile.id);
+            // Check if current user is a parent in the Parent Profile registry
+            const { count, error: parentProfileError } = await supabase
+                .from('parent_profiles')
+                .select('id', { count: 'exact', head: true })
+                .eq('id', profile.id);
 
             if (parentProfileError) {
                 setError("Could not verify user type.");
@@ -58,52 +60,29 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
             
             if (count && count > 0) { // It's a parent
                 setIsParentView(true);
-                // 1. Get all their children profiles for the switcher
                 const { data: childrenData, error: childrenError } = await supabase.rpc('get_my_children_profiles');
 
-                if (childrenError) { setError("Could not fetch children list."); setLoading(false); return; }
+                if (childrenError) { 
+                    setError("Could not fetch children list."); 
+                    setLoading(false); 
+                    return; 
+                }
                 
-                const enrolledChildren = (childrenData || []).filter((child: any) => child.student_user_id);
+                const enrolledChildren = (childrenData || []).filter((child: any) => child.id);
                 setAllMyChildren(enrolledChildren);
 
-                // 2. Find which student they are currently viewing via their 'student_profiles' record
-                const { data: parentStudentProfile, error: profileError } = await supabase.from('student_profiles').select('admission_id').eq('user_id', profile.id).single();
-                
-                if (profileError || !parentStudentProfile) { 
-                    // Fallback: if no specific student selected, pick the first one
-                    if (enrolledChildren.length > 0) {
-                        const firstChild = enrolledChildren[0];
-                        setCurrentAdmissionId(firstChild.id);
-                        if (firstChild.student_user_id) setCurrentStudentId(firstChild.student_user_id);
-                    } else {
-                        // No children found or enrolled yet. Stop loading here to show empty state.
-                        setLoading(false);
-                        return;
-                    }
+                if (enrolledChildren.length > 0) {
+                    const firstChild = enrolledChildren[0];
+                    setCurrentAdmissionId(firstChild.id);
+                    setCurrentStudentId(firstChild.id);
                 } else {
-                    const initialAdmissionId = parentStudentProfile.admission_id;
-                    setCurrentAdmissionId(initialAdmissionId);
-
-                    // 3. Find the student_user_id from that admission record
-                    const linkedChild = enrolledChildren.find((c: any) => c.id === initialAdmissionId);
-                    if (linkedChild?.student_user_id) {
-                        setCurrentStudentId(linkedChild.student_user_id);
-                    } else {
-                        // Fallback if link is broken
-                         if (enrolledChildren.length > 0) {
-                            setCurrentStudentId(enrolledChildren[0].student_user_id);
-                            setCurrentAdmissionId(enrolledChildren[0].id);
-                        } else {
-                            setLoading(false); // No valid child found
-                        }
-                    }
+                    setLoading(false);
+                    return;
                 }
-
             } else { // It's a student
                 setIsParentView(false);
                 setCurrentStudentId(profile.id);
             }
-            // We will let the next effect handle data fetching if ID exists
         };
 
         initializeView();
@@ -111,9 +90,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
 
     // This effect fetches the main dashboard data whenever the student ID to view changes
     const fetchDashboardData = useCallback(async () => {
-        if (!currentStudentId) {
-             return;
-        }
+        if (!currentStudentId) return;
 
         setLoading(true);
         setError(null);
@@ -136,7 +113,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
         if (newAdmissionId === currentAdmissionId) return; // No change
 
         setLoading(true);
-        // 1. Update the parent's pointer in the DB
         const { error: switchError } = await supabase.rpc('parent_switch_student_view', { p_new_admission_id: newAdmissionId });
         if (switchError) {
             setError(`Failed to switch student view: ${switchError.message}`);
@@ -144,18 +120,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
             return;
         }
         
-        // 2. Update local state to trigger data re-fetch
         setCurrentAdmissionId(newAdmissionId);
-        const newChild = allMyChildren.find(c => c.id === newAdmissionId);
-        if (newChild?.student_user_id) {
-            setCurrentStudentId(newChild.student_user_id);
-        } else {
-            setError("Error finding new student to display.");
-            setLoading(false);
-        }
+        setCurrentStudentId(newAdmissionId.toString());
     };
     
-    // CHECK FOR WIZARD REQUIREMENT
     if (dashboardData?.needs_onboarding) {
         return <StudentOnboardingWizard data={dashboardData} onComplete={fetchDashboardData} />;
     }
@@ -165,10 +133,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
             return <div className="flex h-full items-center justify-center"><Spinner size="lg" /></div>;
         }
         
-        // Empty State for Parents with no kids linked
         if (isParentView && !currentStudentId) {
              return (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in duration-700">
                     <div className="p-6 bg-muted/30 rounded-full mb-4 border-2 border-dashed border-border">
                         <svg className="w-12 h-12 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     </div>
@@ -180,18 +147,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
 
         if (error) {
             return (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in shake duration-500">
                     <div className="p-4 bg-destructive/10 rounded-full mb-4">
                         <svg className="w-8 h-8 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     </div>
                     <h3 className="text-lg font-bold text-foreground">Dashboard Unavailable</h3>
                     <p className="text-muted-foreground mt-2 max-w-md">{error}</p>
-                    <button onClick={() => window.location.reload()} className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90">Reload Page</button>
+                    <button onClick={() => window.location.reload()} className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 transition-all active:scale-95 shadow-lg">Reload Page</button>
                 </div>
             );
         }
         
-        // Critical: Handle case where data is missing but no error (Blank Screen Fix)
         if (!dashboardData) {
             return (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in zoom-in-95">
@@ -200,7 +166,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
                     </div>
                     <h3 className="text-lg font-bold text-foreground">Initializing Student Profile...</h3>
                     <p className="text-muted-foreground mt-2 max-w-md">We are setting up your dashboard. If this persists, please contact support.</p>
-                    <button onClick={fetchDashboardData} className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90">
+                    <button onClick={fetchDashboardData} className="mt-6 px-6 py-2 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 shadow-lg">
                         Retry Loading
                     </button>
                 </div>
@@ -241,7 +207,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ profile, onSignOut,
                     onSelectRole={onSelectRole} 
                     onMenuClick={() => setIsSidebarOpen(true)}
                     pageTitle={activeTab}
-                    // Pass parent-specific props
                     isParentView={isParentView}
                     allMyChildren={allMyChildren}
                     currentChildId={currentAdmissionId}

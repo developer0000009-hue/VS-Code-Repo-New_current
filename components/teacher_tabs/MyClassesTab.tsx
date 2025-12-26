@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { TeacherClassOverview, TeacherClassDetails, ClassSubject, LessonPlan, FunctionComponentWithIcon } from '../../types';
@@ -62,7 +61,7 @@ const MyClassesTab: FunctionComponentWithIcon<MyClassesTabProps> = ({ currentUse
             <h2 className="text-xl font-bold">My Classes</h2>
             {loading.overviews ? <div className="flex justify-center p-4"><Spinner /></div> :
              error && !classDetails ? <p className="text-red-500 p-4">{error}</p> :
-             overviews.length === 0 ? <p className="text-muted-foreground text-center">You are not assigned to any classes.</p> :
+             (overviews ?? []).length === 0 ? <p className="text-muted-foreground text-center">You are not assigned to any classes.</p> :
             (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {overviews.map(cls => (
@@ -101,7 +100,7 @@ const MyClassesTab: FunctionComponentWithIcon<MyClassesTabProps> = ({ currentUse
             {isAssignmentModalOpen && selectedClassId && classDetails && (
                 <AddAssignmentModal 
                     classId={selectedClassId} 
-                    subjects={classDetails.subjects} 
+                    subjects={classDetails.subjects ?? []} 
                     onClose={() => setIsAssignmentModalOpen(false)} 
                     onSuccess={refreshDetails}
                     currentUserId={currentUserId}
@@ -110,7 +109,7 @@ const MyClassesTab: FunctionComponentWithIcon<MyClassesTabProps> = ({ currentUse
             {isMaterialModalOpen && selectedClassId && classDetails && (
                 <AddMaterialModal 
                     classId={selectedClassId} 
-                    subjects={classDetails.subjects} 
+                    subjects={classDetails.subjects ?? []} 
                     onClose={() => setIsMaterialModalOpen(false)} 
                     onSuccess={refreshDetails}
                     currentUserId={currentUserId}
@@ -134,70 +133,79 @@ const ClassCard: React.FC<{classOverview: TeacherClassOverview, isSelected: bool
     </button>
 );
 
-const RosterView: React.FC<{details: TeacherClassDetails}> = ({details}) => (
-    <div>
-        {details.roster.length === 0 ? <p className="text-muted-foreground">No students in this class.</p> : (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {details.roster.map(student => (
-                    <li key={student.id} className="px-4 py-3 bg-muted/30 rounded-lg flex items-center gap-3 border border-border">
-                        <img className="h-8 w-8 rounded-full" src={`https://api.dicebear.com/8.x/initials/svg?seed=${student.display_name}`} alt="" />
-                        <span className="text-sm font-medium text-foreground">{student.display_name}</span>
-                    </li>
-                ))}
-            </ul>
-        )}
-    </div>
-);
+const RosterView: React.FC<{details: TeacherClassDetails}> = ({details}) => {
+    const roster = details?.roster ?? [];
+    return (
+        <div>
+            {roster.length === 0 ? <p className="text-muted-foreground">No students in this class.</p> : (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {roster.map(student => (
+                        <li key={student.id} className="px-4 py-3 bg-muted/30 rounded-lg flex items-center gap-3 border border-border">
+                            <img className="h-8 w-8 rounded-full" src={`https://api.dicebear.com/8.x/initials/svg?seed=${student.display_name}`} alt="" />
+                            <span className="text-sm font-medium text-foreground">{student.display_name}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+};
 
-const AssignmentsView: React.FC<{details: TeacherClassDetails, onAdd: ()=>void}> = ({details, onAdd}) => (
-    <div>
-        <div className="flex justify-end mb-4"><button onClick={onAdd} className="btn-primary-sm"><PlusIcon className="w-4 h-4"/>Add Assignment</button></div>
-        {details.assignments.length === 0 ? <p className="text-muted-foreground">No assignments posted for this class yet.</p> : (
-            <div className="space-y-3">
-                {details.assignments.map(a => (
-                    <div key={a.id} className="p-4 rounded-lg border border-border bg-muted/20">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <p className="font-semibold text-foreground">{a.title}</p>
-                                <p className="text-xs text-muted-foreground">{a.subject}</p>
+const AssignmentsView: React.FC<{details: TeacherClassDetails, onAdd: ()=>void}> = ({details, onAdd}) => {
+    const assignments = details?.assignments ?? [];
+    return (
+        <div>
+            <div className="flex justify-end mb-4"><button onClick={onAdd} className="btn-primary-sm"><PlusIcon className="w-4 h-4"/>Add Assignment</button></div>
+            {assignments.length === 0 ? <p className="text-muted-foreground">No assignments posted for this class yet.</p> : (
+                <div className="space-y-3">
+                    {assignments.map(a => (
+                        <div key={a.id} className="p-4 rounded-lg border border-border bg-muted/20">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="font-semibold text-foreground">{a.title}</p>
+                                    <p className="text-xs text-muted-foreground">{a.subject}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-medium text-muted-foreground">Due: {new Date(a.due_date).toLocaleDateString()}</p>
+                                    <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">{a.status}</span>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-xs font-medium text-muted-foreground">Due: {new Date(a.due_date).toLocaleDateString()}</p>
-                                <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">{a.status}</span>
-                            </div>
+                            <p className="text-sm text-muted-foreground mt-2">{a.description}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-2">{a.description}</p>
-                    </div>
-                ))}
-            </div>
-        )}
-    </div>
-);
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
-const MaterialsView: React.FC<{details: TeacherClassDetails, onAdd: ()=>void}> = ({details, onAdd}) => (
-     <div>
-        <div className="flex justify-end mb-4"><button onClick={onAdd} className="btn-primary-sm"><PlusIcon className="w-4 h-4"/>Add Material</button></div>
-        {details.studyMaterials.length === 0 ? <p className="text-muted-foreground">No study materials uploaded for this class yet.</p> : (
-            <div className="space-y-3">
-                {details.studyMaterials.map(m => (
-                    <div key={m.id} className="p-3 rounded-lg border border-border bg-muted/20 flex items-center gap-3">
-                        <BookOpenIcon className="w-5 h-5 text-primary flex-shrink-0"/>
-                        <div className="flex-grow">
-                            <p className="font-semibold text-foreground text-sm">{m.title}</p>
-                            <p className="text-xs text-muted-foreground">{m.file_name}</p>
+const MaterialsView: React.FC<{details: TeacherClassDetails, onAdd: ()=>void}> = ({details, onAdd}) => {
+    const materials = details?.studyMaterials ?? [];
+    return (
+        <div>
+            <div className="flex justify-end mb-4"><button onClick={onAdd} className="btn-primary-sm"><PlusIcon className="w-4 h-4"/>Add Material</button></div>
+            {materials.length === 0 ? <p className="text-muted-foreground">No study materials uploaded for this class yet.</p> : (
+                <div className="space-y-3">
+                    {materials.map(m => (
+                        <div key={m.id} className="p-3 rounded-lg border border-border bg-muted/20 flex items-center gap-3">
+                            <BookOpenIcon className="w-5 h-5 text-primary flex-shrink-0"/>
+                            <div className="flex-grow">
+                                <p className="font-semibold text-foreground text-sm">{m.title}</p>
+                                <p className="text-xs text-muted-foreground">{m.file_name}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex-shrink-0">{new Date(m.created_at).toLocaleDateString()}</p>
                         </div>
-                        <p className="text-xs text-muted-foreground flex-shrink-0">{new Date(m.created_at).toLocaleDateString()}</p>
-                    </div>
-                ))}
-            </div>
-        )}
-        <style>{`.btn-primary-sm { display: inline-flex; items-center: center; gap: 0.5rem; background-color: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; transition: background-color 0.2s; } .btn-primary-sm:hover { background-color: hsl(var(--primary) / 0.9); }`}</style>
-    </div>
-);
+                    ))}
+                </div>
+            )}
+            <style>{`.btn-primary-sm { display: inline-flex; items-center: center; gap: 0.5rem; background-color: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; transition: background-color 0.2s; } .btn-primary-sm:hover { background-color: hsl(var(--primary) / 0.9); }`}</style>
+        </div>
+    );
+};
 
 const AddAssignmentModal: React.FC<{classId: number, subjects: ClassSubject[], onClose:()=>void, onSuccess:()=>void, currentUserId: string}> = ({classId, subjects, onClose, onSuccess, currentUserId}) => {
     const [title, setTitle] = useState('');
-    const [subjectId, setSubjectId] = useState<string>(subjects[0]?.id.toString() || '');
+    const [subjectId, setSubjectId] = useState<string>(subjects?.[0]?.id?.toString() || '');
     const [dueDate, setDueDate] = useState('');
     const [description, setDescription] = useState('');
     const [maxScore, setMaxScore] = useState(100);
@@ -209,14 +217,12 @@ const AddAssignmentModal: React.FC<{classId: number, subjects: ClassSubject[], o
         setLoading(true);
         setError('');
         
-        // Correctly format datetime-local string to ISO
         const isoDate = new Date(dueDate).toISOString();
 
-        // Use the general 'create_homework_assignment' RPC
         const { error: rpcError } = await supabase.rpc('create_homework_assignment', {
             p_class_id: classId,
             p_subject_id: parseInt(subjectId),
-            p_teacher_id: currentUserId, // Use the passed currentUserId
+            p_teacher_id: currentUserId, 
             p_title: title,
             p_description: description,
             p_due_date: isoDate,
@@ -242,7 +248,7 @@ const AddAssignmentModal: React.FC<{classId: number, subjects: ClassSubject[], o
                         {error && <p className="text-destructive bg-destructive/10 p-2 rounded-md text-sm">{error}</p>}
                         <div><label className="input-label">Title</label><input type="text" value={title} onChange={e=>setTitle(e.target.value)} required className="input-base"/></div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div><label className="input-label">Subject</label><select value={subjectId} onChange={e=>setSubjectId(e.target.value)} required className="input-base">{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                            <div><label className="input-label">Subject</label><select value={subjectId} onChange={e=>setSubjectId(e.target.value)} required className="input-base">{(subjects ?? []).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                             <div><label className="input-label">Due Date & Time</label><input type="datetime-local" value={dueDate} onChange={e=>setDueDate(e.target.value)} required className="input-base"/></div>
                         </div>
                         <div><label className="input-label">Max Score</label><input type="number" value={maxScore} onChange={e=>setMaxScore(parseInt(e.target.value))} required className="input-base"/></div>
@@ -263,7 +269,7 @@ const AddAssignmentModal: React.FC<{classId: number, subjects: ClassSubject[], o
 
 const AddMaterialModal: React.FC<{classId: number, subjects: ClassSubject[], onClose:()=>void, onSuccess:()=>void, currentUserId: string}> = ({classId, subjects, onClose, onSuccess, currentUserId}) => {
     const [title, setTitle] = useState('');
-    const [subjectId, setSubjectId] = useState<string>(subjects[0]?.id.toString() || '');
+    const [subjectId, setSubjectId] = useState<string>(subjects?.[0]?.id?.toString() || '');
     const [description, setDescription] = useState('');
     const [file, setFile] = useState<File|null>(null);
     const [loading, setLoading] = useState(false);
@@ -314,7 +320,7 @@ const AddMaterialModal: React.FC<{classId: number, subjects: ClassSubject[], onC
                     <main className="p-6 space-y-4">
                         {error && <p className="text-destructive bg-destructive/10 p-2 rounded-md text-sm">{error}</p>}
                         <div><label className="input-label">Title</label><input type="text" value={title} onChange={e=>setTitle(e.target.value)} required className="input-base"/></div>
-                        <div><label className="input-label">Subject</label><select value={subjectId} onChange={e=>setSubjectId(e.target.value)} required className="input-base">{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                        <div><label className="input-label">Subject</label><select value={subjectId} onChange={e=>setSubjectId(e.target.value)} required className="input-base">{(subjects ?? []).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                         <div><label className="input-label">Description</label><textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} className="input-base"/></div>
                         <div><label className="input-label">File</label><input type="file" onChange={e => setFile(e.target.files ? e.target.files[0] : null)} required className="input-base file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
                     </main>

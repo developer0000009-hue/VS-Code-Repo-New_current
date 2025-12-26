@@ -7,7 +7,6 @@ import { LockIcon } from './icons/LockIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { EyeOffIcon } from './icons/EyeOffIcon';
 
-
 interface LoginFormProps {
     onSwitchToSignup: () => void;
     onForgotPassword: () => void;
@@ -32,127 +31,100 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
             });
 
             if (signInError) {
-                // Check if specific Supabase error for unconfirmed email
                 if (signInError.message.toLowerCase().includes('confirm') || signInError.message.toLowerCase().includes('verified')) {
-                    setError("Account activation pending. Please check your inbox for the verification link.");
+                    setError("Identity activation pending. Verify your inbox.");
                 } else {
                     setError(signInError.message);
                 }
                 setLoading(false);
                 return;
             }
-            
-            if (!data.session) {
-                // Correct credentials but no session usually means email confirmation required
-                setError("Email confirmation required. Please check your inbox to activate your portal.");
-                setLoading(false);
-                return;
-            }
-
-            // Successful login! The listener in App.tsx will detect the new session.
-            // We do not set loading to false because the component will be unmounted shortly.
         } catch (err: any) {
-            console.error("Login exception:", err);
-            setError("A network error occurred. Please verify your connection.");
+            setError("Connectivity Protocol Failure.");
             setLoading(false);
         }
     };
 
     return (
-        <div className="bg-card/60 dark:bg-card/50 backdrop-blur-xl p-8 sm:p-12 rounded-3xl border border-border/50 space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-            <div className="text-center space-y-2">
-                <h2 className="text-3xl font-serif font-extrabold text-foreground tracking-tight">Welcome Back</h2>
-                <p className="text-muted-foreground text-sm">
-                    Sign in to access your personalized dashboard.
+        <div className="bg-card/40 dark:bg-card/30 backdrop-blur-3xl p-8 sm:p-12 rounded-[2.5rem] border border-white/10 space-y-10 shadow-2xl relative overflow-hidden">
+            <div className="text-center space-y-3 relative z-10">
+                <h2 className="text-4xl font-serif font-black text-white tracking-tight leading-none">Initialize</h2>
+                <p className="text-white/40 text-sm font-medium tracking-tight">
+                    Secure access to the institutional node.
                 </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-6 relative z-10">
                 {error && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-4 rounded-xl flex items-start gap-3 animate-in shake duration-300">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span className="font-medium">{error}</span>
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-4 rounded-2xl flex items-center gap-3 animate-in shake duration-500">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>
+                        <span>{error}</span>
                     </div>
                 )}
 
                 <div className="space-y-2 group">
-                    <label htmlFor="email" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1 transition-colors group-focus-within:text-primary">Email Address</label>
+                    <label className="block text-[10px] font-black text-white/20 uppercase tracking-[0.3em] ml-1 transition-colors group-focus-within:text-primary">User Identifier</label>
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors duration-300">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
                             <MailIcon className="h-5 w-5" />
                         </div>
                         <input
-                            id="email"
-                            name="email"
                             type="email"
-                            autoComplete="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="block w-full h-[52px] pl-12 pr-4 bg-muted/30 border border-border/60 rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-background transition-all duration-200"
-                            placeholder="name@example.com"
+                            className="block w-full h-[62px] pl-14 pr-4 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/50 focus:bg-white/10 transition-all duration-300 font-medium"
+                            placeholder="institutional@id.net"
                         />
                     </div>
                 </div>
 
                 <div className="space-y-2 group">
                     <div className="flex justify-between items-center ml-1">
-                        <label htmlFor="password" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-widest transition-colors group-focus-within:text-primary">Password</label>
-                        <button
-                            type="button"
-                            onClick={onForgotPassword}
-                            className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors focus:outline-none hover:underline"
-                        >
-                            Forgot password?
-                        </button>
+                        <label className="block text-[10px] font-black text-white/20 uppercase tracking-[0.3em] transition-colors group-focus-within:text-primary">Cipher Key</label>
+                        <button type="button" onClick={onForgotPassword} className="text-[10px] font-black text-primary/60 hover:text-primary transition-colors uppercase tracking-widest">Lost Key?</button>
                     </div>
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors duration-300">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
                             <LockIcon className="h-5 w-5" />
                         </div>
                         <input
-                            id="password"
-                            name="password"
                             type={showPassword ? "text" : "password"}
-                            autoComplete="current-password"
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="block w-full h-[52px] pl-12 pr-11 bg-muted/30 border border-border/60 rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-background transition-all duration-200"
-                            placeholder="••••••••"
+                            className="block w-full h-[62px] pl-14 pr-12 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/50 focus:bg-white/10 transition-all duration-300 font-medium"
+                            placeholder="••••••••••••"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-foreground focus:outline-none transition-colors duration-200"
-                            tabIndex={-1}
+                            className="absolute inset-y-0 right-0 pr-5 flex items-center text-white/20 hover:text-white transition-colors"
                         >
                             {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                         </button>
                     </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-4">
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-[52px] flex items-center justify-center py-3.5 px-6 rounded-xl shadow-lg shadow-primary/25 text-sm font-bold text-white bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all transform hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="w-full h-[62px] flex items-center justify-center py-3.5 px-8 rounded-2xl shadow-2xl shadow-primary/20 text-sm font-black text-white bg-primary hover:bg-primary/90 focus:outline-none transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 uppercase tracking-[0.25em]"
                     >
-                        {loading ? <Spinner size="sm" className="text-white" /> : 'Sign In'}
+                        {loading ? <Spinner size="sm" className="text-white" /> : 'Authorize'}
                     </button>
                 </div>
             </form>
 
-            <div className="text-center">
-                <p className="text-sm text-muted-foreground">
-                    Don't have an account?{' '}
+            <div className="text-center relative z-10">
+                <p className="text-xs text-white/30 font-medium">
+                    New Identity?{' '}
                     <button
                         onClick={onSwitchToSignup}
-                        className="font-bold text-primary hover:text-primary/80 transition-colors focus:outline-none hover:underline ml-1"
+                        className="font-black text-primary hover:text-primary/80 transition-colors uppercase tracking-widest ml-1"
                     >
-                        Create free account
+                        Initialize Account
                     </button>
                 </p>
             </div>

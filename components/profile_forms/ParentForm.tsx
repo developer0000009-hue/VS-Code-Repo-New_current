@@ -1,398 +1,392 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ParentProfileData } from '../../types';
-import { countries, statesByCountry, citiesByState } from '../data/locations';
-import { countryCodes } from '../data/countryCodes';
-import { UsersIcon } from '../icons/UsersIcon';
 import { UserIcon } from '../icons/UserIcon';
 import { PhoneIcon } from '../icons/PhoneIcon';
 import { GlobeIcon } from '../icons/GlobeIcon';
 import { LocationIcon } from '../icons/LocationIcon';
 import { HomeIcon } from '../icons/HomeIcon';
-import { UploadIcon } from '../icons/UploadIcon';
+import { UsersIcon } from '../icons/UsersIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { RefreshIcon } from '../icons/RefreshIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
+import { XCircleIcon } from '../icons/XCircleIcon';
 import CustomSelect from '../common/CustomSelect';
+import { countries, statesByCountry, citiesByState } from '../data/locations';
+import Spinner from '../common/Spinner';
+import { GoogleGenAI } from '@google/genai';
 
-// --- Styled Components ---
-
-const PremiumInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; icon?: React.ReactNode; fullWidth?: boolean }> = ({ label, icon, fullWidth, className, ...props }) => (
-    <div className={`relative group ${fullWidth ? 'w-full' : ''}`}>
-        <div className="absolute top-1/2 -translate-y-1/2 left-4 text-muted-foreground/60 group-focus-within:text-primary transition-colors duration-300 z-10 pointer-events-none">
-            {icon}
-        </div>
-        <input
-            {...props}
-            placeholder=" "
-            className={`peer block w-full h-14 rounded-xl border border-input bg-background/50 px-4 ${icon ? 'pl-11' : 'pl-4'} pt-5 pb-2 text-sm text-foreground font-medium shadow-sm transition-all duration-200 hover:bg-background hover:border-primary/40 focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${className}`}
-        />
-        <label className={`absolute left-4 top-4 z-10 origin-[0] -translate-y-2.5 scale-75 transform text-[10px] font-bold uppercase tracking-wider text-muted-foreground duration-200 
-            peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-xs peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case
-            peer-focus:-translate-y-2.5 peer-focus:scale-75 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:text-primary pointer-events-none ${icon ? 'peer-placeholder-shown:left-11' : ''}`}>
-            {label}
-        </label>
-    </div>
+const LocateFixedIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+    </svg>
 );
 
-const SectionHeader: React.FC<{ title: string, subtitle: string, icon: React.ReactNode, colorClass: string }> = ({ title, subtitle, icon, colorClass }) => (
-    <div className="flex items-start gap-4 mb-8">
-        <div className={`p-3 rounded-2xl ${colorClass} shadow-sm ring-1 ring-inset ring-black/5 dark:ring-white/10`}>
+const PremiumFloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> & { label: string; icon?: React.ReactNode; isTextArea?: boolean; isSynced?: boolean }> = ({ label, icon, isTextArea, isSynced, className, ...props }) => (
+    <div className="relative group w-full">
+        {label && (
+            <label className={`absolute left-11 top-0 -translate-y-1/2 bg-[#0c0e12] px-2 text-[10px] font-black uppercase tracking-[0.25em] z-20 duration-300 pointer-events-none
+                ${isSynced ? 'text-primary' : 'text-white/40 group-focus-within:text-primary'}`}>
+                {label}
+            </label>
+        )}
+        <div className={`absolute ${isTextArea ? 'top-6' : 'top-1/2 -translate-y-1/2'} left-5 text-white/20 group-focus-within:text-primary transition-colors duration-300 z-10 pointer-events-none ${isSynced ? 'text-primary/60' : ''}`}>
             {icon}
         </div>
-        <div>
-            <h3 className="text-xl font-bold text-foreground tracking-tight">{title}</h3>
-            <p className="text-sm text-muted-foreground font-medium mt-0.5">{subtitle}</p>
-        </div>
+        {isTextArea ? (
+            <textarea
+                {...(props as any)}
+                placeholder=" "
+                className={`peer block w-full h-32 rounded-[2.2rem] border transition-all duration-300 px-6 pl-14 pt-6 pb-2 text-sm text-white font-medium shadow-inner outline-none placeholder-transparent
+                    ${isSynced ? 'border-primary/40 bg-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)]' : 'border-white/10 bg-black/40 hover:border-white/20 focus:border-primary focus:ring-8 focus:ring-primary/5'} 
+                    ${className}`}
+            />
+        ) : (
+            <input
+                {...props}
+                placeholder=" "
+                className={`peer block w-full h-[74px] rounded-[1.8rem] border transition-all duration-300 px-6 pl-14 pt-5 pb-1 text-sm text-white font-medium shadow-inner outline-none placeholder-transparent
+                    ${isSynced ? 'border-primary/40 bg-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.1)]' : 'border-white/10 bg-black/40 hover:border-white/20 focus:border-primary focus:ring-8 focus:ring-primary/5'} 
+                    ${className}`}
+            />
+        )}
+        {isSynced && (
+            <div className="absolute right-5 top-1/2 -translate-y-1/2 animate-in zoom-in-95 duration-500">
+                <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_15px_rgba(var(--primary),0.8)] flex items-center justify-center">
+                    <CheckCircleIcon className="w-2 h-2 text-white" />
+                </div>
+            </div>
+        )}
     </div>
 );
 
 interface FormProps {
     formData: Partial<ParentProfileData & { phone: string; display_name: string; }>;
     handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+    activeTab: 'details' | 'contact';
 }
 
-const ParentForm: React.FC<FormProps> = ({ formData, handleChange }) => {
-    const [activeTab, setActiveTab] = useState<'personal' | 'address'>('personal');
-    const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-    const bannerInputRef = React.useRef<HTMLInputElement>(null);
+const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) => {
+    const [loadingStates, setLoadingStates] = useState(false);
+    const [loadingCities, setLoadingCities] = useState(false);
+    const [isLocating, setIsLocating] = useState(false);
+    const [syncStatus, setSyncStatus] = useState<string>('');
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const [syncedFields, setSyncedFields] = useState<Set<string>>(new Set());
+    const [mapUrl, setMapUrl] = useState<string | null>(null);
 
-    // Auto-set gender based on relationship
-    useEffect(() => {
-        const rel = formData.relationship_to_student;
-        let newGender = '';
-        if (rel === 'Father') newGender = 'Male';
-        else if (rel === 'Mother') newGender = 'Female';
-
-        if (newGender && formData.gender !== newGender) {
-             // Manually trigger change handler to update state in parent
-             handleChange({ target: { name: 'gender', value: newGender } } as any);
-        }
-    }, [formData.relationship_to_student, formData.gender, handleChange]);
-
-    // Derive country code and local number directly from formData.phone to avoid state sync issues
-    const { derivedCountryCode, derivedLocalPhone } = useMemo(() => {
-        const fullPhone = formData.phone || '';
-        // Sort codes by length (desc) to match longest prefix first (e.g. +1 vs +1242)
-        const sortedCodes = [...countryCodes].sort((a, b) => b.dial_code.length - a.dial_code.length);
-        
-        const foundCode = sortedCodes.find(c => fullPhone.startsWith(c.dial_code));
-        
-        if (foundCode) {
-            return {
-                derivedCountryCode: foundCode.dial_code,
-                derivedLocalPhone: fullPhone.substring(foundCode.dial_code.length)
-            };
-        }
-        
-        // Default fallback or if no prefix match
-        return {
-            derivedCountryCode: '+91', 
-            derivedLocalPhone: fullPhone.replace(/^\+/, '') // Strip leading + if it was just a number
-        };
-    }, [formData.phone]);
-
-    const handlePhonePartChange = (type: 'code' | 'number', value: string) => {
-        let newFullPhone = '';
-        if (type === 'code') {
-            newFullPhone = `${value}${derivedLocalPhone}`;
-        } else {
-            const sanitizedNumber = value.replace(/\D/g, ''); // Only digits
-            newFullPhone = `${derivedCountryCode}${sanitizedNumber}`;
-        }
-        
-        // Update parent state directly
-        handleChange({ target: { name: 'phone', value: newFullPhone } } as any);
-    };
-
-    const handleSelectChange = (name: string) => (value: string) => {
-        handleChange({ target: { name, value } } as any);
-    };
-
-    const handleCountrySelect = (country: string) => {
-        handleChange({ target: { name: 'country', value: country } } as any);
-        handleChange({ target: { name: 'state', value: '' } } as any);
-        handleChange({ target: { name: 'city', value: '' } } as any);
-        
-        // Auto-set phone code based on country selection if phone is empty
-        if (!formData.phone) {
-            const countryData = countryCodes.find(c => c.name === country);
-            if (countryData) {
-                // This updates phone to just the code, effectively setting the dropdown
-                handleChange({ target: { name: 'phone', value: countryData.dial_code } } as any);
-            }
-        }
-    };
-    
-    const handleStateSelect = (state: string) => {
-        handleChange({ target: { name: 'state', value: state } } as any);
-        handleChange({ target: { name: 'city', value: '' } } as any);
-    };
-    
     const availableStates = useMemo(() => formData.country ? statesByCountry[formData.country] || [] : [], [formData.country]);
     const availableCities = useMemo(() => formData.state ? citiesByState[formData.state] || [] : [], [formData.state]);
 
-    const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => setBannerPreview(reader.result as string);
-            reader.readAsDataURL(file);
+    const handleSelectChange = (name: string, isManual = true) => (value: string) => {
+        handleChange({ target: { name, value } } as any);
+
+        if (name === 'relationship_to_student') {
+            if (value === 'Father') handleChange({ target: { name: 'gender', value: 'Male' } } as any);
+            else if (value === 'Mother') handleChange({ target: { name: 'gender', value: 'Female' } } as any);
+        }
+
+        if (isManual) {
+            if (name === 'country') {
+                setLoadingStates(true);
+                handleChange({ target: { name: 'state', value: '' } } as any);
+                handleChange({ target: { name: 'city', value: '' } } as any);
+                setTimeout(() => setLoadingStates(false), 400);
+            }
+            if (name === 'state') {
+                setLoadingCities(true);
+                handleChange({ target: { name: 'city', value: '' } } as any);
+                setTimeout(() => setLoadingCities(false), 400);
+            }
+            const next = new Set(syncedFields);
+            next.delete(name);
+            setSyncedFields(next);
         }
     };
 
-    const childrenOptions = [
-        { value: "1", label: "1 Child" },
-        { value: "2", label: "2 Children" },
-        { value: "3", label: "3 Children" },
-        { value: "4", label: "4 Children" },
-        { value: "5", label: "5 Children" },
-        { value: "6", label: "More than 5" }
-    ];
+    const handleAutoLocate = async () => {
+        if (!navigator.geolocation) {
+            setSyncError("Geolocation services unavailable in this terminal environment.");
+            return;
+        }
 
-    const isPhoneValid = derivedLocalPhone.length >= 7 && derivedLocalPhone.length <= 15;
+        setIsLocating(true);
+        setSyncStatus('Resolving GPS Telemetry...');
+        setSyncError(null);
+        setSyncedFields(new Set());
+        setMapUrl(null);
+
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            
+            try {
+                setSyncStatus('Initializing AI Handshake...');
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                
+                const prompt = `Identify the residential address for coordinates: ${latitude}, ${longitude}.
+                Use the googleMaps tool for high-precision mapping.
+                
+                CRITICAL INSTRUCTION: Return ONLY a raw JSON string. State and Country MUST match international standards (e.g. 'Rajasthan', 'India').
+                
+                JSON Format:
+                { 
+                  "address": "Street address with building/house details", 
+                  "city": "Standard city name", 
+                  "state": "Full State name", 
+                  "country": "India", 
+                  "pin_code": "Postal code" 
+                }`;
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: prompt,
+                    config: {
+                        tools: [{ googleMaps: {} }],
+                        toolConfig: {
+                            retrievalConfig: {
+                                latLng: { latitude, longitude }
+                            }
+                        }
+                    }
+                });
+
+                // Extract grounding metadata URLs as per instructions
+                const mapsUri = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.find((chunk: any) => chunk.maps?.uri)?.maps?.uri;
+                if (mapsUri) setMapUrl(mapsUri);
+
+                const text = response.text || '';
+                const jsonStr = text.match(/\{[\s\S]*\}/)?.[0];
+                
+                if (jsonStr) {
+                    setSyncStatus('Mapping Geographic Ledger...');
+                    const data = JSON.parse(jsonStr);
+                    
+                    const fields = ['country', 'state', 'city', 'address', 'pin_code'];
+                    setSyncedFields(new Set(fields));
+
+                    // Step through updates for better UX feel
+                    if (data.country) handleSelectChange('country', false)(data.country);
+                    await new Promise(r => setTimeout(r, 400));
+                    if (data.state) handleSelectChange('state', false)(data.state);
+                    await new Promise(r => setTimeout(r, 400));
+                    if (data.city) handleSelectChange('city', false)(data.city);
+                    if (data.address) handleChange({ target: { name: 'address', value: data.address } } as any);
+                    if (data.pin_code) handleChange({ target: { name: 'pin_code', value: data.pin_code } } as any);
+                    
+                    setSyncStatus('Identity Synced Successfully.');
+                    setTimeout(() => setSyncStatus(''), 3000);
+                } else {
+                    throw new Error("Invalid telemetry payload received from AI node.");
+                }
+            } catch (err: any) {
+                console.error("Locate Identity Failure:", err);
+                setSyncError("Neural location sync failed. Please manually define residency parameters.");
+                setSyncStatus('');
+            } finally {
+                setIsLocating(false);
+            }
+        }, (err) => {
+            console.error("Geolocation Error:", err);
+            setIsLocating(false);
+            setSyncStatus('');
+            setSyncError("Access Denied: Please authorize residency telemetry in your device settings.");
+        }, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+        });
+    };
+
+    if (activeTab === 'details') {
+        return (
+            <div className="animate-in slide-in-from-right-10 duration-700 pb-12">
+                <div className="flex items-center gap-6 mb-12">
+                    <div className="w-20 h-20 bg-primary/10 rounded-[1.8rem] flex items-center justify-center border border-primary/20 shadow-inner ring-4 ring-primary/5">
+                        <UsersIcon className="w-10 h-10 text-primary" />
+                    </div>
+                    <div>
+                        <h3 className="text-3xl font-serif font-black text-white tracking-tight leading-none uppercase">Guardian Identity</h3>
+                        <p className="text-sm text-white/30 font-medium mt-2 tracking-tight">Define your relationship and role within the institutional registry.</p>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <PremiumFloatingInput label="Full Legal Name" name="display_name" value={formData.display_name} onChange={handleChange} required icon={<UserIcon className="w-6 h-6"/>} />
+                    
+                    <CustomSelect 
+                        label="Relationship Status" 
+                        value={formData.relationship_to_student || ''} 
+                        onChange={handleSelectChange('relationship_to_student')} 
+                        options={[{value:'Father', label:'Father'}, {value:'Mother', label:'Mother'}, {value:'Guardian', label:'Legal Guardian'}, {value:'Other', label:'Authorized Affiliate'}]}
+                        icon={<UsersIcon className="w-5 h-5"/>}
+                    />
+                    
+                    <CustomSelect 
+                        label="Gender" 
+                        value={formData.gender || ''} 
+                        onChange={handleSelectChange('gender')} 
+                        options={[{value:'Male', label:'Male'}, {value:'Female', label:'Female'}, {value:'Other', label:'Other / Diverse'}, {value:'Prefer not to say', label:'Prefer not to say'}]}
+                        icon={<UserIcon className="w-5 h-5"/>}
+                    />
+                    
+                    <CustomSelect 
+                        label="Family Roster Size" 
+                        value={String(formData.number_of_children || '1')} 
+                        onChange={handleSelectChange('number_of_children')} 
+                        options={[{value:'1', label:'Single Child'}, {value:'2', label:'Nuclear Family (2)'}, {value:'3', label:'Nuclear Family (3)'}, {value:'4', label:'Extended Household (4+)'}]}
+                        icon={<UsersIcon className="w-5 h-5"/>}
+                    />
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="space-y-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20">
-            
-            {/* --- HERO SECTION --- */}
-            <div className="relative rounded-3xl overflow-hidden bg-card border border-border shadow-xl group">
-                {/* Banner */}
-                <div className="h-48 md:h-64 bg-muted relative group/banner">
-                    {bannerPreview ? (
-                         <img src={bannerPreview} alt="Profile Banner" className="w-full h-full object-cover transition-transform duration-700 group-hover/banner:scale-105" />
-                    ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center">
-                             <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                             <div className="text-center z-10 opacity-30">
-                                <UserIcon className="w-20 h-20 mx-auto mb-2" />
-                            </div>
-                        </div>
-                    )}
-                    <div 
-                        className="absolute inset-0 bg-black/40 opacity-0 group-hover/banner:opacity-100 transition-all duration-300 flex items-center justify-center cursor-pointer backdrop-blur-[2px]"
-                        onClick={() => bannerInputRef.current?.click()}
-                    >
-                        <span className="text-white font-bold text-sm flex items-center gap-2 bg-white/20 px-6 py-3 rounded-full border border-white/30 hover:bg-white/30 transition-all transform hover:scale-105 backdrop-blur-md shadow-lg">
-                            <UploadIcon className="w-4 h-4"/> Change Cover
-                        </span>
+        <div className="animate-in slide-in-from-right-10 duration-700 pb-12">
+            <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-8 mb-14 bg-white/[0.02] p-8 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none group-hover:scale-110 transition-transform duration-1000"><LocationIcon className="w-48 h-48" /></div>
+                
+                <div className="flex items-center gap-6 relative z-10">
+                    <div className="w-20 h-20 bg-indigo-500/10 rounded-[1.8rem] flex items-center justify-center border border-indigo-500/20 shadow-inner ring-4 ring-indigo-500/5">
+                        <HomeIcon className="w-10 h-10 text-indigo-400" />
                     </div>
-                    <input type="file" ref={bannerInputRef} onChange={handleBannerChange} accept="image/*" className="hidden" />
-                </div>
-
-                {/* Profile Info Overlay */}
-                <div className="px-8 md:px-12 pb-8 pt-0 relative">
-                    <div className="flex flex-col md:flex-row items-start md:items-end gap-8 -mt-16">
-                        {/* Profile Picture */}
-                        <div className="relative group/logo flex-shrink-0">
-                            <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-[6px] border-card shadow-2xl flex items-center justify-center overflow-hidden bg-background relative z-10 transition-transform duration-300 group-hover/logo:scale-[1.02]">
-                                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center">
-                                    <span className="text-4xl md:text-5xl font-black text-primary/20 select-none">
-                                        {formData.display_name?.charAt(0) || 'P'}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 bg-primary border-4 border-card w-8 h-8 rounded-full z-20 shadow-md flex items-center justify-center text-white" title="Primary User">
-                                <CheckCircleIcon className="w-4 h-4" />
-                            </div>
-                        </div>
-
-                        {/* Name & Role */}
-                        <div className="flex-grow w-full pt-2 md:pb-4 space-y-1">
-                            <h2 className="text-3xl md:text-5xl font-black text-foreground tracking-tight leading-tight">
-                                {formData.display_name || 'Parent Profile'}
-                            </h2>
-                            <p className="text-lg text-muted-foreground font-medium flex items-center gap-2">
-                                <span className="bg-primary/10 text-primary px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border border-primary/20">
-                                    {formData.relationship_to_student || 'Guardian'}
-                                </span>
-                                {formData.gender && <span className="text-sm">• {formData.gender}</span>}
+                    <div>
+                        <h3 className="text-3xl font-serif font-black text-white tracking-tight leading-none uppercase">Residency & Contact</h3>
+                        <p className="text-sm text-white/30 font-medium mt-2 tracking-tight">Primary communication channels and residential telemetry.</p>
+                        {syncStatus && (
+                            <p className="text-[10px] font-black uppercase text-indigo-400 mt-3 animate-pulse tracking-[0.2em] flex items-center gap-2">
+                                <SparklesIcon className="w-3 h-3" /> {syncStatus}
                             </p>
-                        </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="px-8 md:px-12 mt-4 bg-muted/30 border-t border-border/60">
-                    <div className="flex overflow-x-auto scrollbar-hide gap-8">
-                        {[
-                            { id: 'personal', label: 'Personal Details', icon: <UserIcon className="w-4 h-4"/> },
-                            { id: 'address', label: 'Address & Contact', icon: <LocationIcon className="w-4 h-4"/> },
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`
-                                    flex items-center gap-2.5 py-5 text-sm font-bold border-b-[3px] transition-all whitespace-nowrap
-                                    ${activeTab === tab.id 
-                                        ? 'border-primary text-primary' 
-                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                                    }
-                                `}
-                            >
-                                {tab.icon}
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
+                <div className="relative z-10 w-full xl:w-auto">
+                    <button 
+                        type="button"
+                        onClick={handleAutoLocate}
+                        disabled={isLocating}
+                        className={`w-full xl:w-auto flex items-center justify-center gap-4 px-10 py-5 rounded-[1.4rem] font-black text-[11px] uppercase tracking-[0.3em] transition-all duration-700 shadow-2xl border
+                            ${isLocating 
+                                ? 'bg-primary/20 text-primary border-primary/40 animate-pulse cursor-wait' 
+                                : 'bg-white/[0.03] text-white/50 border-white/10 hover:border-primary/50 hover:bg-primary/10 hover:text-primary active:scale-95'
+                            }
+                        `}
+                    >
+                        {isLocating ? <Spinner size="sm" className="text-primary"/> : <><LocateFixedIcon className="w-5 h-5"/> Locate Identity</>}
+                    </button>
                 </div>
             </div>
 
-            {/* --- FORM SECTIONS --- */}
-            <div className="pt-2">
-                
-                {activeTab === 'personal' && (
-                    <div className="bg-card rounded-3xl border border-border/60 shadow-sm p-8 md:p-10 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <SectionHeader 
-                            title="Primary Guardian Information" 
-                            subtitle="Details of the main contact person for the student." 
-                            icon={<UsersIcon className="w-6 h-6 text-blue-600 dark:text-blue-400"/>}
-                            colorClass="bg-blue-50 dark:bg-blue-900/20"
-                        />
-                        
-                        <div className="space-y-8 max-w-4xl">
-                            <PremiumInput 
-                                label="Full Name" 
-                                name="display_name" 
-                                value={formData.display_name || ''} 
-                                onChange={handleChange} 
-                                required 
-                                icon={<UserIcon className="w-5 h-5"/>} 
-                            />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <CustomSelect
-                                    label="Relationship to Student"
-                                    placeholder="Select Relationship"
-                                    options={[{ value: "Father", label: "Father" }, { value: "Mother", label: "Mother" }, { value: "Guardian", label: "Guardian" }, { value: "Other", label: "Other" }]}
-                                    value={formData.relationship_to_student || ''}
-                                    onChange={handleSelectChange('relationship_to_student')}
-                                    icon={<UsersIcon className="w-4 h-4"/>}
-                                    required
-                                />
-                                
-                                <CustomSelect
-                                    label="Gender"
-                                    placeholder="Select Gender"
-                                    options={[{ value: "Male", label: "Male" }, { value: "Female", label: "Female" }, { value: "Other", label: "Other" }, { value: "Prefer not to say", label: "Prefer not to say" }]}
-                                    value={formData.gender || ''}
-                                    onChange={handleSelectChange('gender')}
-                                    disabled={formData.relationship_to_student === 'Father' || formData.relationship_to_student === 'Mother'}
-                                    icon={<UserIcon className="w-4 h-4"/>}
-                                />
-                            </div>
-
-                            <div>
-                                <CustomSelect
-                                    label="Number of Children Enrolling"
-                                    placeholder="Select Count"
-                                    options={childrenOptions}
-                                    value={String(formData.number_of_children || '')}
-                                    onChange={handleSelectChange('number_of_children')}
-                                    icon={<UsersIcon className="w-4 h-4"/>}
-                                />
-                            </div>
+            {/* Premium UI Error State */}
+            {syncError && (
+                <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center justify-between gap-5 animate-in slide-in-from-top-4 shadow-xl">
+                    <div className="flex items-center gap-4 text-red-500">
+                        <XCircleIcon className="w-8 h-8 shrink-0" />
+                        <div>
+                            <p className="text-sm font-black uppercase tracking-widest leading-none">Sync Interrupted</p>
+                            <p className="text-xs font-medium mt-1.5 opacity-80">{syncError}</p>
                         </div>
+                    </div>
+                    <button onClick={() => setSyncError(null)} className="text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors">Dismiss</button>
+                </div>
+            )}
+
+            <div className="space-y-12 bg-[#0c0e12] p-8 md:p-12 rounded-[3.5rem] border border-white/5 shadow-3xl ring-1 ring-black/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <PremiumFloatingInput 
+                        label="Primary Mobile Number" 
+                        name="phone" 
+                        type="tel" 
+                        value={formData.phone} 
+                        onChange={handleChange} 
+                        required 
+                        icon={<PhoneIcon className="w-6 h-6"/>} 
+                    />
+                    
+                    <CustomSelect 
+                        label="Country" 
+                        value={formData.country || ''} 
+                        onChange={handleSelectChange('country')} 
+                        options={countries.map(c => ({value: c, label: c}))}
+                        icon={<GlobeIcon className="w-5 h-5"/>}
+                        placeholder="Select Country..."
+                        searchable
+                        isSynced={syncedFields.has('country')}
+                    />
+                </div>
+
+                <div className="relative group">
+                    <div className="absolute -top-1.5 -left-1.5 w-8 h-8 bg-primary/5 rounded-full blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
+                    <PremiumFloatingInput 
+                        label="Full Residential Address" 
+                        name="address" 
+                        value={formData.address} 
+                        onChange={handleChange as any} 
+                        isTextArea 
+                        isSynced={syncedFields.has('address')}
+                        icon={<LocationIcon className="w-6 h-6"/>} 
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    <div className="relative">
+                        <CustomSelect 
+                            label="State / Province" 
+                            value={formData.state || ''} 
+                            onChange={handleSelectChange('state')} 
+                            options={availableStates.map(s => ({value: s, label: s}))}
+                            icon={loadingStates ? <Spinner size="sm" /> : <LocationIcon className="w-5 h-5"/>}
+                            disabled={!formData.country}
+                            placeholder={formData.country ? "Select State..." : "Waiting..."}
+                            searchable
+                            isSynced={syncedFields.has('state')}
+                        />
+                        {loadingStates && <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-[1.8rem] pointer-events-none animate-in fade-in z-20"><Spinner size="sm" /></div>}
+                    </div>
+                    <div className="relative">
+                        <CustomSelect 
+                            label="City / Locality" 
+                            value={formData.city || ''} 
+                            onChange={handleSelectChange('city')} 
+                            options={availableCities.map(c => ({value: c, label: c}))}
+                            icon={loadingCities ? <Spinner size="sm" /> : <LocationIcon className="w-5 h-5"/>}
+                            disabled={!formData.state}
+                            placeholder={formData.state ? "Select City..." : "Waiting..."}
+                            searchable
+                            isSynced={syncedFields.has('city')}
+                        />
+                        {loadingCities && <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-[1.8rem] pointer-events-none animate-in fade-in z-20"><Spinner size="sm" /></div>}
+                    </div>
+                    <PremiumFloatingInput 
+                        label="Pin / Zip Code" 
+                        name="pin_code" 
+                        value={formData.pin_code} 
+                        onChange={handleChange} 
+                        isSynced={syncedFields.has('pin_code')}
+                        icon={<LocationIcon className="w-6 h-6"/>} 
+                    />
+                </div>
+                
+                {mapUrl && (
+                    <div className="flex justify-center pt-2 animate-in fade-in">
+                         <a 
+                            href={mapUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex items-center gap-2 text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-[0.2em]"
+                        >
+                            <LocationIcon className="w-3 h-3"/> Verify Node on Maps
+                         </a>
                     </div>
                 )}
 
-                {activeTab === 'address' && (
-                    <div className="bg-card rounded-3xl border border-border/60 shadow-sm p-8 md:p-10 animate-in fade-in slide-in-from-right-4 duration-500">
-                        <SectionHeader 
-                            title="Residential & Contact Details" 
-                            subtitle="Where the student primarily resides and how to reach you." 
-                            icon={<HomeIcon className="w-6 h-6 text-purple-600 dark:text-purple-400"/>}
-                            colorClass="bg-purple-50 dark:bg-purple-900/20"
-                        />
-
-                        <div className="space-y-8 max-w-4xl">
-                            {/* Phone Input Group */}
-                            <div className="space-y-2">
-                                <div className="flex gap-4">
-                                    <div className="w-[160px] flex-shrink-0">
-                                        <CustomSelect
-                                            label="Code"
-                                            placeholder="+91"
-                                            options={countryCodes.map(c => ({ value: c.dial_code, label: `${c.dial_code} (${c.code})` }))}
-                                            value={derivedCountryCode}
-                                            onChange={(val) => handlePhonePartChange('code', val)}
-                                            icon={<GlobeIcon className="w-4 h-4"/>}
-                                            searchable
-                                        />
-                                    </div>
-                                    <div className="flex-grow">
-                                        <PremiumInput 
-                                            label="Phone Number" 
-                                            name="localPhone" 
-                                            type="tel"
-                                            value={derivedLocalPhone} 
-                                            onChange={(e) => handlePhonePartChange('number', e.target.value)} 
-                                            icon={<PhoneIcon className="w-4 h-4"/>}
-                                        />
-                                    </div>
-                                </div>
-                                {derivedLocalPhone && (
-                                    <p className={`text-xs font-bold flex items-center gap-1.5 ml-1 ${isPhoneValid ? 'text-green-600' : 'text-amber-600'}`}>
-                                        {isPhoneValid 
-                                            ? <><CheckCircleIcon className="w-3.5 h-3.5"/> Number looks valid</>
-                                            : 'Please enter a valid phone number (7-15 digits)'
-                                        }
-                                    </p>
-                                )}
-                            </div>
-
-                            <PremiumInput 
-                                label="Street Address" 
-                                name="address" 
-                                value={formData.address || ''} 
-                                onChange={handleChange} 
-                                placeholder="Flat / House No / Street" 
-                                icon={<LocationIcon className="w-4 h-4"/>}
-                            />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <CustomSelect 
-                                    label="Country" 
-                                    placeholder="Select Country" 
-                                    options={countries.map(c => ({ value: c, label: c }))}
-                                    value={formData.country || ''}
-                                    onChange={handleCountrySelect}
-                                    icon={<GlobeIcon className="w-4 h-4"/>}
-                                    searchable
-                                    required
-                                />
-                                
-                                <CustomSelect 
-                                    label="State / Province" 
-                                    placeholder="Select State" 
-                                    options={availableStates.map(s => ({ value: s, label: s }))}
-                                    value={formData.state || ''}
-                                    onChange={handleStateSelect}
-                                    icon={<LocationIcon className="w-4 h-4"/>}
-                                    searchable
-                                    disabled={availableStates.length === 0}
-                                    required
-                                />
-
-                                <CustomSelect 
-                                    label="City" 
-                                    placeholder="Select City" 
-                                    options={availableCities.map(c => ({ value: c, label: c }))}
-                                    value={formData.city || ''}
-                                    onChange={handleSelectChange('city')}
-                                    icon={<LocationIcon className="w-4 h-4"/>}
-                                    searchable
-                                    disabled={availableCities.length === 0}
-                                    required
-                                />
-                                
-                                <PremiumInput 
-                                    label="Pin Code / Zip Code" 
-                                    name="pin_code" 
-                                    value={formData.pin_code || ''} 
-                                    onChange={handleChange} 
-                                    icon={<LocationIcon className="w-4 h-4"/>} 
-                                />
-                            </div>
+                {syncedFields.size > 0 && !isLocating && (
+                    <div className="pt-4 flex items-center justify-center gap-3 animate-in slide-in-from-bottom-2 duration-500">
+                        <div className="px-5 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center gap-3 shadow-lg">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">Geographic Parameters Synced</span>
                         </div>
                     </div>
                 )}

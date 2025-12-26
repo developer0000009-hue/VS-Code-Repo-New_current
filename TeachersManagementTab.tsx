@@ -1,33 +1,34 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '../services/supabase';
-import { TeacherExtended, UserProfile } from '../types';
-import Spinner from './common/Spinner';
-import { TeacherIcon } from './icons/TeacherIcon';
-import { SearchIcon } from './icons/SearchIcon';
-import { EditIcon } from './icons/EditIcon';
-import { PlusIcon } from './icons/PlusIcon';
-import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { BriefcaseIcon } from './icons/BriefcaseIcon';
-import { GridIcon } from './icons/GridIcon';
-import { FilterIcon } from './icons/FilterIcon';
-import { XIcon } from './icons/XIcon';
-import { MoreHorizontalIcon } from './icons/MoreHorizontalIcon';
-import { MailIcon } from './icons/MailIcon';
-import { PhoneIcon } from './icons/PhoneIcon';
-import { DownloadIcon } from './icons/DownloadIcon';
-import { TrashIcon } from './icons/TrashIcon';
-import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
-import { ChevronRightIcon } from './icons/ChevronRightIcon';
-import { ChevronDownIcon } from './icons/ChevronDownIcon';
-import { UsersIcon } from './icons/UsersIcon';
-import AddTeacherModal from './AddTeacherModal';
-import TeacherDetailModal from './TeacherDetailModal';
-import BulkActionsModal, { BulkActionType } from './teachers/BulkActionsModal';
-import DepartmentsTab from './teachers/DepartmentsTab';
-import { TransferIcon } from './icons/TransferIcon';
-import { BookIcon } from './icons/BookIcon';
-import { UploadIcon } from './icons/UploadIcon';
-import { CommunicationIcon } from './icons/CommunicationIcon';
+import { supabase } from './services/supabase';
+import { TeacherExtended, UserProfile } from './types';
+import Spinner from './components/common/Spinner';
+import { TeacherIcon } from './components/icons/TeacherIcon';
+import { SearchIcon } from './components/icons/SearchIcon';
+import { EditIcon } from './components/icons/EditIcon';
+import { PlusIcon } from './components/icons/PlusIcon';
+import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
+import { BriefcaseIcon } from './components/icons/BriefcaseIcon';
+import { GridIcon } from './components/icons/GridIcon';
+import { FilterIcon } from './components/icons/FilterIcon';
+import { XIcon } from './components/icons/XIcon';
+import { MoreHorizontalIcon } from './components/icons/MoreHorizontalIcon';
+import { MailIcon } from './components/icons/MailIcon';
+import { PhoneIcon } from './components/icons/PhoneIcon';
+import { DownloadIcon } from './components/icons/DownloadIcon';
+import { TrashIcon } from './components/icons/TrashIcon';
+import { ChevronLeftIcon } from './components/icons/ChevronLeftIcon';
+import { ChevronRightIcon } from './components/icons/ChevronRightIcon';
+import { ChevronDownIcon } from './components/icons/ChevronDownIcon';
+import { UsersIcon } from './components/icons/UsersIcon';
+import AddTeacherModal from './components/AddTeacherModal';
+import TeacherDetailModal from './components/TeacherDetailModal';
+import BulkActionsModal, { BulkActionType } from './components/teachers/BulkActionsModal';
+import DepartmentsTab from './components/teachers/DepartmentsTab';
+import { TransferIcon } from './components/icons/TransferIcon';
+import { BookIcon } from './components/icons/BookIcon';
+import { UploadIcon } from './components/icons/UploadIcon';
+import { CommunicationIcon } from './components/icons/CommunicationIcon';
 
 // --- Types ---
 type QuickFilterType = 'All' | 'Active' | 'New Joinees' | 'Pending Verification' | 'On Leave' | 'Inactive';
@@ -483,8 +484,10 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-sm overflow-hidden border-2 border-background">
-                                                            {teacher.details?.profile_picture_url ? <img src={teacher.details.profile_picture_url} className="w-full h-full object-cover"/> : teacher.display_name.charAt(0)}
+                                                        <div className="relative">
+                                                             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-sm overflow-hidden border-2 border-background">
+                                                                {teacher.details?.profile_picture_url ? <img src={teacher.details.profile_picture_url} className="w-full h-full object-cover" alt={teacher.display_name}/> : teacher.display_name.charAt(0)}
+                                                            </div>
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">{teacher.display_name}</p>

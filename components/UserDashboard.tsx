@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { ROLE_ICONS } from '../constants';
@@ -69,8 +68,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ profile, onSignOut, onSwi
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onConfirm={onSwitchRole}
-                title="Confirm Role Switch"
-                message="Are you sure you want to switch your role? Your current role-specific profile data will be removed, and you will be guided through the new profile setup."
+                title="Confirm Identity Switch"
+                message="Are you sure you want to switch your active portal role? Your existing profile data for each role is securely retained and will be available as soon as you switch back."
                 confirmText="Yes, Switch Role"
             />
         </div>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { StudentDashboardData } from '../../types';
 import { BarChartIcon } from '../icons/BarChartIcon';
@@ -23,7 +22,7 @@ const UPCOMING_EXAMS = [
 ];
 
 const ExamsTab: React.FC<ExamsTabProps> = ({ data }) => {
-    const { recentGrades } = data;
+    const recentGrades = data?.recentGrades ?? [];
 
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -88,7 +87,7 @@ const ExamsTab: React.FC<ExamsTabProps> = ({ data }) => {
                                 </div>
                                 
                                 <div className="w-full bg-muted/50 rounded-full h-2 mb-4 overflow-hidden">
-                                    <div className={`h-full rounded-full ${grade.grade.startsWith('A') ? 'bg-green-500' : grade.grade.startsWith('B') ? 'bg-blue-500' : 'bg-yellow-500'}`} style={{ width: `${(grade.marks_obtained / grade.total_marks) * 100}%` }}></div>
+                                    <div className={`h-full rounded-full ${grade.grade.startsWith('A') ? 'bg-green-500' : grade.grade.startsWith('B') ? 'bg-blue-500' : 'bg-yellow-500'}`} style={{ width: `${(grade.marks_obtained / (grade.total_marks || 1)) * 100}%` }}></div>
                                 </div>
 
                                 <div className="flex justify-between items-end text-sm">

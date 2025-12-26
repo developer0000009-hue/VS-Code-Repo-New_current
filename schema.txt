@@ -1,15 +1,128 @@
+
 -- ===============================================================================================
---  SCHOOL MANAGEMENT SYSTEM - MASTER SCHEMA
---  Version: 7.1.0 (Parent Portal RPC Fix)
+--  GURUKUL OS - MASTER SCHEMA
+--  Version: 10.3.0 (Infrastructure Restoration)
+--  Description: Comprehensive schema including missing Vault/Document relations.
 -- ===============================================================================================
 
--- ... [Previous Table Definitions remain unchanged] ...
-
+-- 1. CORE TABLES
 -- -----------------------------------------------------------------------------------------------
--- 11. RPC FUNCTIONS (CORE & PARENT PORTAL)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE NOT NULL,
+    display_name TEXT,
+    phone TEXT,
+    role TEXT,
+    profile_completed BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    branch_id INT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    email_confirmed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS public.admissions (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    applicant_name TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    status TEXT DEFAULT 'Pending Review',
+    submitted_at TIMESTAMPTZ DEFAULT now(),
+    submitted_by UUID REFERENCES public.profiles(id),
+    parent_id UUID REFERENCES public.profiles(id),
+    parent_name TEXT,
+    parent_email TEXT,
+    parent_phone TEXT,
+    date_of_birth DATE,
+    gender TEXT,
+    profile_photo_url TEXT,
+    medical_info TEXT,
+    emergency_contact TEXT,
+    application_number TEXT UNIQUE,
+    student_user_id UUID REFERENCES public.profiles(id),
+    branch_id INT
+);
+
+-- 2. DOCUMENT VAULT INFRASTRUCTURE (Fix for "relation does not exist")
+-- -----------------------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.document_requirements (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    admission_id BIGINT REFERENCES public.admissions(id) ON DELETE CASCADE,
+    document_name TEXT NOT NULL,
+    status TEXT DEFAULT 'Pending' CHECK (status IN ('Pending', 'Submitted', 'Accepted', 'Rejected', 'Verified')),
+    notes_for_parent TEXT,
+    rejection_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.admission_documents (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    requirement_id BIGINT REFERENCES public.document_requirements(id) ON DELETE CASCADE,
+    admission_id BIGINT REFERENCES public.admissions(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    storage_path TEXT NOT NULL,
+    uploaded_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. SECURITY (RLS)
+-- -----------------------------------------------------------------------------------------------
+ALTER TABLE public.document_requirements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admission_documents ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Parents can view their own requirements" ON public.document_requirements;
+CREATE POLICY "Parents can view their own requirements" ON public.document_requirements
+FOR SELECT TO authenticated
+USING (EXISTS (
+    SELECT 1 FROM public.admissions a 
+    WHERE a.id = admission_id 
+    AND (a.parent_id = auth.uid() OR a.submitted_by = auth.uid() OR a.student_user_id = auth.uid())
+));
+
+DROP POLICY IF EXISTS "Parents can view their own documents" ON public.admission_documents;
+CREATE POLICY "Parents can view their own documents" ON public.admission_documents
+FOR SELECT TO authenticated
+USING (EXISTS (
+    SELECT 1 FROM public.admissions a 
+    WHERE a.id = admission_id 
+    AND (a.parent_id = auth.uid() OR a.submitted_by = auth.uid() OR a.student_user_id = auth.uid())
+));
+
+-- 4. LOGIC INTERFACE (RPCs)
 -- -----------------------------------------------------------------------------------------------
 
--- 11.1 Parent: Get Dashboard Stats
+-- Deep Document Fetch with Integrity Check
+CREATE OR REPLACE FUNCTION public.parent_get_document_requirements()
+RETURNS TABLE (
+    id BIGINT,
+    admission_id BIGINT,
+    document_name TEXT,
+    status TEXT,
+    notes_for_parent TEXT,
+    rejection_reason TEXT,
+    applicant_name TEXT,
+    profile_photo_url TEXT,
+    admission_documents JSONB
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    RETURN QUERY 
+    SELECT 
+        dr.id, 
+        dr.admission_id, 
+        dr.document_name, 
+        dr.status::text, 
+        dr.notes_for_parent, 
+        dr.rejection_reason,
+        a.applicant_name,
+        a.profile_photo_url,
+        COALESCE(
+            (SELECT jsonb_agg(ad) FROM public.admission_documents ad WHERE ad.requirement_id = dr.id),
+            '[]'::jsonb
+        ) as admission_documents
+    FROM public.document_requirements dr
+    JOIN public.admissions a ON dr.admission_id = a.id
+    WHERE a.parent_id = auth.uid() OR a.submitted_by = auth.uid() OR a.student_user_id = auth.uid();
+END;
+$$;
+
+-- Global Dashboard Stats
 CREATE OR REPLACE FUNCTION public.get_parent_dashboard_stats()
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -17,9 +130,9 @@ DECLARE
     v_pending int;
     v_approved int;
 BEGIN
-    SELECT count(*) INTO v_total FROM public.admissions WHERE submitted_by = auth.uid();
-    SELECT count(*) INTO v_pending FROM public.admissions WHERE submitted_by = auth.uid() AND status IN ('Pending Review', 'Documents Requested');
-    SELECT count(*) INTO v_approved FROM public.admissions WHERE submitted_by = auth.uid() AND status = 'Approved';
+    SELECT count(*) INTO v_total FROM public.admissions WHERE (submitted_by = auth.uid() OR parent_id = auth.uid());
+    SELECT count(*) INTO v_pending FROM public.admissions WHERE (submitted_by = auth.uid() OR parent_id = auth.uid()) AND status IN ('Pending Review', 'Documents Requested');
+    SELECT count(*) INTO v_approved FROM public.admissions WHERE (submitted_by = auth.uid() OR parent_id = auth.uid()) AND status = 'Approved';
 
     RETURN jsonb_build_object(
         'total_applications', COALESCE(v_total, 0),
@@ -28,93 +141,5 @@ BEGIN
     );
 END;
 $$;
-
--- 11.2 Parent: Get Children Profiles
-CREATE OR REPLACE FUNCTION public.get_my_children_profiles()
-RETURNS SETOF public.admissions LANGUAGE sql SECURITY DEFINER AS $$
-    SELECT * FROM public.admissions 
-    WHERE submitted_by = auth.uid() OR parent_id = auth.uid()
-    ORDER BY submitted_at DESC;
-$$;
-
--- 11.3 Parent: Get Messages/Announcements
-CREATE OR REPLACE FUNCTION public.get_my_messages()
-RETURNS TABLE (
-    message_id bigint,
-    subject text,
-    body text,
-    sender_name text,
-    sender_role text,
-    sent_at timestamptz,
-    status text,
-    target_criteria jsonb
-) LANGUAGE sql SECURITY DEFINER AS $$
-    SELECT id, subject, body, sender_name, sender_role, sent_at, status, target_criteria
-    FROM public.communications
-    WHERE 'Parent/Guardian' = ANY(recipients)
-    ORDER BY sent_at DESC;
-$$;
-
--- 11.4 Parent: Get Document Requirements
-CREATE OR REPLACE FUNCTION public.parent_get_document_requirements()
-RETURNS TABLE (
-    id bigint,
-    admission_id bigint,
-    document_name text,
-    status text,
-    notes_for_parent text,
-    rejection_reason text,
-    applicant_name text,
-    admission_documents jsonb
-) LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    RETURN QUERY 
-    SELECT 
-        dr.id, 
-        dr.admission_id, 
-        dr.document_name, 
-        dr.status, 
-        dr.notes_for_parent, 
-        dr.rejection_reason,
-        a.applicant_name,
-        COALESCE(
-            (SELECT jsonb_agg(ad) FROM public.admission_documents ad WHERE ad.requirement_id = dr.id),
-            '[]'::jsonb
-        ) as admission_documents
-    FROM public.document_requirements dr
-    JOIN public.admissions a ON dr.admission_id = a.id
-    WHERE a.submitted_by = auth.uid() OR a.parent_id = auth.uid();
-END;
-$$;
-
--- 11.5 Generic: Auth Setup
-CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, display_name, role)
-  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'display_name', NEW.raw_user_meta_data->>'role')
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 11.6 Admin: Setup School
-CREATE OR REPLACE FUNCTION public.initialize_school_admin() RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    UPDATE public.profiles SET role = 'School Administration', profile_completed = false WHERE id = auth.uid();
-    INSERT INTO public.school_admin_profiles (user_id, onboarding_step) VALUES (auth.uid(), 'profile')
-    ON CONFLICT (user_id) DO UPDATE SET onboarding_step = EXCLUDED.onboarding_step;
-    RETURN jsonb_build_object('success', true);
-END;
-$$;
-
--- 11.7 Admin: Finalize Setup
-CREATE OR REPLACE FUNCTION public.complete_branch_step() RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    UPDATE public.school_admin_profiles SET onboarding_step = 'completed' WHERE user_id = auth.uid();
-    UPDATE public.profiles SET profile_completed = true WHERE id = auth.uid();
-END;
-$$;
-
--- ... [Remaining RPCs from previous versions continue here] ...
 
 NOTIFY pgrst, 'reload schema';

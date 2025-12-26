@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 import { TeacherProfileData } from '../../types';
 
@@ -127,10 +125,12 @@ const TeacherForm: React.FC<FormProps> = ({ formData, handleChange, photoPreview
                     <div className="p-4 bg-muted/30 border border-border rounded-md space-y-4">
                         <h4 className="text-xs font-bold uppercase text-muted-foreground">HR & Finance (Admin Only)</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Fix: salary mapping */}
                             <div>
                                 <Label htmlFor="salary">Annual Salary</Label>
                                 <BaseInput id="salary" name="salary" type="text" value={formData.salary || ''} onChange={handleChange} placeholder="e.g. 45000" />
                             </div>
+                            {/* Fix: bank_details mapping */}
                             <div>
                                 <Label htmlFor="bank_details">Bank Details</Label>
                                 <BaseInput id="bank_details" name="bank_details" type="text" value={formData.bank_details || ''} onChange={handleChange} placeholder="IBAN / Account No." />

@@ -7,12 +7,14 @@ interface AnnouncementsTabProps {
 }
 
 const AnnouncementsTab: React.FC<AnnouncementsTabProps> = ({ data }) => {
+    const announcements = data?.announcements ?? [];
+
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold text-foreground">Announcements</h2>
-            {data.announcements.length > 0 ? (
+            {announcements.length > 0 ? (
                 <div className="space-y-5">
-                    {data.announcements.map(ann => (
+                    {announcements.map(ann => (
                         <div key={ann.id} className="bg-card p-5 rounded-xl border border-border shadow-sm transition-shadow hover:shadow-md">
                              <div className="flex items-start gap-4">
                                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mt-1">

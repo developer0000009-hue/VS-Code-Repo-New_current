@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { SchoolBranch, BulkImportResult } from '../../types';
@@ -52,16 +51,15 @@ const normalizeClassName = (name: string): string => {
 };
 
 /**
- * Enhanced error formatter to provide specific debugging context for bulk failures.
+ * Enhanced error formatter to provide specific debugging context for bulk failures and prevent [object Object].
  */
 const formatError = (err: any): string => {
     if (!err) return "An unknown error occurred.";
     if (typeof err === 'string') {
-         if (err.includes("[object Object]")) return "An unexpected mapping error occurred.";
-         return err;
+         return (err === "[object Object]" || err === "{}") ? "Mapping protocol failed." : err;
     }
     
-    // Handle specific object structures returned from DB functions for better traceability
+    // Handle specific object structures returned from DB functions
     if (typeof err === 'object') {
         let context = "";
         if (err.row) context += `Row ${err.row}: `;
@@ -71,18 +69,21 @@ const formatError = (err: any): string => {
         if (err.teacher_email) context += `Teacher [${err.teacher_email}] `;
         if (err.student_email) context += `Student [${err.student_email}] `;
         
-        const message = err.error || err.message || err.error_description || err.details || err.hint;
+        const message = err.message || err.error_description || err.details?.message || err.details || err.hint;
         if (message && typeof message === 'string' && !message.includes("[object Object]")) {
             return context ? `${context}${message}` : message;
+        }
+        
+        // If message is an object, try to unpack it
+        if (typeof message === 'object' && message?.message && typeof message.message === 'string') {
+             return context ? `${context}${message.message}` : message.message;
         }
     }
 
     try {
         const json = JSON.stringify(err);
-        if (json && json !== '{}' && json !== '[]') return json;
-    } catch {
-        // Ignore JSON errors
-    }
+        if (json && json !== '{}' && json !== '[]' && !json.includes("[object Object]")) return json;
+    } catch { }
     
     return "The system could not find the specified record or mapping.";
 };

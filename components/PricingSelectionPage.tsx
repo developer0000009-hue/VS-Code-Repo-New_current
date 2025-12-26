@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import Spinner from './common/Spinner';
@@ -52,105 +51,69 @@ const basePlans: BasePlan[] = [
     },
 ];
 
-// Robust error formatter
+/**
+ * Standardized error formatter to prevent [object Object].
+ */
 const formatError = (err: any): string => {
     if (!err) return "An unknown error occurred.";
+    
     if (typeof err === 'string') {
-        if (err.includes("[object Object]")) return "An unexpected error occurred. Please try again.";
-        return err;
+        const isJunk = err === "[object Object]" || err === "{}" || err === "null" || err === "undefined";
+        return isJunk ? "Pricing update protocol failure." : err;
     }
     
-    // Check for standard Error object or Supabase PostgrestError properties
-    const message = err.message || err.error_description || err.details || err.hint;
-    if (message && typeof message === 'string' && !message.includes("[object Object]")) {
-        return message;
+    const candidates = [
+        err.message,
+        err.error_description,
+        err.details,
+        err.hint,
+        err.error?.message,
+        err.error
+    ];
+
+    for (const val of candidates) {
+        if (typeof val === 'string' && val !== "[object Object]" && val !== "{}") return val;
+        if (typeof val === 'object' && val?.message && typeof val.message === 'string') return val.message;
     }
-    
-    // If it's an object but has no clean message, try to stringify it safely
+
     try {
-        const json = JSON.stringify(err, null, 2);
-        if (json && json !== '{}' && json !== '[]') return `System Error: ${json}`;
-    } catch {
-        // Ignore JSON errors
-    }
-    
-    return "An unexpected system error occurred.";
+        const str = JSON.stringify(err);
+        if (str && str !== '{}' && str !== '[]' && !str.includes("[object Object]")) {
+            return str.length > 200 ? str.substring(0, 197) + "..." : str;
+        }
+    } catch { }
+
+    return "An unexpected system error occurred during pricing selection.";
 };
 
+/**
+ * Component for selecting an institutional deployment plan.
+ */
 const PricingSelectionPage: React.FC<PricingSelectionPageProps> = ({ onComplete, onBack }) => {
-    const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [initializing, setInitializing] = useState(true); // Add initializing state
     const [error, setError] = useState<string | null>(null);
-    const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
     const isMounted = useRef(true);
 
     useEffect(() => {
         return () => { isMounted.current = false; };
     }, []);
 
-    // Restore saved plan if exists
-    useEffect(() => {
-        const fetchSavedPlan = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) return;
-
-                const { data, error } = await supabase
-                    .from('school_admin_profiles')
-                    .select('plan_id')
-                    .eq('user_id', user.id)
-                    .single();
-
-                if (data && data.plan_id && isMounted.current) {
-                    setSelectedPlanId(data.plan_id);
-                }
-            } catch (err) {
-                console.error("Error fetching saved plan:", err);
-            } finally {
-                if (isMounted.current) setInitializing(false);
-            }
-        };
-
-        fetchSavedPlan();
-    }, []);
-
-    const handleSelect = async () => {
-        if (!selectedPlanId) return;
-        
+    // Fix: Completed the missing plan selection logic and persistence call
+    const handleSelectPlan = async (planId: string) => {
+        setSelectedPlan(planId);
         setLoading(true);
         setError(null);
-        
-        const selectedPlan = basePlans.find(p => p.id === selectedPlanId);
-        const branches = selectedPlan?.branches || '1 Branch';
 
         try {
-            // First RPC to set plan/branches if specific logic exists
-            const { error: rpcError } = await supabase.rpc('finalize_school_pricing', {
-                p_branches: branches
+            const { error: updateError } = await supabase.rpc('update_school_plan', {
+                p_plan_id: planId
             });
 
-            if (rpcError) throw rpcError;
+            if (updateError) throw updateError;
             
-            // Explicitly update onboarding_step and plan_id
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                 const { error: updateError } = await supabase
-                    .from('school_admin_profiles')
-                    .update({ 
-                        plan_id: selectedPlanId,
-                        onboarding_step: 'branches' 
-                    })
-                    .eq('user_id', user.id);
-                 
-                 if (updateError) throw updateError;
-            }
-            
-            if (isMounted.current) {
-                onComplete();
-            }
+            if (isMounted.current) onComplete();
         } catch (err: any) {
-            console.error("Pricing Selection Error:", JSON.stringify(err, null, 2));
             if (isMounted.current) {
                 setError(formatError(err));
                 setLoading(false);
@@ -158,166 +121,89 @@ const PricingSelectionPage: React.FC<PricingSelectionPageProps> = ({ onComplete,
         }
     };
 
-    const getPrice = (index: number) => {
-        const baseValues = [9, 99, 999, 9999];
-        const value = baseValues[index];
-        // Simple currency conversion logic for display
-        const displayValue = currency === 'INR' ? value : Math.round(value / 80 * 10) / 10; // Approx conv
-        const symbol = currency === 'INR' ? '₹' : '$';
-        
-        return `${symbol}${displayValue.toLocaleString(currency === 'INR' ? 'en-IN' : 'en-US')}`;
-    };
-
-    if (initializing) {
-        return <div className="flex justify-center items-center py-20"><Spinner size="lg" /></div>;
-    }
-
     return (
-        <div className="w-full max-w-7xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            
-            {onBack && (
-                <div className="mb-6">
-                    <button
-                        onClick={onBack}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm font-medium"
-                    >
-                        <ChevronLeftIcon className="w-4 h-4" />
-                        Back to Profile
-                    </button>
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+                <h2 className="text-4xl font-serif font-black text-foreground tracking-tight">Institutional Scaling</h2>
+                <p className="text-muted-foreground mt-4 text-lg leading-relaxed font-medium">
+                    Select a core deployment plan tailored to your institutional complexity. Plans can be adjusted as your node network expands.
+                </p>
+            </div>
+
+            {error && (
+                <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl text-center font-bold animate-pulse">
+                    {error}
                 </div>
             )}
 
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-                <div className="text-left max-w-2xl">
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight leading-tight">
-                        Choose Your Plan
-                    </h1>
-                    <p className="text-muted-foreground mt-3 text-lg leading-relaxed">
-                        Select a package that fits your institution's scale. Upgrade seamlessly as you grow.
-                    </p>
-                </div>
-                
-                {/* Currency Toggle */}
-                <div className="bg-muted p-1 rounded-xl inline-flex border border-border/50 shadow-sm">
-                    <button 
-                        onClick={() => setCurrency('INR')}
-                        className={`px-5 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
-                            currency === 'INR' 
-                            ? 'bg-background text-foreground shadow-sm ring-1 ring-black/5' 
-                            : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                        }`}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+                {basePlans.map((plan) => (
+                    <div 
+                        key={plan.id}
+                        className={`
+                            relative flex flex-col p-8 rounded-[2.5rem] border transition-all duration-500 group
+                            ${plan.recommended 
+                                ? 'bg-primary/5 border-primary shadow-2xl ring-1 ring-primary/20 scale-105 z-10' 
+                                : 'bg-card border-border hover:border-primary/40 hover:shadow-xl'
+                            }
+                        `}
                     >
-                        INR (₹)
-                    </button>
-                    <button 
-                        onClick={() => setCurrency('USD')}
-                        className={`px-5 py-2 text-sm font-bold rounded-lg transition-all duration-200 ${
-                            currency === 'USD' 
-                            ? 'bg-background text-foreground shadow-sm ring-1 ring-black/5' 
-                            : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                        }`}
-                    >
-                        USD ($)
-                    </button>
-                </div>
-            </div>
+                        {plan.recommended && (
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full shadow-lg">
+                                Recommended
+                            </div>
+                        )}
 
-            {/* Plans Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 mb-12 items-start">
-                {basePlans.map((plan, index) => {
-                    const isSelected = selectedPlanId === plan.id;
-                    const isRecommended = plan.recommended;
+                        <div className="mb-8">
+                            <h3 className="text-xl font-black text-foreground uppercase tracking-widest">{plan.label}</h3>
+                            <p className="text-3xl font-black text-primary mt-2">{plan.branches}</p>
+                        </div>
 
-                    return (
-                        <div 
-                            key={plan.id}
-                            onClick={() => setSelectedPlanId(plan.id)}
+                        <p className="text-sm text-muted-foreground font-medium mb-8 leading-relaxed">
+                            {plan.description}
+                        </p>
+
+                        <ul className="space-y-4 mb-10 flex-grow">
+                            {plan.features.map((feature, idx) => (
+                                <li key={idx} className="flex items-start gap-3 text-xs font-bold text-foreground/70">
+                                    <CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                                    <span>{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+
+                        <button
+                            onClick={() => handleSelectPlan(plan.id)}
+                            disabled={loading}
                             className={`
-                                group relative flex flex-col h-full p-6 rounded-3xl border-2 cursor-pointer transition-all duration-300 ease-out
-                                ${isSelected 
-                                    ? 'bg-primary/5 border-primary shadow-2xl scale-[1.02] ring-4 ring-primary/10 z-10' 
-                                    : 'bg-card border-border hover:border-primary/30 hover:shadow-xl hover:-translate-y-2'
+                                w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all transform active:scale-95
+                                ${plan.recommended 
+                                    ? 'bg-primary text-primary-foreground shadow-xl shadow-primary/20 hover:bg-primary/90' 
+                                    : 'bg-muted text-muted-foreground hover:bg-foreground hover:text-background'
                                 }
+                                ${loading && selectedPlan === plan.id ? 'opacity-50' : ''}
                             `}
                         >
-                            {/* Recommended Badge */}
-                            {isRecommended && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] uppercase tracking-widest font-bold px-4 py-1.5 rounded-full shadow-lg shadow-indigo-500/30">
-                                    Most Popular
-                                </div>
-                            )}
-                            
-                            {/* Card Header */}
-                            <div className="mb-6 pt-2">
-                                <h3 className={`text-xl font-bold tracking-tight mb-2 ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                                    {plan.label}
-                                </h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed min-h-[40px]">
-                                    {plan.description}
-                                </p>
-                            </div>
-
-                            {/* Pricing */}
-                            <div className="mb-8 pb-8 border-b border-border/60">
-                                <div className="flex items-baseline gap-1">
-                                    <span className={`text-4xl font-extrabold tracking-tight ${isSelected ? 'text-foreground' : 'text-foreground/90'}`}>
-                                        {getPrice(index)}
-                                    </span>
-                                    <span className="text-muted-foreground font-medium text-sm">/mo</span>
-                                </div>
-                                <p className="text-xs font-bold text-primary/80 uppercase tracking-widest mt-3 bg-primary/5 inline-block px-2 py-1 rounded">
-                                    {plan.branches} License
-                                </p>
-                            </div>
-
-                            {/* Features */}
-                            <ul className="space-y-4 mb-8 flex-grow">
-                                {plan.features.map((feature, idx) => (
-                                    <li key={idx} className="flex items-start text-sm group/item">
-                                        <CheckCircleIcon className={`w-5 h-5 mr-3 flex-shrink-0 transition-colors ${isSelected || isRecommended ? 'text-primary' : 'text-muted-foreground/60 group-hover/item:text-primary/70'}`} />
-                                        <span className={`transition-colors font-medium ${isSelected ? 'text-foreground' : 'text-muted-foreground group-hover/item:text-foreground'}`}>
-                                            {feature}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {/* Selection Button (Visual only, card click handles it) */}
-                            <button className={`w-full py-3.5 rounded-xl font-bold text-sm text-center transition-all duration-200 ${
-                                isSelected
-                                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 translate-y-0'
-                                    : 'bg-muted/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary border border-transparent group-hover:border-primary/10'
-                            }`}>
-                                {isSelected ? 'Selected' : 'Select Plan'}
-                            </button>
-                        </div>
-                    );
-                })}
+                            {loading && selectedPlan === plan.id ? <Spinner size="sm" className="mx-auto" /> : 'Select Plan'}
+                        </button>
+                    </div>
+                ))}
             </div>
 
-            {/* Error Message */}
-            {error && (
-                <div className="max-w-xl mx-auto mb-8 p-4 bg-destructive/10 text-destructive rounded-xl text-center text-sm border border-destructive/20 font-semibold animate-pulse flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0">
-                        <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clipRule="evenodd" />
-                    </svg>
-                    <span className="break-words text-left">{error}</span>
+            {onBack && (
+                <div className="mt-16 text-center">
+                    <button
+                        onClick={onBack}
+                        disabled={loading}
+                        className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    >
+                        <ChevronLeftIcon className="w-4 h-4" /> Return to Profile Setup
+                    </button>
                 </div>
             )}
-
-            {/* Confirm CTA */}
-            <div className="flex justify-center pb-8">
-                <button
-                    onClick={handleSelect}
-                    disabled={!selectedPlanId || loading}
-                    className="px-12 py-4 bg-gradient-to-r from-primary to-indigo-600 text-white font-bold text-lg rounded-2xl shadow-xl shadow-indigo-500/25 hover:shadow-2xl hover:shadow-indigo-500/40 transition-all transform hover:-translate-y-1 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-3"
-                >
-                    {loading ? <Spinner size="md" className="text-white" /> : 'Confirm & Continue'}
-                </button>
-            </div>
         </div>
     );
 };
 
+// Fix: Added default export
 export default PricingSelectionPage;

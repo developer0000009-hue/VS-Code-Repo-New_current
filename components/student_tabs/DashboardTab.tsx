@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { StudentDashboardData } from '../../types';
+import { StudentDashboardData, Day } from '../../types';
 import { ClockIcon } from '../icons/ClockIcon';
 import { ChecklistIcon } from '../icons/ChecklistIcon';
 import { CalendarIcon } from '../icons/CalendarIcon';
@@ -42,46 +41,51 @@ const StatCard: React.FC<{ title: string, value: string | number, icon: React.Re
 );
 
 
-const UpcomingAssignments: React.FC<{ data: StudentDashboardData }> = ({ data }) => (
-    <div className="bg-card p-6 rounded-2xl border border-border shadow-sm h-full">
-        <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-foreground text-lg">Assignments Due</h3>
-            <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded-md">{data.assignments.length} Pending</span>
-        </div>
-        {data.assignments.length > 0 ? (
-            <ul className="space-y-4">
-                {data.assignments.slice(0, 3).map(assignment => (
-                    <li key={assignment.id} className="flex items-center gap-4 group">
-                        <div className="w-12 h-12 rounded-xl bg-muted/50 border border-border text-foreground flex flex-col items-center justify-center flex-shrink-0 group-hover:border-primary/50 transition-colors">
-                             <span className="text-[10px] font-bold uppercase text-muted-foreground">{new Date(assignment.due_date).toLocaleDateString('en-US', { month: 'short' })}</span>
-                             <span className="text-lg font-extrabold -mt-1">{new Date(assignment.due_date).getDate()}</span>
-                        </div>
-                        <div className="flex-grow min-w-0">
-                            <p className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">{assignment.title}</p>
-                            <p className="text-xs text-muted-foreground truncate">{assignment.subject}</p>
-                        </div>
-                        <div className={`w-2 h-2 rounded-full ${new Date(assignment.due_date) < new Date() ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                    </li>
-                ))}
-            </ul>
-        ) : (
-            <div className="text-center py-12">
-                <ChecklistIcon className="w-12 h-12 mx-auto text-muted-foreground/20 mb-3" />
-                <p className="text-sm text-muted-foreground font-medium">You're all caught up!</p>
+const UpcomingAssignments: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
+    const assignments = data?.assignments || [];
+    return (
+        <div className="bg-card p-6 rounded-2xl border border-border shadow-sm h-full">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-foreground text-lg">Assignments Due</h3>
+                <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-1 rounded-md">{assignments.length} Pending</span>
             </div>
-        )}
-    </div>
-);
+            {assignments.length > 0 ? (
+                <ul className="space-y-4">
+                    {assignments.slice(0, 3).map(assignment => (
+                        <li key={assignment.id} className="flex items-center gap-4 group">
+                            <div className="w-12 h-12 rounded-xl bg-muted/50 border border-border text-foreground flex flex-col items-center justify-center flex-shrink-0 group-hover:border-primary/50 transition-colors">
+                                 <span className="text-[10px] font-bold uppercase text-muted-foreground">{new Date(assignment.due_date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                                 <span className="text-lg font-extrabold -mt-1">{new Date(assignment.due_date).getDate()}</span>
+                            </div>
+                            <div className="flex-grow min-w-0">
+                                <p className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">{assignment.title}</p>
+                                <p className="text-xs text-muted-foreground truncate">{assignment.subject}</p>
+                            </div>
+                            <div className={`w-2 h-2 rounded-full ${new Date(assignment.due_date) < new Date() ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <div className="text-center py-12">
+                    <ChecklistIcon className="w-12 h-12 mx-auto text-muted-foreground/20 mb-3" />
+                    <p className="text-sm text-muted-foreground font-medium">You're all caught up!</p>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const TodaysSchedule: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
-    const today = new Date().getDay(); // Sunday - 0, Monday - 1, ...
-    const todaysClasses = data.timetable
-        .filter(t => t.day_of_week === today)
-        .sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const DAYS_ARRAY: Day[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = DAYS_ARRAY[new Date().getDay()];
 
-    // Mock logic to simulate a live class for demo purposes
+    const timetable = data?.timetable || [];
+    const todaysClasses = timetable
+        .filter(t => t.day === todayName)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
     const currentHour = new Date().getHours();
-    const isLive = (start: string) => parseInt(start.split(':')[0]) === currentHour || (currentHour >= 9 && currentHour <= 15 && Math.random() > 0.7);
+    const isLive = (start: string) => parseInt(start.split(':')[0]) === currentHour;
 
     return (
         <div className="bg-card p-6 rounded-2xl border border-border shadow-sm h-full">
@@ -93,12 +97,12 @@ const TodaysSchedule: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
             {todaysClasses.length > 0 ? (
                 <div className="space-y-4 relative before:absolute before:left-[4.5rem] before:top-2 before:bottom-2 before:w-px before:bg-border/50">
                     {todaysClasses.map((cls, idx) => {
-                        const live = isLive(cls.start_time);
+                        const live = isLive(cls.startTime);
                         return (
-                         <div key={cls.start_time} className="relative flex items-center gap-6 group">
+                         <div key={`${cls.startTime}-${idx}`} className="relative flex items-center gap-6 group">
                             <div className="text-right flex-shrink-0 w-12">
-                                <p className="text-xs font-bold text-foreground">{cls.start_time.slice(0, 5)}</p>
-                                <p className="text-[10px] text-muted-foreground">{cls.end_time.slice(0, 5)}</p>
+                                <p className="text-xs font-bold text-foreground">{cls.startTime.slice(0, 5)}</p>
+                                <p className="text-[10px] text-muted-foreground">{cls.endTime.slice(0, 5)}</p>
                             </div>
                             
                             <div className={`absolute left-[4.2rem] w-3 h-3 rounded-full border-2 border-card z-10 ${live ? 'bg-red-500 ring-4 ring-red-500/20' : 'bg-muted-foreground/30'}`}></div>
@@ -130,15 +134,16 @@ const TodaysSchedule: React.FC<{ data: StudentDashboardData }> = ({ data }) => {
 }
 
 const DashboardTab: React.FC<DashboardTabProps> = ({ data }) => {
-    const attendancePercent = data.attendanceSummary.total_days > 0
-        ? Math.round((data.attendanceSummary.present_days / data.attendanceSummary.total_days) * 100)
+    const summary = data?.attendanceSummary;
+    const assignments = data?.assignments || [];
+    const attendancePercent = summary && summary.total_days > 0
+        ? Math.round((summary.present_days / summary.total_days) * 100)
         : 100;
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <GreetingHeader name={data.profile.display_name} />
+            <GreetingHeader name={data?.profile?.display_name || 'Student'} />
             
-            {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <StatCard 
                     title="Attendance Rate"
@@ -148,13 +153,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ data }) => {
                  />
                  <StatCard 
                     title="Assignments Due"
-                    value={data.assignments.length}
+                    value={assignments.length}
                     icon={<ClockIcon className="w-6 h-6" />}
-                    color="bg-amber-500"
+                    color="bg-amber-50"
                  />
                  <StatCard 
                     title="School Events"
-                    value={3} // Static for now
+                    value={3}
                     icon={<CalendarIcon className="w-6 h-6" />}
                     color="bg-blue-500"
                  />
