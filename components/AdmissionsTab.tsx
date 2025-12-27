@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { AdmissionApplication, AdmissionStatus } from '../types';
@@ -10,18 +11,16 @@ import { EyeIcon } from './icons/EyeIcon';
 import { ClockIcon } from './icons/ClockIcon';
 import { FilterIcon } from './icons/FilterIcon';
 import { UsersIcon } from './icons/UsersIcon';
-// Fix: Added missing AlertTriangleIcon import
 import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 
 const statusColors: { [key: string]: string } = {
   'Pending Review': 'bg-amber-50/10 text-amber-600 border-amber-200 dark:border-amber-800',
   'Documents Requested': 'bg-blue-50/10 text-blue-600 border-blue-200 dark:border-blue-800',
   'Approved': 'bg-emerald-50/10 text-emerald-600 border-emerald-200 dark:border-emerald-800',
+  'Verified': 'bg-emerald-50/10 text-emerald-600 border-emerald-200 dark:border-emerald-800',
   'Rejected': 'bg-red-50/10 text-red-600 border-red-200 dark:border-red-800',
 };
 
-// Fix: Component defined and exported to satisfy import requirements in EnquiryDetailsModal.tsx.
-// Facilitates administrative requests for specific verification documentation.
 export const RequestDocumentsModal: React.FC<{
     admissionId: number;
     applicantName: string;
@@ -113,7 +112,8 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
         setLoading(true);
         try {
             const { data } = await supabase.rpc('get_admissions', { p_branch_id: branchId });
-            if (data) setApplicants(data as AdmissionApplication[]);
+            // Defensive: ensure applicants is never null or undefined
+            setApplicants((data || []) as AdmissionApplication[]);
         } finally {
             setLoading(false);
         }
@@ -121,7 +121,7 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
 
     useEffect(() => { fetchApplicants(); }, [fetchApplicants]);
 
-    const filteredApps = applicants.filter(app => filterStatus === 'All' || app.status === filterStatus);
+    const filteredApps = (applicants || []).filter(app => filterStatus === 'All' || app.status === filterStatus);
 
     return (
         <div className="space-y-6 md:space-y-8 animate-in fade-in slide-up">

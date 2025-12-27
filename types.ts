@@ -163,8 +163,8 @@ export interface StudentForAdmin extends UserProfile {
     address: string | null;
 }
 
-// Fix: Added missing AdmissionStatus type
-export type AdmissionStatus = 'Pending Review' | 'Documents Requested' | 'Approved' | 'Rejected';
+// Fix: Added 'Verified' to AdmissionStatus to allow valid comparison in ChildProfileCard
+export type AdmissionStatus = 'Pending Review' | 'Documents Requested' | 'Approved' | 'Rejected' | 'Verified';
 
 // Fix: Added missing AdmissionApplication interface
 export interface AdmissionApplication {

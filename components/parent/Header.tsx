@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { UserProfile, Role, Communication } from '../../types';
 import { supabase } from '../../services/supabase';
@@ -23,26 +24,26 @@ const Header: React.FC<HeaderProps> = ({ profile, onSelectRole, onSignOut, onPro
     const fetchNotifications = useCallback(async () => {
         setLoading(true);
         try {
-            // CRITICAL FIX: The function get_my_messages is expected to return message_id, subject, etc.
             const { data, error } = await supabase.rpc('get_my_messages');
             
             if (error) {
-                console.warn("RPC: get_my_messages not found or errored. Check schema v16.2.0 installation.", error.message);
-                // Graceful fallback to prevent UI breakage
+                console.warn("RPC: get_my_messages protocol fail.", error.message);
                 setNotifications([]);
                 return;
             }
 
-            if (data) {
-                // Map message_id to id for consistency with the Communication type
+            // Strict array verification to prevent .map crashes
+            if (data && Array.isArray(data)) {
                 const mappedData = data.map((item: any) => ({
                     ...item,
-                    id: item.message_id
+                    id: item.message_id || item.id
                 }));
                 setNotifications(mappedData);
+            } else {
+                setNotifications([]);
             }
         } catch (err) {
-            console.error("Critical error fetching notifications:", err);
+            console.error("Critical identity broadcast failure:", err);
             setNotifications([]);
         } finally {
             setLoading(false);
@@ -52,7 +53,6 @@ const Header: React.FC<HeaderProps> = ({ profile, onSelectRole, onSignOut, onPro
     useEffect(() => {
         fetchNotifications();
         
-        // Listen for new communications in realtime if the table is enabled
         const channel = supabase
             .channel('public:communications')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'communications' }, () => {
@@ -99,10 +99,7 @@ const Header: React.FC<HeaderProps> = ({ profile, onSelectRole, onSignOut, onPro
                             <NotificationPopover 
                                 isOpen={isNotifOpen}
                                 onClose={() => setIsNotifOpen(false)}
-                                onViewAll={() => {
-                                    setIsNotifOpen(false);
-                                    // Navigation handled by ParentDashboard tabs
-                                }}
+                                onViewAll={() => setIsNotifOpen(false)}
                                 notifications={notifications}
                                 isLoading={loading}
                             />

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import RoleSelectionPage from './components/RoleSelectionPage';
 import { BranchCreationPage } from './components/BranchCreationPage';
@@ -10,36 +11,6 @@ import ThemeSwitcher from './components/common/ThemeSwitcher';
 import { SchoolIcon } from './components/icons/SchoolIcon';
 import ProfileDropdown from './components/common/ProfileDropdown';
 import Stepper from './components/common/Stepper';
-
-const formatError = (err: any): string => {
-    if (!err) return "Synchronization failed.";
-    
-    if (typeof err === 'string') {
-        const isJunk = err === "[object Object]" || err === "{}" || err === "null" || err === "undefined";
-        return isJunk ? "An internal system exception occurred." : err;
-    }
-    
-    const candidates = [
-        err.message, 
-        err.error_description, 
-        err.details, 
-        err.hint, 
-        err.error?.message,
-        err.error
-    ];
-    
-    for (const val of candidates) {
-        if (typeof val === 'string' && val !== "[object Object]" && val !== "{}") return val;
-        if (typeof val === 'object' && val?.message && typeof val.message === 'string') return val.message;
-    }
-    
-    try {
-        const str = JSON.stringify(err);
-        if (str && str !== '{}' && str !== '[]' && !str.includes("[object Object]")) return str;
-    } catch { }
-    
-    return "An unexpected system exception occurred during setup.";
-};
 
 interface OnboardingFlowProps {
     profile: UserProfile;
@@ -99,37 +70,32 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
         setLoading(false);
     }, [profile.role, profile.profile_completed, onboardingStep, isTransitioning]);
 
-    const handleSignOut = async () => {
-        if (isMounted.current) setLoading(true);
-        await supabase.auth.signOut();
-    };
-    
     const handleRoleSelect = async (role: Role) => {
         if (!isMounted.current || isTransitioning) return;
         setIsTransitioning(true);
         setLoading(true);
         
         try {
-            // switch_active_role now automatically detects if a profile is reusable
+            // Atomic Role Switch with sub-profile verification
             const { data, error } = await supabase.rpc('switch_active_role', { p_target_role: role });
             if (error) throw error;
 
-            if (onStepChange) {
-                await onStepChange();
-            }
+            if (onStepChange) await onStepChange();
             
             setSelectedRole(role);
 
-            // If the RPC restored a profile, we immediately complete onboarding
+            // AUTO-SKIP: If the profile was already established, finalize immediately
             if (data?.profile_restored) {
                 onComplete();
+            } else {
+                setStep('profile');
+                setLoading(false);
+                setIsTransitioning(false);
             }
 
         } catch (err: any) {
-            const formatted = formatError(err);
-            console.error('Role selection failed: ' + formatted, err);
-            alert(`Setup Failed: ${formatted}`);
-            
+            console.error('Identity Provisioning failure:', err);
+            alert(`Setup Failed: ${err.message || "Institutional context error"}`);
             if (isMounted.current) {
                 setStep('role');
                 setLoading(false);
@@ -143,55 +109,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
         if (onStepChange) await onStepChange();
     };
 
-    const handleFinalize = async () => {
-        setLoading(true);
-        try {
-            const { error } = await supabase.rpc('complete_branch_step');
-            if (error) throw error;
-            if (isMounted.current) await onComplete();
-        } catch (error: any) {
-            alert("Protocol Violation: " + formatError(error));
-        } finally {
-            if (isMounted.current) setLoading(false);
-        }
-    };
-    
     const handleBack = async () => {
         if (!isMounted.current || profile.profile_completed) return;
-
-        if (selectedRole === BuiltInRoles.SCHOOL_ADMINISTRATION) {
-            setLoading(true);
-            try {
-                if (step === 'branches') {
-                     await supabase.from('school_admin_profiles').update({ onboarding_step: 'pricing' }).eq('user_id', profile.id);
-                     setStep('pricing');
-                } else if (step === 'pricing') {
-                     await supabase.from('school_admin_profiles').update({ onboarding_step: 'profile' }).eq('user_id', profile.id);
-                     setStep('profile');
-                } else if (step === 'profile') {
-                     await supabase.from('profiles').update({ role: null, profile_completed: false }).eq('id', profile.id);
-                     setSelectedRole(null);
-                     setStep('role');
-                }
-                if (onStepChange) await onStepChange();
-            } catch (err) {
-                 console.error("Back navigation sync error:", err);
-            } finally {
-                 if (isMounted.current) setLoading(false);
-            }
-            return;
-        }
-
-        if (step === 'profile') {
-            setLoading(true);
-            try {
-                await supabase.from('profiles').update({ role: null, profile_completed: false }).eq('id', profile.id);
-                setSelectedRole(null);
-                setStep('role');
-                if (onStepChange) await onStepChange();
-            } finally {
-                if (isMounted.current) setLoading(false);
-            }
+        setLoading(true);
+        try {
+            await supabase.from('profiles').update({ role: null, profile_completed: false }).eq('id', profile.id);
+            setSelectedRole(null);
+            setStep('role');
+            if (onStepChange) await onStepChange();
+        } finally {
+            if (isMounted.current) setLoading(false);
         }
     };
 
@@ -215,7 +142,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
             content = <PricingSelectionPage onComplete={handleStepAdvance} onBack={handleBack} />;
             break;
         case 'branches':
-            content = <BranchCreationPage onNext={handleFinalize} profile={profile} onBack={handleBack} />;
+            content = <BranchCreationPage onNext={onComplete} profile={profile} onBack={handleBack} />;
             break;
         default:
             content = <RoleSelectionPage onRoleSelect={handleRoleSelect} onComplete={onComplete} />;
@@ -234,16 +161,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ profile, onComplete, on
                             </div>
                             <span className="font-serif font-bold text-lg hidden sm:block text-foreground tracking-tight">Institutional Setup</span>
                         </div>
-                        
                         {selectedRole === BuiltInRoles.SCHOOL_ADMINISTRATION && step !== 'role' && (
                             <div className="hidden md:flex items-center justify-center flex-grow max-w-xl mx-auto">
                                 <Stepper steps={ONBOARDING_STEPS} currentStep={currentStepIndex} />
                             </div>
                         )}
-
                         <div className="flex items-center gap-3">
                             <ThemeSwitcher />
-                            <ProfileDropdown profile={profile} onSignOut={handleSignOut} />
+                            <ProfileDropdown profile={profile} onSignOut={() => supabase.auth.signOut()} />
                         </div>
                     </div>
                 </div>

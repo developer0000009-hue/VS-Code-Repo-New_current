@@ -17,8 +17,15 @@ import { TrashIcon } from './icons/TrashIcon';
 import { XIcon } from './icons/XIcon';
 import { MailIcon } from './icons/MailIcon';
 import { UploadIcon } from './icons/UploadIcon';
+import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 import StudentProfileModal from './students/StudentProfileModal';
 import BulkStudentActionsModal, { BulkStudentActionType } from './students/BulkStudentActionsModal';
+
+const formatError = (err: any): string => {
+    if (!err) return "Identity synchronization failed.";
+    if (typeof err === 'string') return err;
+    return err.message || err.error_description || err.details || "The institutional node reported an unhandled exception.";
+};
 
 interface StudentManagementTabProps {
     branchId?: number | null;
@@ -60,7 +67,7 @@ export const AddStudentModal: React.FC<{ onClose: () => void; onSave: () => void
             onSave();
             onClose();
         } catch (err: any) {
-            alert(err.message || "Failed to add student");
+            alert(formatError(err));
         } finally { setLoading(false); }
     };
 
@@ -90,6 +97,7 @@ export const AddStudentModal: React.FC<{ onClose: () => void; onSave: () => void
 const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId }) => {
     const [allStudents, setAllStudents] = useState<StudentForAdmin[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [quickFilter, setQuickFilter] = useState<'All' | 'Active' | 'Pending' | 'New'>('All');
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
@@ -103,11 +111,13 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
 
     const fetchData = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
-            const { data, error } = await supabase.rpc('get_all_students_for_admin', { p_branch_id: branchId });
-            if (error) throw error;
+            const { data, error: rpcError } = await supabase.rpc('get_all_students_for_admin', { p_branch_id: branchId });
+            if (rpcError) throw rpcError;
             setAllStudents(data || []);
-        } catch (e) {
+        } catch (e: any) {
+            setError(formatError(e));
             console.error("Student Fetch Error:", e);
         } finally {
             setLoading(false);
@@ -154,6 +164,16 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                 <KPICard title="Newly Registered" value={allStudents.filter(s => new Date(s.created_at).toDateString() === new Date().toDateString()).length} icon={<GraduationCapIcon className="w-6 h-6"/>} color="bg-amber-600" />
             </div>
 
+            {error && (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-between shadow-sm animate-in shake duration-500">
+                    <div className="flex items-center gap-3">
+                        <AlertTriangleIcon className="w-5 h-5" />
+                        <span className="text-sm font-bold">{error}</span>
+                    </div>
+                    <button onClick={fetchData} className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><RefreshIcon className="w-4 h-4"/></button>
+                </div>
+            )}
+
             <div className="bg-card border border-border rounded-[2rem] shadow-sm overflow-hidden flex flex-col min-h-[500px]">
                 <div className="p-6 border-b border-border flex flex-col md:flex-row gap-6 justify-between items-center">
                     <div className="relative w-full md:max-w-md">
@@ -174,7 +194,15 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
-                            {loading ? <tr><td colSpan={5} className="p-20 text-center"><Spinner size="lg" /></td></tr> : paginatedData.map(student => (
+                            {loading ? (
+                                <tr><td colSpan={5} className="p-20 text-center"><Spinner size="lg" /></td></tr>
+                            ) : paginatedData.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="p-20 text-center text-muted-foreground italic">
+                                        No student nodes found in the current branch context.
+                                    </td>
+                                </tr>
+                            ) : paginatedData.map(student => (
                                 <tr key={student.id} className="hover:bg-muted/40 cursor-pointer group" onClick={() => setSelectedStudent(student)}>
                                     <td className="p-6">
                                         <div className="flex items-center gap-3">
@@ -211,5 +239,14 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
         </div>
     );
 };
+
+const RefreshIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+        <path d="M21 3v5h-5" />
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+        <path d="M3 21v-5h5" />
+    </svg>
+);
 
 export default StudentManagementTab;

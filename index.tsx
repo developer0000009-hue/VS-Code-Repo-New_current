@@ -1,4 +1,3 @@
-
 import React, { ErrorInfo, ReactNode } from 'react';
 import ReactDOMClient from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
@@ -23,15 +22,11 @@ interface ErrorBoundaryState {
  * Standard Error Boundary for catching UI exceptions.
  */
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Fix: Explicitly define state property to resolve access errors
+  // Fix: Explicitly declare state to resolve property 'state' does not exist error.
   public state: ErrorBoundaryState = { hasError: false };
-
-  // Fix: Explicitly define props property to resolve access errors (line 64 error fix)
-  public props: ErrorBoundaryProps;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.props = props;
   }
 
   public static getDerivedStateFromError(_error: Error): ErrorBoundaryState {
@@ -42,9 +37,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     console.error("Critical UI Error Captured:", error, errorInfo);
   }
 
-  public render() {
-    // Fix: access state correctly
-    if (this.state.hasError) {
+  public render(): ReactNode {
+    // Fix: Correctly access state and props which are inherited from React.Component.
+    const { hasError } = this.state;
+    const { children } = this.props;
+
+    if (hasError) {
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-6 text-center">
             <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-6">
@@ -64,8 +62,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
 
-    // Fix: access props correctly
-    return this.props.children;
+    return children;
   }
 }
 

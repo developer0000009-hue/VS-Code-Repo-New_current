@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, STORAGE_KEY } from './services/supabase';
-import { UserProfile, BuiltInRoles } from './types';
+import { UserProfile, BuiltInRoles, Role } from './types';
 import AuthPage from './components/AuthPage';
 import SchoolAdminDashboard from './components/SchoolAdminDashboard';
 import ParentDashboard from './components/ParentDashboard';
@@ -26,6 +26,11 @@ const App: React.FC = () => {
         isFetching.current = true;
         
         try {
+            // Identity Handshake: Claim shadow profiles or reconcile drift
+            if (force) {
+                await supabase.rpc('reconcile_user_profile_id');
+            }
+
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
@@ -35,11 +40,11 @@ const App: React.FC = () => {
             if (profileError) throw profileError;
 
             if (!profileData) {
-                // Initialize profile if missing
+                // Initialize default identity if missing from registry
                 const { data: newProfile, error: insertError } = await supabase.from('profiles').upsert({
                     id: currentSession.user.id,
                     email: currentSession.user.email,
-                    display_name: currentSession.user.user_metadata?.display_name || 'New User',
+                    display_name: currentSession.user.user_metadata?.display_name || 'Anonymous Node',
                     is_active: true
                 }).select().maybeSingle();
                 
@@ -48,7 +53,7 @@ const App: React.FC = () => {
             } else {
                 setProfile(profileData as UserProfile);
                 
-                // If school admin, track their onboarding progress
+                // For administrative nodes, track setup lifecycle
                 if (profileData.role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
                     const { data: adminProfile } = await supabase
                         .from('school_admin_profiles')
@@ -59,7 +64,7 @@ const App: React.FC = () => {
                 }
             }
         } catch (e) {
-            console.error("Critical Profile Sync Failure:", e);
+            console.error("CRITICAL: Identity Sync Protocol failure.", e);
         } finally {
             isFetching.current = false;
             setLoading(false);
@@ -89,11 +94,19 @@ const App: React.FC = () => {
         if (session) await loadUserData(session, true);
     };
 
-    const handleRoleReset = async () => {
+    const handleRoleSelect = async (role: Role, isExisting?: boolean) => {
         setLoading(true);
-        if (profile) {
-            await supabase.from('profiles').update({ role: null, profile_completed: false }).eq('id', profile.id);
+        try {
+            const { data, error } = await supabase.rpc('switch_active_role', { p_target_role: role });
+            if (error) throw error;
+
             if (session) await loadUserData(session, true);
+            
+            // Navigate back home to reset dashboard context
+            navigate('/', { replace: true });
+        } catch (err: any) {
+            console.error("Role Switch Protocol failed:", err);
+            setLoading(false);
         }
     };
 
@@ -111,13 +124,14 @@ const App: React.FC = () => {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0c] text-center p-6">
                 <Spinner size="lg" />
-                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-pulse">Initializing Identity Node</p>
+                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-pulse">Establishing Identity Stream</p>
             </div>
         );
     }
 
     if (!session || !profile) return <AuthPage />;
 
+    // Force Onboarding if role is undefined or profile is incomplete
     if (!profile.role || (!profile.profile_completed && profile.role !== BuiltInRoles.SUPER_ADMIN)) {
         return (
             <OnboardingFlow 
@@ -133,25 +147,26 @@ const App: React.FC = () => {
         switch (profile.role) {
             case BuiltInRoles.SCHOOL_ADMINISTRATION:
             case BuiltInRoles.BRANCH_ADMIN:
-                return <SchoolAdminDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSelectRole={(r) => handleOnboardingComplete()} />;
+            case BuiltInRoles.PRINCIPAL:
+            case BuiltInRoles.HR_MANAGER:
+            case BuiltInRoles.ACADEMIC_COORDINATOR:
+            case BuiltInRoles.ACCOUNTANT:
+                return <SchoolAdminDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSelectRole={handleRoleSelect} />;
             case BuiltInRoles.PARENT_GUARDIAN:
-                return <ParentDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSelectRole={(r) => handleOnboardingComplete()} />;
+                return <ParentDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSelectRole={handleRoleSelect} />;
             case BuiltInRoles.STUDENT:
-                return <StudentDashboard profile={profile} onSignOut={handleSignOut} onSwitchRole={handleRoleReset} onSelectRole={(r) => handleOnboardingComplete()} />;
+                return <StudentDashboard profile={profile} onSignOut={handleSignOut} onSwitchRole={() => handleRoleSelect(null as any)} onSelectRole={handleRoleSelect} />;
             case BuiltInRoles.TEACHER:
-                return <TeacherDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSwitchRole={handleRoleReset} onSelectRole={(r) => handleOnboardingComplete()} />;
+                // Fix: Added missing required onSwitchRole prop to satisfy TeacherDashboardProps interface
+                return <TeacherDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSelectRole={handleRoleSelect} onSwitchRole={() => handleRoleSelect(null as any)} />;
             default:
-                return <div className="p-20 text-center">Identity Mismatch: Role {profile.role} is not mapped to a dashboard.</div>;
+                return <div className="p-20 text-center">Identity Mismatch: Role {profile.role} is not mapped to a telemetry dashboard.</div>;
         }
     };
 
     return (
         <Routes>
             <Route path="/" element={renderDashboard()} />
-            <Route path="/admin" element={profile.role === BuiltInRoles.SCHOOL_ADMINISTRATION || profile.role === BuiltInRoles.BRANCH_ADMIN ? renderDashboard() : <Navigate to="/" />} />
-            <Route path="/parent" element={profile.role === BuiltInRoles.PARENT_GUARDIAN ? renderDashboard() : <Navigate to="/" />} />
-            <Route path="/student" element={profile.role === BuiltInRoles.STUDENT ? renderDashboard() : <Navigate to="/" />} />
-            <Route path="/teacher" element={profile.role === BuiltInRoles.TEACHER ? renderDashboard() : <Navigate to="/" />} />
             <Route path="*" element={<NotFound redirectTo="/" />} />
         </Routes>
     );
