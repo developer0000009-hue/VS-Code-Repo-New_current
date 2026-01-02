@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabase';
 import { StudentDashboardData, DocumentRequirement } from '../../types';
@@ -205,13 +204,16 @@ const StudentOnboardingWizard: React.FC<WizardProps> = ({ data, onComplete }) =>
             
             <div className="grid grid-cols-1 gap-4">
                 {/* Standard required docs list if not present in DB */}
-                {["Birth Certificate", "Address Proof", "Photo ID"].map((docName, idx) => {
+                {["Birth Certificate", "Address Proof", "Identity Proof (Guardian)", "Previous Year Marksheet"].map((docName, idx) => {
                     const existing = docs.find(d => d.document_name === docName);
+                    // Standardize check for Verified status (using master enum standard)
                     const status = existing?.status || 'Pending';
+                    const isVerified = status === 'Verified';
+                    
                     return (
                         <div key={docName} className="flex items-center justify-between p-4 bg-card border border-border rounded-xl">
                             <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${status === 'Accepted' ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'}`}>
+                                <div className={`p-2 rounded-lg ${isVerified ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'}`}>
                                     <DocumentTextIcon className="w-5 h-5"/>
                                 </div>
                                 <div>
@@ -220,7 +222,7 @@ const StudentOnboardingWizard: React.FC<WizardProps> = ({ data, onComplete }) =>
                                 </div>
                             </div>
                             <button className="px-4 py-2 text-xs font-bold bg-primary/10 text-primary rounded-lg hover:bg-primary/20">
-                                {status === 'Pending' || status === 'Rejected' ? 'Upload' : 'View'}
+                                {isVerified ? 'View' : 'Upload'}
                             </button>
                         </div>
                     )

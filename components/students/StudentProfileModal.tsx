@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { StudentForAdmin, SchoolClass, Course } from '../../types';
@@ -75,7 +74,6 @@ const DocumentCard: React.FC<{
     
     const getStatusStyle = (s: string) => {
         switch(s) {
-            case 'Accepted': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 shadow-[0_0_10px_rgba(52,211,153,0.1)]';
             case 'Verified': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 shadow-[0_0_10px_rgba(52,211,153,0.1)]';
             case 'Submitted': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
             case 'Rejected': return 'text-red-400 bg-red-400/10 border-red-400/20';
@@ -86,14 +84,14 @@ const DocumentCard: React.FC<{
     return (
         <div className="group relative bg-[#0f1115] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all duration-300 hover:shadow-xl hover:shadow-black/50 flex flex-col h-full overflow-hidden">
             {/* Ambient Glow */}
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none transition-opacity group-hover:opacity-100 ${status === 'Accepted' ? 'from-emerald-500/10' : 'from-blue-500/10'}`}></div>
+            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none transition-opacity group-hover:opacity-100 ${status === 'Verified' ? 'from-emerald-500/10' : 'from-blue-500/10'}`}></div>
 
             <div className="flex justify-between items-start mb-4 relative z-10">
                 <div className="p-3 rounded-xl bg-[#1a1d23] text-white/50 group-hover:text-white group-hover:bg-[#252830] transition-colors border border-white/5 shadow-inner">
                     <FileTextIcon className="w-6 h-6"/>
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${getStatusStyle(status)} backdrop-blur-sm`}>
-                    {status === 'Accepted' ? 'Verified' : status}
+                    {status}
                 </span>
             </div>
             
@@ -122,7 +120,7 @@ const DocumentCard: React.FC<{
                         <EyeIcon className="w-3.5 h-3.5"/> View
                     </button>
                     
-                    {status !== 'Accepted' && status !== 'Verified' && (
+                    {status !== 'Verified' && (
                          <div className="flex gap-2">
                              <button 
                                 onClick={() => onVerify(doc.id)} 
@@ -394,7 +392,7 @@ const AssignClassModal: React.FC<{ student: StudentForAdmin, onClose: () => void
         <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="bg-[#0f1115] w-full max-w-md rounded-3xl shadow-2xl border border-white/10 flex flex-col relative overflow-hidden scale-100 font-serif" onClick={e => e.stopPropagation()}>
                 <div className="px-6 pt-6 pb-4 flex justify-between items-center z-10"><div className="flex items-center gap-3"><div className="p-2 bg-white/5 rounded-2xl text-white shadow-inner border border-white/10"><UsersIcon className="w-5 h-5"/></div><h3 className="text-lg font-bold text-white tracking-tight">Guided Enrollment</h3></div><button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-white/50 hover:text-white"><XIcon className="w-5 h-5"/></button></div>
-                <div className="px-6 pb-8 pt-2 flex-grow flex flex-col min-h-[350px]">
+                <div className="px-6 pb-8 pt-2 flex-grow flex-col min-h-[350px]">
                     {step === 1 ? (
                         <div className="flex flex-col h-full animate-in slide-in-from-right-8 duration-500">
                             <div className="mb-6"><span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.25em] mb-2 block">Step 1: Placement</span><h4 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none mb-2">Select<br/>Class Section</h4></div>
@@ -608,7 +606,7 @@ const StudentProfileModal: React.FC<StudentProfileModalProps> = ({ student, onCl
 
     const handleVerifyDocument = async (docId: number) => {
         try {
-            const { error } = await supabase.from('document_requirements').update({ status: 'Accepted' }).eq('id', docId);
+            const { error } = await supabase.from('document_requirements').update({ status: 'Verified' }).eq('id', docId);
             if (error) throw error;
             fetchDocuments();
         } catch (e) { console.error(e); alert("Failed to verify document"); }
@@ -809,8 +807,8 @@ const StudentProfileModal: React.FC<StudentProfileModalProps> = ({ student, onCl
                                 <p className="text-white/30 text-xs mt-1 max-w-md leading-relaxed">Secure document storage for identity, academic records, and compliance.</p>
                             </div>
                             <div className="text-right">
-                                <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${docsLoading ? 'border-transparent text-white/20' : documents.every((d:any) => d.status === 'Accepted') ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' : 'border-amber-500/20 bg-amber-500/10 text-amber-500'}`}>
-                                    {docsLoading ? 'Syncing...' : documents.every((d:any) => d.status === 'Accepted') ? 'All Verified' : 'Action Required'}
+                                <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${docsLoading ? 'border-transparent text-white/20' : documents.every((d:any) => d.status === 'Verified') ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' : 'border-amber-500/20 bg-amber-500/10 text-amber-500'}`}>
+                                    {docsLoading ? 'Syncing...' : documents.every((d:any) => d.status === 'Verified') ? 'All Verified' : 'Action Required'}
                                 </span>
                             </div>
                         </div>

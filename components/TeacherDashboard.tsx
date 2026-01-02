@@ -16,11 +16,7 @@ import ProfessionalDevelopmentTab from './teacher_tabs/ProfessionalDevelopmentTa
 
 interface TeacherDashboardProps {
     profile: UserProfile;
-    onSwitchRole: () => void; // Assuming handleRoleReset is passed here for role switching, or handleDirectRoleSwitch? 
-    // Actually App.tsx passes onSwitchRole={handleRoleReset}. We need onSelectRole to be passed if Header uses ProfileDropdown completely.
-    // Let's assume we need onSelectRole for full functionality as per App.tsx trends.
-    // However, App.tsx only passes `onSwitchRole` prop to TeacherDashboard currently.
-    // I will add onSelectRole to the props to match Header requirements.
+    onSwitchRole: () => void;
     onSelectRole?: (role: Role, isExisting?: boolean) => void;
     onProfileUpdate: () => void;
     onSignOut: () => void;
@@ -42,7 +38,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ profile, onSwitchRo
         'My Classes': <MyClassesTab currentUserId={profile.id} />,
         'Attendance': <AttendanceTab />,
         'Lesson Planner': <LessonPlannerTab currentUserId={profile.id} />,
-        'Communication': <CommunicationTab currentUserId={profile.id} />,
+        'Communication': <CommunicationTab profile={profile} />,
         'Performance': <PerformanceTab currentUserId={profile.id} />,
         'Professional Development': <ProfessionalDevelopmentTab currentUserId={profile.id} />,
         'My Profile': <ProfileCreationPage 

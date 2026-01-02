@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { useRoles } from '../../contexts/RoleContext';
@@ -41,10 +42,8 @@ const ROLE_ICONS_MAP: Record<string, React.FC<{className?: string}>> = {
 };
 
 const TEMPLATES = [
-    { id: 1, name: 'Fee Reminder', subject: 'Important: Pending Fee Payment', body: 'Dear Parent,\n\nThis is a reminder that the school fees for the current term are due. Please make the payment at your earliest convenience to avoid late charges.\n\nThank you.' },
-    { id: 2, name: 'Exam Notification', subject: 'Upcoming Examination Schedule', body: 'Dear Student/Parent,\n\nThe schedule for the upcoming exams has been released. Please check the portal for details.\n\nBest of luck!' },
-    { id: 3, name: 'Holiday Alert', subject: 'School Holiday Notice', body: 'Dear All,\n\nThe school will remain closed on [Date] on account of [Reason]. Classes will resume on [Date].\n\nRegards,\nAdministration' },
-    { id: 4, name: 'Transport Update', subject: 'Change in Bus Route/Timing', body: 'Dear Parent,\n\nPlease note that there will be a slight change in the timing for Route # [Number] effective from tomorrow.\n\nThank you.' },
+    { id: 1, name: 'General Reminder', subject: 'Class Update', body: 'Dear Parent,\n\nPlease note the following update regarding our upcoming class activities.' },
+    { id: 2, name: 'Homework Alert', subject: 'New Assignment Posted', body: 'Dear Student/Parent,\n\nA new assignment has been posted for the class. Please check the portal for instructions.' },
 ];
 
 const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = ({ currentUserId }) => {
@@ -66,20 +65,28 @@ const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = (
 
     const fetchHistory = useCallback(async () => {
         setLoading(prev => ({ ...prev, fetching: true }));
-        const { data, error } = await supabase.rpc('get_communications_history');
-        if (error) {
-            console.error("Fetch history error:", error);
-        } else {
+        try {
+            const { data, error } = await supabase.rpc('get_communications_history');
+            if (error) throw error;
             setHistory(data || []);
+        } catch (err) {
+            console.error("Fetch history failure:", err);
+        } finally {
+            setLoading(prev => ({ ...prev, fetching: false }));
         }
-        setLoading(prev => ({ ...prev, fetching: false }));
     }, []);
 
     const fetchClasses = useCallback(async () => {
         setLoading(prev => ({ ...prev, classes: true }));
-        const { data } = await supabase.rpc('get_all_classes_for_admin');
-        setClasses(data || []);
-        setLoading(prev => ({ ...prev, classes: false }));
+        try {
+            const { data, error } = await supabase.rpc('get_teacher_classes');
+            if (error) throw error;
+            setClasses(data || []);
+        } catch (err) {
+            console.error("Fetch classes failure:", err);
+        } finally {
+            setLoading(prev => ({ ...prev, classes: false }));
+        }
     }, []);
 
     useEffect(() => {
@@ -128,26 +135,28 @@ const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = (
 
         setLoading(prev => ({ ...prev, sending: true }));
 
-        const { error: rpcError } = await supabase.rpc('send_bulk_communication', {
-            p_subject: subject,
-            p_body: body,
-            p_recipient_roles: recipients,
-            p_target_criteria: criteria
-        });
+        try {
+            const { error: rpcError } = await supabase.rpc('send_bulk_communication', {
+                p_subject: subject,
+                p_body: body,
+                p_recipient_roles: recipients,
+                p_target_criteria: criteria
+            });
 
-        if (rpcError) {
-            setErrorMessage(`Failed to send: ${rpcError.message}`);
-        } else {
+            if (rpcError) throw rpcError;
+
             setSuccessMessage('Message queued successfully!');
             setSubject('');
             setBody('');
             setSelectedRoles(new Set());
             setSelectedClass('');
             await fetchHistory();
-            
             setTimeout(() => setSuccessMessage(null), 3000);
+        } catch (err: any) {
+            setErrorMessage(`Protocol Failure: ${err.message || "Communication link lost."}`);
+        } finally {
+            setLoading(prev => ({ ...prev, sending: false }));
         }
-        setLoading(prev => ({ ...prev, sending: false }));
     };
 
     const toggleRole = (role: Role) => {
@@ -184,116 +193,114 @@ const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = (
             <div className="lg:col-span-2 bg-card border border-border rounded-xl shadow-md flex flex-col overflow-hidden">
                 <div className="p-5 border-b border-border bg-muted/10">
                     <h3 className="font-bold text-lg text-foreground">Compose Message</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Send announcements, alerts, and reminders.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Send class updates or alerts to parents.</p>
                 </div>
                 
-                <form onSubmit={handleSendMessage} className="p-5 flex-grow flex flex-col space-y-5 overflow-y-auto">
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label className="text-sm font-semibold text-foreground">Recipients</label>
-                            <div className="flex bg-muted p-0.5 rounded-lg">
-                                <button type="button" onClick={() => setTargetType('roles')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${targetType === 'roles' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Role</button>
-                                <button type="button" onClick={() => setTargetType('class')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${targetType === 'class' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Class</button>
+                <form onSubmit={handleSendMessage} className="flex-grow flex flex-col overflow-hidden">
+                    <div className="p-5 flex-grow flex flex-col space-y-5 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <label className="text-sm font-semibold text-foreground">Recipients</label>
+                                <div className="flex bg-muted p-0.5 rounded-lg">
+                                    <button type="button" onClick={() => setTargetType('roles')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${targetType === 'roles' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Role</button>
+                                    <button type="button" onClick={() => setTargetType('class')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${targetType === 'class' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Class</button>
+                                </div>
                             </div>
+
+                            {targetType === 'roles' ? (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">Select Groups:</span>
+                                        <button type="button" onClick={toggleSelectAllRoles} className="text-xs text-primary hover:underline font-medium">
+                                            {selectedRoles.size === communicationRoles.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {communicationRoles.map(role => (
+                                            <label key={role} className={`cursor-pointer border rounded-full px-3 py-1.5 text-xs font-medium transition-all select-none flex items-center gap-1 ${selectedRoles.has(role) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-border hover:border-primary/50'}`}>
+                                                <input type="checkbox" className="hidden" checked={selectedRoles.has(role)} onChange={() => toggleRole(role)} />
+                                                {selectedRoles.has(role) && <CheckCircleIcon className="w-3 h-3"/>}
+                                                {role}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <select 
+                                        value={selectedClass} 
+                                        onChange={e => setSelectedClass(e.target.value)} 
+                                        className="w-full input-premium"
+                                    >
+                                        <option value="" disabled>Select a Class...</option>
+                                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
-                        {targetType === 'roles' ? (
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-muted-foreground">Select Groups:</span>
-                                    <button type="button" onClick={toggleSelectAllRoles} className="text-xs text-primary hover:underline font-medium">
-                                        {selectedRoles.size === communicationRoles.length ? 'Deselect All' : 'Select All'}
-                                    </button>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {communicationRoles.map(role => (
-                                        <label key={role} className={`cursor-pointer border rounded-full px-3 py-1.5 text-xs font-medium transition-all select-none flex items-center gap-1 ${selectedRoles.has(role) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-border hover:border-primary/50'}`}>
-                                            <input type="checkbox" className="hidden" checked={selectedRoles.has(role)} onChange={() => toggleRole(role)} />
-                                            {selectedRoles.has(role) && <CheckCircleIcon className="w-3 h-3"/>}
-                                            {role}
-                                        </label>
-                                    ))}
-                                </div>
+                        <div>
+                             <label className="text-sm font-semibold text-foreground mb-1.5 block">Use Template (Optional)</label>
+                             <select onChange={handleTemplateSelect} defaultValue="" className="w-full input-premium">
+                                 <option value="" disabled>Select a template...</option>
+                                 {TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                             </select>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between mb-1.5">
+                                <label className="text-sm font-semibold text-foreground">Subject</label>
+                                <span className={`text-xs ${subject.length > 100 ? 'text-red-500' : 'text-muted-foreground'}`}>{subject.length}/128</span>
                             </div>
-                        ) : (
-                            <div>
-                                <select 
-                                    value={selectedClass} 
-                                    onChange={e => setSelectedClass(e.target.value)} 
-                                    className="w-full input-premium"
-                                >
-                                    <option value="" disabled>Select a Class...</option>
-                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                                {selectedClass && <p className="text-xs text-muted-foreground mt-2 ml-1">Message will be sent to all students and parents in this class.</p>}
+                            <input 
+                                type="text" 
+                                maxLength={128}
+                                value={subject}
+                                onChange={e => setSubject(e.target.value)}
+                                placeholder="e.g. Important Class Update"
+                                className="w-full input-premium font-medium"
+                            />
+                        </div>
+
+                        <div className="flex-grow flex flex-col">
+                            <label className="text-sm font-semibold text-foreground mb-1.5">Message</label>
+                            <div className="relative flex-grow min-h-[150px]">
+                                <textarea 
+                                    value={body}
+                                    onChange={e => setBody(e.target.value)}
+                                    placeholder="Type your message here..."
+                                    className="w-full h-full min-h-[150px] p-4 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none text-sm leading-relaxed"
+                                ></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-5 border-t border-border bg-muted/10">
+                         {errorMessage && (
+                            <div className="mb-3 p-3 bg-red-500/10 text-red-500 rounded-lg text-sm border border-red-500/20 animate-in shake duration-300">
+                               {errorMessage}
                             </div>
                         )}
-                    </div>
-
-                    <div>
-                         <label className="text-sm font-semibold text-foreground mb-1.5 block">Use Template (Optional)</label>
-                         <select onChange={handleTemplateSelect} defaultValue="" className="w-full input-premium">
-                             <option value="" disabled>Select a template...</option>
-                             {TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                         </select>
-                    </div>
-
-                    <div>
-                        <div className="flex justify-between mb-1.5">
-                            <label className="text-sm font-semibold text-foreground">Subject</label>
-                            <span className={`text-xs ${subject.length > 100 ? 'text-red-500' : 'text-muted-foreground'}`}>{subject.length}/128</span>
-                        </div>
-                        <input 
-                            type="text" 
-                            maxLength={128}
-                            value={subject}
-                            onChange={e => setSubject(e.target.value)}
-                            placeholder="e.g. Important School Update"
-                            className="w-full input-premium font-medium"
-                        />
-                    </div>
-
-                    <div className="flex-grow flex flex-col">
-                        <label className="text-sm font-semibold text-foreground mb-1.5">Message</label>
-                        <div className="relative flex-grow">
-                            <textarea 
-                                value={body}
-                                onChange={e => setBody(e.target.value)}
-                                placeholder="Type your message here..."
-                                className="w-full h-full min-h-[150px] p-4 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none text-sm leading-relaxed"
-                            ></textarea>
-                            <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/80 px-2 py-0.5 rounded-md backdrop-blur-sm border border-border">
-                                {body.trim().split(/\s+/).filter(Boolean).length} words
+                        {successMessage && (
+                            <div className="mb-3 p-3 bg-green-500/10 text-green-500 rounded-lg text-sm flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-green-500/20">
+                                <CheckCircleIcon className="w-4 h-4"/> {successMessage}
                             </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between mb-3">
+                             <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest truncate max-w-[200px]">
+                                {getRecipientSummary()}
+                             </span>
                         </div>
+                        <button 
+                            type="submit"
+                            disabled={loading.sending} 
+                            className="w-full py-4 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3"
+                        >
+                            {loading.sending ? <Spinner size="sm" className="text-white"/> : <><SendIcon className="w-4 h-4" /> Send Message</>}
+                        </button>
                     </div>
                 </form>
-
-                <div className="p-5 border-t border-border bg-muted/10">
-                     {errorMessage && (
-                        <div className="mb-3 p-3 bg-red-500/10 text-red-500 rounded-lg text-sm border border-red-500/20">
-                           {errorMessage}
-                        </div>
-                    )}
-                    {successMessage && (
-                        <div className="mb-3 p-3 bg-green-500/10 text-green-500 rounded-lg text-sm flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-green-500/20">
-                            <CheckCircleIcon className="w-4 h-4"/> {successMessage}
-                        </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between mb-2">
-                         <span className="text-xs font-medium text-muted-foreground truncate max-w-[150px]">
-                            {getRecipientSummary()}
-                         </span>
-                    </div>
-                    <button 
-                        onClick={handleSendMessage} 
-                        disabled={loading.sending} 
-                        className="w-full py-3 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 text-white rounded-lg font-bold shadow-lg shadow-primary/20 transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {loading.sending ? <Spinner size="sm" className="text-white"/> : <><SendIcon className="w-4 h-4" /> Send Message</>}
-                    </button>
-                </div>
             </div>
 
             {/* --- RIGHT PANEL: HISTORY --- */}
@@ -305,12 +312,13 @@ const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = (
                     </button>
                 </div>
                 
-                <div className="flex-grow overflow-y-auto p-5 space-y-4 bg-muted/5">
+                <div className="flex-grow overflow-y-auto p-5 space-y-4 bg-muted/5 custom-scrollbar">
                     {loading.fetching && history.length === 0 ? (
-                        <div className="flex justify-center py-20"><Spinner size="lg"/></div>
+                        <div className="flex justify-center py-20"><Spinner size="lg" className="text-primary"/></div>
                     ) : history.length === 0 ? (
-                        <div className="text-center py-20 text-muted-foreground">
-                            <p>No communication history found.</p>
+                        <div className="text-center py-24 text-muted-foreground opacity-40">
+                             <MegaphoneIcon className="w-12 h-12 mx-auto mb-4" />
+                            <p className="font-bold text-lg">No history detected.</p>
                         </div>
                     ) : (
                         history.map((msg) => {

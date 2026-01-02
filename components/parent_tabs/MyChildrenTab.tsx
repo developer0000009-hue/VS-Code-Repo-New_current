@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
@@ -8,13 +7,15 @@ import ChildProfileCard from './ChildProfileCard';
 import ChildRegistrationModal from './ChildRegistrationModal';
 import { PlusIcon } from '../icons/PlusIcon';
 import { SearchIcon } from '../icons/SearchIcon';
-import { RefreshIcon } from '../icons/RefreshIcon';
-import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
 
 type FilterType = 'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED';
 
-// Fix: Changed onManageDocuments parameter type from number to string to match UUID standard.
-const MyChildrenTab: React.FC<{ onManageDocuments: (id: string) => void; profile: UserProfile }> = ({ onManageDocuments, profile }) => {
+interface MyChildrenTabProps {
+    onManageDocuments: (id: string) => void;
+    profile: UserProfile;
+}
+
+const MyChildrenTab: React.FC<MyChildrenTabProps> = ({ onManageDocuments, profile }) => {
     const navigate = useNavigate();
     const [applications, setApplications] = useState<AdmissionApplication[]>([]);
     const [loading, setLoading] = useState(true);
@@ -39,7 +40,9 @@ const MyChildrenTab: React.FC<{ onManageDocuments: (id: string) => void; profile
         }
     }, [profile?.id]);
 
-    useEffect(() => { fetchData(); }, [fetchData]); 
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]); 
 
     const filteredApplications = useMemo(() => {
         return applications.filter(app => {
@@ -89,7 +92,8 @@ const MyChildrenTab: React.FC<{ onManageDocuments: (id: string) => void; profile
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white/[0.02] p-4 rounded-[2rem] border border-white/5 mb-10 shadow-inner">
+            {/* Filter Hub */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white/[0.02] p-4 rounded-[2.5rem] border border-white/5 mb-10 shadow-inner">
                 <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5 w-full md:w-auto overflow-x-auto no-scrollbar">
                     {(['ALL', 'APPROVED', 'PENDING', 'REJECTED'] as FilterType[]).map(f => (
                         <button
@@ -114,6 +118,7 @@ const MyChildrenTab: React.FC<{ onManageDocuments: (id: string) => void; profile
                 </div>
             </div>
 
+            {/* Card Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {filteredApplications.map((app, idx) => (
                     <div key={app.id} className="animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: `${idx * 80}ms` }}>
@@ -132,6 +137,7 @@ const MyChildrenTab: React.FC<{ onManageDocuments: (id: string) => void; profile
                     </div>
                 ))}
                 
+                {/* Empty State / Add Child Trigger */}
                 <button 
                     onClick={() => { setEditingChild(null); setIsModalOpen(true); }}
                     className="flex flex-col items-center justify-center p-12 rounded-[2.5rem] border-2 border-dashed border-white/5 hover:border-primary/40 hover:bg-primary/[0.01] transition-all duration-700 group relative overflow-hidden h-full min-h-[300px] bg-black/20"

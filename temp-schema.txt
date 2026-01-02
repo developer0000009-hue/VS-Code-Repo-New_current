@@ -1,68 +1,130 @@
+
 -- ===============================================================================================
--- GURUKUL OS - ACCESS PROTOCOL PATCH
--- Version: 12.3.2 (Identity Node Resilience)
+-- GURUKUL OS - INQUIRY WORKSPACE PATCH
+-- Version: 17.1.0 (Messaging & Persistence Fix)
 -- ===============================================================================================
 
--- 5. DEFENSIVE DOCUMENT VERIFICATION RPC
-CREATE OR REPLACE FUNCTION public.admin_verify_document(
-    p_requirement_id BIGINT,
-    p_status TEXT, 
-    p_reason TEXT DEFAULT NULL
-) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+-- 1. CORE TABLE REFINEMENT
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='enquiry_messages' AND column_name='sender_role') THEN
+        ALTER TABLE public.enquiry_messages ADD COLUMN sender_role TEXT DEFAULT 'SCHOOL_ADMIN';
+    END IF;
+END $$;
+
+-- 2. RPC: SEND ENQUIRY MESSAGE (Auto-resolves Parent Link)
+CREATE OR REPLACE FUNCTION public.send_enquiry_message(
+    p_node_id UUID,
+    p_message TEXT
+) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-    v_admission_id UUID;
-    v_doc_name TEXT;
-    v_current_status TEXT;
-    v_parent_exists BOOLEAN;
-    v_audit_table_exists BOOLEAN;
+    v_parent_id UUID;
 BEGIN
-    -- Resolve context from requirement registry
-    SELECT admission_id, document_name, status::text INTO v_admission_id, v_doc_name, v_current_status
-    FROM public.document_requirements 
-    WHERE id = p_requirement_id;
+    -- Resolve the parent linked to this inquiry
+    SELECT (CASE WHEN parent_id IS NOT NULL THEN parent_id ELSE submitted_by END) INTO v_parent_id
+    FROM public.admissions
+    WHERE id = p_node_id;
 
-    IF v_admission_id IS NULL THEN
-        RAISE EXCEPTION 'Identity Node Mismatch: Requirement % has no associated admission context.', p_requirement_id;
+    IF v_parent_id IS NULL THEN
+        RAISE EXCEPTION 'Identity Link Failure: No parent associated with this lead node.';
     END IF;
 
-    -- Strict validation of parent identity node availability
-    SELECT EXISTS (SELECT 1 FROM public.admissions WHERE id = v_admission_id) INTO v_parent_exists;
+    INSERT INTO public.enquiry_messages (
+        admission_id,
+        sender_id,
+        sender_role,
+        message,
+        created_at
+    ) VALUES (
+        p_node_id,
+        auth.uid(),
+        'SCHOOL_ADMIN',
+        p_message,
+        now()
+    );
 
-    IF NOT v_parent_exists THEN
-        RAISE EXCEPTION 'Referenced identity node is unavailable. The parent record may have been moved or archived during synchronization.';
-    END IF;
+    -- Touch the main record for sorting
+    UPDATE public.admissions SET updated_at = now() WHERE id = p_node_id;
+END;
+$$;
 
-    -- Update requirement record state
-    UPDATE public.document_requirements
+-- 3. RPC: UPDATE ENQUIRY LIFECYCLE (Data Persistence)
+CREATE OR REPLACE FUNCTION public.update_enquiry_lifecycle(
+    p_node_id UUID,
+    p_status TEXT,
+    p_notes TEXT,
+    p_metadata JSONB,
+    p_finalize BOOLEAN DEFAULT false
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_old_status TEXT;
+    v_new_name TEXT;
+BEGIN
+    SELECT status::text, applicant_name INTO v_old_status, v_new_name FROM public.admissions WHERE id = p_node_id;
+    
+    v_new_name := COALESCE(p_metadata->>'applicant_name', v_new_name);
+
+    -- Update Core Data
+    UPDATE public.admissions
     SET status = p_status::public.admission_status,
-        rejection_reason = p_reason,
+        notes = p_notes,
+        applicant_name = v_new_name,
         updated_at = now()
-    WHERE id = p_requirement_id;
+    WHERE id = p_node_id;
 
-    -- Check if audit table is provisioned
-    SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'admission_audit_logs'
-    ) INTO v_audit_table_exists;
-
-    -- Ledger Sync (Defensive)
-    IF v_audit_table_exists THEN
+    -- Log to Timeline if status changed
+    IF v_old_status != p_status THEN
         INSERT INTO public.admission_audit_logs (
-            admission_id, 
-            previous_status, 
-            new_status, 
-            changed_by, 
-            changed_by_name
-        )
-        VALUES (
-            v_admission_id, 
-            'Artifact: ' || v_doc_name || ' (' || v_current_status || ')', 
-            p_status || COALESCE(': ' || p_reason, ''),
-            auth.uid(),
-            COALESCE((SELECT display_name FROM profiles WHERE id = auth.uid()), 'System Admin')
+            admission_id, previous_status, new_status, changed_by, changed_by_name, item_type
+        ) VALUES (
+            p_node_id, v_old_status, p_status, auth.uid(), 
+            (SELECT display_name FROM public.profiles WHERE id = auth.uid()),
+            'STATUS_CHANGE'
         );
     END IF;
+
+    RETURN jsonb_build_object('success', true, 'message', 'Node state persisted successfully.');
+END;
+$$;
+
+-- 4. RPC: GET ENQUIRY TIMELINE (Unified View)
+CREATE OR REPLACE FUNCTION public.get_enquiry_timeline(p_node_id UUID)
+RETURNS TABLE (
+    id UUID,
+    item_type TEXT,
+    details JSONB,
+    created_at TIMESTAMPTZ,
+    created_by_name TEXT,
+    is_admin BOOLEAN
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    RETURN QUERY
+    -- Messages
+    SELECT 
+        m.id,
+        'MESSAGE' as item_type,
+        jsonb_build_object('message', m.message) as details,
+        m.created_at,
+        p.display_name as created_by_name,
+        (m.sender_role = 'SCHOOL_ADMIN') as is_admin
+    FROM public.enquiry_messages m
+    JOIN public.profiles p ON m.sender_id = p.id
+    WHERE m.admission_id = p_node_id
+    
+    UNION ALL
+    
+    -- Status Logs
+    SELECT 
+        l.id::uuid,
+        'STATUS_CHANGE' as item_type,
+        jsonb_build_object('old', l.previous_status, 'new', l.new_status) as details,
+        l.created_at,
+        l.changed_by_name as created_by_name,
+        true as is_admin
+    FROM public.admission_audit_logs l
+    WHERE l.admission_id = p_node_id
+    
+    ORDER BY created_at ASC;
 END;
 $$;
 

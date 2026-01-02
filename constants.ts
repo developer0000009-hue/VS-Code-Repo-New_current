@@ -26,16 +26,16 @@ export const ROLE_ICONS: Record<string, React.FC<React.SVGProps<SVGSVGElement>>>
     [BuiltInRoles.ACCOUNTANT]: FinanceIcon,
 };
 
-// Standard UI sort order for role lists
+// Standard UI sort order for role lists - Updated as per user request
 export const ROLE_ORDER: Role[] = [
+    BuiltInRoles.PARENT_GUARDIAN,
     BuiltInRoles.SCHOOL_ADMINISTRATION,
+    BuiltInRoles.STUDENT,
+    BuiltInRoles.TEACHER,
     BuiltInRoles.PRINCIPAL,
     BuiltInRoles.HR_MANAGER,
     BuiltInRoles.ACADEMIC_COORDINATOR,
     BuiltInRoles.ACCOUNTANT,
-    BuiltInRoles.TEACHER,
-    BuiltInRoles.STUDENT,
-    BuiltInRoles.PARENT_GUARDIAN,
     BuiltInRoles.TRANSPORT_STAFF,
     BuiltInRoles.ECOMMERCE_OPERATOR,
 ];

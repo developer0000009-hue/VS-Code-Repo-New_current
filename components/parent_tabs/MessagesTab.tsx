@@ -18,6 +18,7 @@ const statusColors: { [key in EnquiryStatus]: string } = {
   'New': 'bg-blue-400/10 text-blue-400 border-blue-400/20',
   'Contacted': 'bg-amber-400/10 text-amber-400 border-amber-400/20',
   'In Review': 'bg-purple-400/10 text-purple-400 border-purple-400/20',
+  'Inquiry Active': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
   'Completed': 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
 };
 
@@ -30,7 +31,6 @@ const formatTimeAgo = (dateString: string) => {
     if (minutes < 60) return `${minutes}M AGO`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}H AGO`;
-    // Fix: Correct 'toLocaleDateString' options to use lowercase strings as required by the 'Intl.DateTimeFormatOptions' type.
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
 };
 
@@ -72,7 +72,8 @@ const MessagesTab: React.FC = () => {
     useEffect(() => { 
         fetchData(); 
         const channel = supabase
-            .channel('public:communications')
+            .channel('parent-comms-hub')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiry_messages' }, () => fetchData(true))
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'communications' }, () => fetchData(true))
             .subscribe();
         return () => { supabase.removeChannel(channel); };
@@ -104,7 +105,6 @@ const MessagesTab: React.FC = () => {
                                     className={`flex-1 py-4 text-[10px] font-black uppercase tracking-[0.3em] rounded-full transition-all duration-500 relative overflow-hidden group ${activeTab === t ? 'bg-[#1a1d24] text-primary shadow-2xl ring-1 ring-white/10 scale-[1.02]' : 'text-white/20 hover:text-white/40'}`}
                                 >
                                     <span className="relative z-10">{t === 'inbox' ? 'Broadcasts' : 'Enquiries'}</span>
-                                    {activeTab === t && <div className="absolute inset-0 bg-primary/5 transition-colors"></div>}
                                 </button>
                             ))}
                         </div>
@@ -160,9 +160,6 @@ const MessagesTab: React.FC = () => {
                 </div>
 
                 <div className={`flex-grow bg-[#09090b] flex flex-col transition-all duration-700 relative ${isMobileDetailOpen ? 'fixed inset-0 z-[60] lg:static' : 'hidden lg:flex'}`}>
-                    <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[150px] pointer-events-none opacity-40"></div>
-                    <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-900/5 rounded-full blur-[150px] pointer-events-none opacity-30"></div>
-
                     {activeTab === 'inbox' ? (
                         selectedAnnouncement ? <AnnouncementDetail announcement={selectedAnnouncement} onClose={() => setIsMobileDetailOpen(false)} /> : <ReadingStandby type="inbox" />
                     ) : (
@@ -180,14 +177,13 @@ const EmptyState = ({ type }: { type: Tab }) => (
             {type === 'inbox' ? <MegaphoneIcon className="w-12 h-12 text-white/10" /> : <SearchIcon className="w-12 h-12 text-white/10" />}
         </div>
         <p className="text-[11px] font-black uppercase tracking-[0.6em] text-white">Registry Standby</p>
-        <p className="text-[16px] mt-6 font-serif italic text-white/30 max-w-xs mx-auto leading-relaxed">No active telemetry detected for this communication node.</p>
+        <p className="text-[16px] mt-6 font-serif italic text-white/30 max-w-xs mx-auto leading-relaxed">No active telemetry detected for this node.</p>
     </div>
 );
 
 const ReadingStandby = ({ type }: { type: Tab }) => (
     <div className="flex flex-col items-center justify-center h-full p-24 text-center animate-in fade-in zoom-in-95 duration-1000">
         <div className="w-40 h-40 bg-white/[0.01] rounded-[4rem] flex items-center justify-center mb-16 border border-white/5 shadow-[0_64px_128px_-12px_rgba(0,0,0,0.8)] relative group overflow-hidden">
-            <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
             {type === 'inbox' ? <MegaphoneIcon className="w-20 h-20 text-white/10 group-hover:text-primary group-hover:scale-110 transition-all duration-700" /> : <CommunicationIcon className="w-20 h-20 text-white/10 group-hover:text-indigo-400 group-hover:scale-110 transition-all duration-700" />}
         </div>
         <h3 className="text-5xl font-serif font-black text-white tracking-tighter uppercase leading-none mb-8">Payload <span className="text-white/20 italic">Standby.</span></h3>
@@ -202,7 +198,7 @@ const AnnouncementDetail = ({ announcement, onClose }: any) => (
                 <button onClick={onClose} className="lg:hidden p-5 -ml-6 rounded-3xl bg-white/5 text-white/30 hover:text-white transition-all active:scale-95"><ChevronLeftIcon className="h-8 w-8"/></button>
                 <div>
                     <h3 className="text-[12px] font-black text-primary uppercase tracking-[0.5em] leading-none mb-2">Authenticated Broadcast</h3>
-                    <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{formatTimeAgo(announcement.sent_at)} • Security Hash: {announcement.id?.slice(0,12)}</p>
+                    <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{formatTimeAgo(announcement.sent_at)} • ID: {announcement.id?.slice(0,12)}</p>
                 </div>
             </div>
             <button className="p-4 rounded-3xl bg-white/5 text-white/20 hover:text-white transition-all"><XIcon className="w-8 h-8"/></button>
@@ -232,7 +228,7 @@ const AnnouncementDetail = ({ announcement, onClose }: any) => (
                 
                 <div className="pt-32 opacity-10 hover:opacity-100 transition-opacity duration-1000 border-t border-white/5">
                     <div className="flex items-center gap-6 text-[11px] font-black uppercase tracking-[0.6em] text-white">
-                        <ShieldCheckIcon className="w-6 h-6 text-emerald-500" /> Integrity Confirmed • Gurukul OS v16 Deployment
+                        <ShieldCheckIcon className="w-6 h-6 text-emerald-500" /> Integrity Confirmed • Gurukul OS v17
                     </div>
                 </div>
              </div>
@@ -246,15 +242,22 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
     const [timeline, setTimeline] = useState<TimelineItem[]>([]);
     const [loading, setLoading] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const primaryId = (enquiry.admission_id || enquiry.id).toString();
 
     const fetchTimeline = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.rpc('get_enquiry_timeline', { p_enquiry_id: enquiry.id });
+        const { data } = await supabase.rpc('get_enquiry_timeline', { p_node_id: primaryId });
         if (data) setTimeline(data);
         setLoading(false);
-    }, [enquiry.id]);
+    }, [primaryId]);
 
-    useEffect(() => { fetchTimeline(); }, [fetchTimeline]);
+    useEffect(() => { 
+        fetchTimeline(); 
+        const channel = supabase.channel(`parent-enq-view-${primaryId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiry_messages', filter: `admission_id=eq.${primaryId}` }, () => fetchTimeline())
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchTimeline, primaryId]);
 
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -264,7 +267,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
         e.preventDefault();
         if (!newMessage.trim() || sending) return;
         setSending(true);
-        const { error } = await supabase.rpc('send_enquiry_message', { p_enquiry_id: enquiry.id, p_message: newMessage });
+        const { error } = await supabase.rpc('send_enquiry_message_from_parent', { p_node_id: primaryId, p_message: newMessage });
         if (!error) {
             setNewMessage('');
             await fetchTimeline();
@@ -280,52 +283,49 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
                     <button onClick={onBack} className="p-5 -ml-6 rounded-3xl bg-white/5 text-white/30 hover:text-white transition-all active:scale-95"><ChevronLeftIcon className="h-8 w-8"/></button>
                     <div className="min-w-0">
                         <h3 className="font-serif font-black text-3xl md:text-5xl text-white truncate uppercase tracking-tighter leading-none">{enquiry.applicant_name}</h3>
-                        <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] mt-5">HANDSHAKE NODE: GRADE {enquiry.grade} COMMUNICATION CHAIN</p>
+                        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em] mt-5">HANDSHAKE NODE: GRADE {enquiry.grade} BLOCK</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-8">
-                    <span className={`text-[11px] font-black uppercase px-8 py-4 rounded-2xl border shadow-3xl backdrop-blur-3xl tracking-[0.3em] ${statusColors[enquiry.status] || 'bg-white/5 text-white/20'}`}>
-                        {enquiry.status}
-                    </span>
-                </div>
+                <span className={`text-[11px] font-black uppercase px-8 py-4 rounded-2xl border shadow-3xl backdrop-blur-3xl tracking-[0.3em] ${statusColors[enquiry.status] || 'bg-white/5 text-white/20'}`}>
+                    {enquiry.status}
+                </span>
             </header>
 
             <div ref={scrollRef} className="flex-grow overflow-y-auto p-10 md:p-24 space-y-12 bg-black/40 custom-scrollbar relative">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-32 gap-6">
                         <Spinner className="text-indigo-400" size="lg" />
-                        <p className="text-[11px] font-black uppercase tracking-[0.5em] text-white/10">Establishing Protocol Uplink</p>
                     </div>
                 ) : timeline.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-white/10 text-center space-y-10">
                         <CommunicationIcon className="w-24 h-24 opacity-10" />
-                        <p className="font-serif italic text-2xl max-w-sm leading-relaxed text-white/20">Handshake initialized. Awaiting institutional node verification.</p>
+                        <p className="font-serif italic text-2xl max-w-sm leading-relaxed text-white/20">Handshake initialized. Awaiting system response.</p>
                     </div>
                 ) : timeline.map((item, idx) => (
                     <div key={idx} className={`flex ${item.is_admin ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-4 duration-700`} style={{ animationDelay: `${idx * 30}ms` }}>
-                         <div className={`max-w-[85%] md:max-w-[70%] p-8 md:p-12 rounded-[3rem] text-[18px] md:text-[20px] leading-loose shadow-3xl ring-1 ring-white/5 transition-all hover:ring-white/10 ${
+                         <div className={`max-w-[85%] md:max-w-[70%] p-8 md:p-12 rounded-[3rem] text-[18px] md:text-[20px] leading-loose shadow-3xl ring-1 ring-white/5 ${
                             item.is_admin 
                             ? 'bg-[#1a1d24]/90 backdrop-blur-3xl text-white/70 rounded-bl-none' 
-                            : 'bg-gradient-to-br from-primary to-indigo-700 text-white rounded-br-none shadow-[0_32px_64px_rgba(var(--primary),0.3)]'
+                            : 'bg-gradient-to-br from-primary to-indigo-700 text-white rounded-br-none'
                          }`}>
-                             <p className="font-serif italic selection:bg-white/20">{item.item_type === 'MESSAGE' ? item.details.message : 'Institutional Handshake Acknowledged'}</p>
+                             <p className="font-serif italic">{item.details.message}</p>
                              <div className={`text-[10px] font-black uppercase mt-10 tracking-[0.4em] opacity-40 border-t border-white/5 pt-6 flex items-center gap-3 ${item.is_admin ? 'justify-start' : 'justify-end'}`}>
-                                <CheckCircleIcon className="w-4 h-4 text-emerald-400" /> {item.created_by_name} • {formatTimeAgo(item.created_at)}
+                                {item.created_by_name} • {formatTimeAgo(item.created_at)}
                              </div>
                          </div>
                     </div>
                 ))}
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-10 md:p-16 border-t border-white/5 bg-[#0f1115]/98 backdrop-blur-3xl flex gap-8 shadow-[0_-32px_64px_-12px_rgba(0,0,0,0.5)] z-20">
+            <form onSubmit={handleSendMessage} className="p-10 md:p-16 border-t border-white/5 bg-[#0f1115]/98 backdrop-blur-3xl flex gap-8 z-20">
                 <input 
                     type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
-                    placeholder="ENTER PAYLOAD HERE..."
-                    className="flex-grow p-7 md:p-10 rounded-[2.5rem] md:rounded-[3rem] bg-black/60 border border-white/10 text-white placeholder:text-white/5 focus:border-primary/50 focus:bg-black/80 outline-none transition-all shadow-inner font-serif italic text-xl md:text-2xl"
+                    placeholder="Type payload here..."
+                    className="flex-grow p-7 md:p-10 rounded-[2.5rem] md:rounded-[3rem] bg-black/60 border border-white/10 text-white placeholder:text-white/5 focus:border-primary/50 outline-none transition-all font-serif italic text-xl md:text-2xl"
                 />
                 <button 
                     type="submit" disabled={!newMessage.trim() || sending} 
-                    className="h-20 w-20 md:h-28 md:w-28 bg-primary text-white flex items-center justify-center rounded-[2.5rem] md:rounded-[3.5rem] shadow-[0_20px_50px_rgba(var(--primary),0.4)] hover:bg-primary/90 hover:-translate-y-2 transition-all active:scale-95 disabled:opacity-20 disabled:grayscale"
+                    className="h-20 w-20 md:h-28 md:w-28 bg-primary text-white flex items-center justify-center rounded-[2.5rem] md:rounded-[3.5rem] shadow-xl hover:bg-primary/90 active:scale-95 disabled:opacity-20"
                 >
                     {sending ? <Spinner size="md" className="text-white" /> : <LocalSendIcon className="w-10 h-10" />}
                 </button>
@@ -333,11 +333,5 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
         </div>
     );
 };
-
-const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-    </svg>
-);
 
 export default MessagesTab;

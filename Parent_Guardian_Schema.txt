@@ -1,4 +1,3 @@
-
 -- ===============================================================================================
 -- GURUKUL OS - PARENT/GUARDIAN PORTAL MASTER SCHEMA
 -- Version: 1.9.6 (Type Integrity Patch)

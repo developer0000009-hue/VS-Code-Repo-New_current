@@ -1,4 +1,3 @@
-
 // Fix: Added React import to resolve 'Cannot find namespace React' errors when using React.FC and React.SVGProps.
 import React from 'react';
 
@@ -18,6 +17,9 @@ export enum BuiltInRoles {
     ACCOUNTANT = 'Accountant',
     SUPER_ADMIN = 'Super Admin'
 }
+
+// Fix: Added 'Inquiry Active' to EnquiryStatus to resolve 'no overlap' type comparison errors.
+export type EnquiryStatus = 'New' | 'Contacted' | 'In Review' | 'Inquiry Active' | 'Completed';
 
 export type AdmissionStatus = 'Registered' | 'Pending Review' | 'Verified' | 'Approved' | 'Rejected' | 'Cancelled';
 
@@ -293,8 +295,6 @@ export interface Enquiry extends MyEnquiry {
     received_at: string;
 }
 
-export type EnquiryStatus = 'New' | 'Contacted' | 'In Review' | 'Completed';
-
 export interface TimelineItem {
     id: string;
     item_type: 'MESSAGE' | 'STATUS_CHANGE' | 'NOTE_ADDED' | 'ADMISSION_STATUS_CHANGE' | 'DOCUMENTS_REQUESTED';
@@ -418,7 +418,7 @@ export interface DocumentRequirement {
     id: number;
     admission_id: string;
     document_name: string;
-    status: 'Pending' | 'Submitted' | 'Accepted' | 'Rejected' | 'Verified';
+    status: 'Pending' | 'Submitted' | 'Verified' | 'Rejected';
     is_mandatory: boolean;
     notes_for_parent?: string;
     rejection_reason?: string;

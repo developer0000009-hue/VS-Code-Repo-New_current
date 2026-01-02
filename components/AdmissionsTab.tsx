@@ -1,18 +1,19 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { AdmissionApplication, AdmissionStatus } from '../types';
 import Spinner from './common/Spinner';
 import { XIcon } from './icons/XIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { SchoolIcon } from './icons/SchoolIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { ClockIcon } from './icons/ClockIcon';
 import { FilterIcon } from './icons/FilterIcon';
-import { UsersIcon } from './icons/UsersIcon';
 import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import AdmissionDetailsModal from './admin/AdmissionDetailsModal';
+// Fix: Imported PremiumAvatar to resolve 'Cannot find name' error on line 295.
+import PremiumAvatar from './common/PremiumAvatar';
 
 const statusColors: Record<string, string> = {
   'Registered': 'bg-slate-500/10 text-slate-400 border-white/5',
@@ -34,6 +35,7 @@ export const RequestDocumentsModal: React.FC<{
     const [loading, setLoading] = useState(false);
     const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
     const [message, setMessage] = useState('');
+    const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     const docOptions = [
         "Birth Certificate",
@@ -47,51 +49,126 @@ export const RequestDocumentsModal: React.FC<{
         setSelectedDocs(prev => prev.includes(doc) ? prev.filter(d => d !== doc) : [...prev, doc]);
     };
 
+    const handleSelectAll = () => {
+        if (selectedDocs.length === docOptions.length) setSelectedDocs([]);
+        else setSelectedDocs(docOptions);
+    };
+
     const handleSendRequest = async () => {
-        if (selectedDocs.length === 0) return alert("Select at least one document.");
+        if (selectedDocs.length === 0) {
+            setStatus({ type: 'error', message: 'Selection Required: At least one document must be requested.' });
+            return;
+        }
+
         setLoading(true);
+        setStatus(null);
+
         try {
-            const { error } = await supabase.rpc('admin_request_documents', {
+            const { data, error } = await supabase.rpc('admin_request_documents', {
                 p_admission_id: admissionId,
                 p_documents: selectedDocs,
                 p_message: message
             });
+
             if (error) throw error;
-            onSuccess();
+
+            setStatus({ type: 'success', message: 'Request Transmitted: Identity verification cycle initialized.' });
+            
+            // Allow user to see success message before closing
+            setTimeout(() => {
+                onSuccess();
+                onClose();
+            }, 1800);
+
         } catch (err: any) {
-            alert(formatError(err) || "Failed to send request.");
+            setStatus({ type: 'error', message: `Uplink Failure: ${formatError(err)}` });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[300] p-4" onClick={onClose}>
-            <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl border border-border p-6 overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold">Request Verification</h3>
-                    <button onClick={onClose}><XIcon className="w-5 h-5"/></button>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">Request specific documents from <strong>{applicantName}</strong>'s guardian.</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[400] p-4" onClick={onClose}>
+            <div className="bg-[#0c0d12] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-white/10 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 ring-1 ring-white/5" onClick={e => e.stopPropagation()}>
                 
-                <div className="space-y-2 mb-6">
-                    {docOptions.map(doc => (
-                        <label key={doc} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 cursor-pointer transition-colors">
-                            <input type="checkbox" checked={selectedDocs.includes(doc)} onChange={() => toggleDoc(doc)} className="rounded border-input text-primary focus:ring-primary w-4 h-4" />
-                            <span className="text-sm font-medium">{doc}</span>
-                        </label>
-                    ))}
+                {/* Compact Header */}
+                <div className="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                            <DocumentTextIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black text-white uppercase tracking-tight">Request Artifacts</h3>
+                            <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Verification Protocol</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
+                        <XIcon className="w-5 h-5"/>
+                    </button>
                 </div>
 
-                <div className="space-y-2 mb-6">
-                    <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest ml-1">Additional Message</label>
-                    <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Explain why these are needed..." className="w-full p-3 bg-muted/30 border border-input rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none h-24 resize-none shadow-inner" />
+                <div className="p-8 overflow-y-auto custom-scrollbar flex-grow space-y-8">
+                    {status && (
+                        <div className={`p-4 rounded-2xl flex items-center gap-4 animate-in slide-in-from-top-2 border ${status.type === 'success' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}>
+                            {status.type === 'success' ? <CheckCircleIcon className="w-6 h-6 shrink-0"/> : <AlertTriangleIcon className="w-6 h-6 shrink-0" />}
+                            <p className="text-xs font-bold uppercase tracking-wide leading-relaxed">{status.message}</p>
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end px-1">
+                            <p className="text-xs font-serif italic text-white/40 leading-relaxed">
+                                Request specific identities for <strong className="text-white not-italic">{applicantName}</strong>'s node.
+                            </p>
+                            <button onClick={handleSelectAll} className="text-[9px] font-black uppercase text-primary tracking-widest hover:underline">
+                                {selectedDocs.length === docOptions.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {docOptions.map(doc => {
+                                const isSelected = selectedDocs.includes(doc);
+                                return (
+                                    <label 
+                                        key={doc} 
+                                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group relative overflow-hidden ${isSelected ? 'bg-primary/10 border-primary ring-2 ring-primary/5' : 'bg-white/[0.02] border-white/5 hover:border-white/10'}`}
+                                    >
+                                        <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center shrink-0 ${isSelected ? 'bg-primary border-primary' : 'bg-black/20 border-white/10 group-hover:border-primary/40'}`}>
+                                            {isSelected && <CheckCircleIcon className="w-3.5 h-3.5 text-white" />}
+                                        </div>
+                                        <span className={`text-[11px] font-bold uppercase tracking-tight transition-colors ${isSelected ? 'text-white' : 'text-white/40 group-hover:text-white/60'}`}>{doc}</span>
+                                        <input type="checkbox" checked={isSelected} onChange={() => toggleDoc(doc)} className="hidden" />
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] ml-1">Context / Message</label>
+                        <textarea 
+                            value={message} 
+                            onChange={e => setMessage(e.target.value)} 
+                            placeholder="Explain the protocol necessity..." 
+                            className="w-full p-5 bg-white/[0.02] border border-white/10 rounded-[1.8rem] text-sm text-white focus:border-primary/50 focus:ring-8 focus:ring-primary/5 outline-none h-28 resize-none shadow-inner transition-all font-serif italic" 
+                        />
+                    </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                    <button onClick={onClose} className="px-4 py-2 font-bold text-muted-foreground">Cancel</button>
-                    <button onClick={handleSendRequest} disabled={loading || selectedDocs.length === 0} className="px-6 py-2 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary/90 flex items-center gap-2">
-                        {loading ? <Spinner size="sm" /> : "Send Request"}
+                {/* Compact Footer */}
+                <div className="px-8 py-6 border-t border-white/5 bg-white/[0.01] flex flex-col sm:flex-row justify-end items-center gap-4">
+                    <button 
+                        onClick={onClose} 
+                        className="w-full sm:w-auto px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white/30 hover:text-white transition-all order-2 sm:order-1"
+                    >
+                        Abort
+                    </button>
+                    <button 
+                        onClick={handleSendRequest} 
+                        disabled={loading || selectedDocs.length === 0} 
+                        className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-3 transform active:scale-95 shadow-2xl order-1 sm:order-2 ${loading || selectedDocs.length === 0 ? 'bg-white/5 text-white/10 cursor-not-allowed grayscale' : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'}`}
+                    >
+                        {loading ? <Spinner size="sm" className="text-white" /> : <><ClockIcon className="w-4 h-4"/> Dispatch Request</>}
                     </button>
                 </div>
             </div>
@@ -116,7 +193,9 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
         try {
             const { data, error } = await supabase.rpc('get_admissions', { p_branch_id: branchId });
             if (error) throw error;
-            setApplicants((data || []) as AdmissionApplication[]);
+            
+            const admissionOnlyRoster = (data || []).filter((a: any) => a.status !== 'Inquiry Active');
+            setApplicants(admissionOnlyRoster as AdmissionApplication[]);
         } catch (err) {
             console.error("Fetch failure:", err);
             setFetchError(formatError(err));
@@ -135,12 +214,12 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
         <div className="space-y-6 md:space-y-8 animate-in fade-in slide-up">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl md:text-3xl font-serif font-black text-foreground tracking-tight uppercase">Admission <span className="text-white/30 italic">Vault.</span></h2>
-                    <p className="text-muted-foreground text-sm md:text-base mt-1">Institutional lifecycle management for enrollment nodes.</p>
+                    <h2 className="text-2xl md:text-3xl font-serif font-black text-white tracking-tight uppercase">Admission <span className="text-white/30 italic">Vault.</span></h2>
+                    <p className="text-white/40 text-sm md:text-base mt-1 italic font-serif leading-relaxed">Institutional lifecycle management for enrollment nodes.</p>
                 </div>
                 <button 
                     onClick={fetchApplicants}
-                    className="p-3 rounded-2xl bg-card border border-border text-muted-foreground hover:text-primary transition-all group"
+                    className="p-3 rounded-2xl bg-white/5 border border-white/10 text-white/30 hover:text-primary transition-all group"
                 >
                     <RefreshIcon className={`w-5 h-5 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform'}`} />
                 </button>
@@ -159,14 +238,14 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
                 </div>
             )}
 
-            <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col min-h-[500px] ring-1 ring-black/5">
-                <div className="p-5 border-b border-border bg-muted/5 flex wrap gap-4 justify-between items-center backdrop-blur-md">
-                    <div className="flex items-center gap-2 bg-background px-4 py-2.5 rounded-2xl border border-border shadow-inner">
-                        <FilterIcon className="w-4 h-4 text-muted-foreground"/>
+            <div className="bg-[#0a0a0c] border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col min-h-[500px] ring-1 ring-white/5">
+                <div className="p-6 border-b border-white/5 bg-white/[0.01] flex wrap gap-4 justify-between items-center backdrop-blur-md">
+                    <div className="flex items-center gap-2 bg-black/40 px-4 py-2.5 rounded-2xl border border-white/5 shadow-inner">
+                        <FilterIcon className="w-4 h-4 text-white/20"/>
                         <select 
                             value={filterStatus} 
                             onChange={e => setFilterStatus(e.target.value)} 
-                            className="bg-transparent text-[10px] font-black uppercase text-foreground focus:outline-none cursor-pointer tracking-widest"
+                            className="bg-transparent text-[10px] font-black uppercase text-white/60 focus:outline-none cursor-pointer tracking-[0.2em]"
                         >
                             <option value="All">GLOBAL ROSTER</option>
                             <option value="Pending Review">Pending Review</option>
@@ -176,7 +255,7 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
                             <option value="Registered">External Registry</option>
                         </select>
                     </div>
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">{filteredApps.length} Identities Active in Node</span>
+                    <span className="text-[10px] font-black text-white/10 uppercase tracking-[0.4em]">{filteredApps.length} Identities Active in Node</span>
                 </div>
 
                 {loading ? (
@@ -186,55 +265,53 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
                     </div>
                 ) : filteredApps.length === 0 && !fetchError ? (
                     <div className="py-40 text-center flex flex-col items-center gap-6">
-                         <div className="w-20 h-20 bg-muted/30 rounded-full flex items-center justify-center border-2 border-dashed border-border/50">
-                            <DocumentTextIcon className="w-10 h-10 text-muted-foreground/30" />
+                         <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border-2 border-dashed border-white/10">
+                            <DocumentTextIcon className="w-10 h-10 text-white/10" />
                          </div>
                          <div className="max-w-xs mx-auto">
-                            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-foreground mb-2">Registry Idle</p>
-                            <p className="text-xs text-muted-foreground leading-relaxed italic">
-                                No records found for this branch. Verify an <strong>Admission Code</strong> in Quick Verification to import new nodes.
+                            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-white/40 mb-2">Registry Idle</p>
+                            <p className="text-xs text-white/20 leading-relaxed italic font-serif">
+                                No records found for this branch. Verify an <strong className="text-white/60">Admission Code</strong> in Quick Verification to import new nodes.
                             </p>
                          </div>
                     </div>
                 ) : (
                     <div className="overflow-x-auto w-full custom-scrollbar">
                         <table className="w-full text-left text-sm min-w-[900px]">
-                            <thead className="bg-muted/30 text-[10px] font-black uppercase text-muted-foreground tracking-[0.25em] border-b border-border">
+                            <thead className="bg-white/[0.02] text-[10px] font-black uppercase text-white/20 tracking-[0.3em] border-b border-white/5">
                                 <tr>
-                                    <th className="p-6 pl-10">Applicant Profile</th>
-                                    <th className="p-6">Registry Date</th>
-                                    <th className="p-6">Lifecycle Status</th>
-                                    <th className="p-6 text-right pr-10">Audit</th>
+                                    <th className="p-8 pl-10">Applicant Profile</th>
+                                    <th className="p-8">Registry Date</th>
+                                    <th className="p-8">Lifecycle Status</th>
+                                    <th className="p-8 text-right pr-10">Audit</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-border/40">
+                            <tbody className="divide-y divide-white/5">
                                 {filteredApps.map(app => (
                                     <tr 
                                         key={app.id} 
-                                        className="hover:bg-primary/[0.02] transition-all group cursor-pointer"
+                                        className="hover:bg-white/[0.01] transition-all group cursor-pointer"
                                         onClick={() => setSelectedAdmission(app)}
                                     >
-                                        <td className="p-6 pl-10">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-[1.25rem] bg-indigo-500/10 text-indigo-400 font-black flex items-center justify-center text-lg border border-indigo-500/20 shadow-inner ring-4 ring-indigo-500/5">
-                                                    {(app.applicant_name || 'A').charAt(0)}
-                                                </div>
+                                        <td className="p-8 pl-10">
+                                            <div className="flex items-center gap-6">
+                                                <PremiumAvatar src={app.profile_photo_url} name={app.applicant_name} size="xs" className="group-hover:scale-105 transition-transform duration-500" />
                                                 <div className="min-w-0">
-                                                    <p className="font-black text-foreground uppercase tracking-tight group-hover:text-primary transition-colors text-[15px]">{app.applicant_name}</p>
-                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Grade {app.grade} Node</p>
+                                                    <p className="font-serif font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors text-[16px]">{app.applicant_name}</p>
+                                                    <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">Grade {app.grade} Node</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-6 font-mono text-[11px] text-muted-foreground">
-                                            {new Date(app.registered_at || app.submitted_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        <td className="p-8 font-mono text-[11px] text-white/30">
+                                            {new Date(app.registered_at || app.submitted_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                                         </td>
-                                        <td className="p-6">
+                                        <td className="p-8">
                                             <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border tracking-widest shadow-sm transition-all ${statusColors[app.status] || statusColors['Registered']}`}>
                                                 {formatStatus(app.status)}
                                             </span>
                                         </td>
-                                        <td className="p-6 text-right pr-10">
-                                            <button className="p-3 rounded-2xl bg-white/[0.03] text-white/30 group-hover:text-primary group-hover:bg-primary/10 group-hover:border-primary/20 border border-transparent transition-all shadow-sm active:scale-90">
+                                        <td className="p-8 text-right pr-10">
+                                            <button className="p-3.5 rounded-2xl bg-white/[0.03] text-white/20 group-hover:text-primary group-hover:bg-primary/10 group-hover:border-primary/20 border border-transparent transition-all shadow-sm active:scale-90">
                                                 <EyeIcon className="w-5 h-5"/>
                                             </button>
                                         </td>

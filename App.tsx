@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, STORAGE_KEY, formatError } from './services/supabase';
@@ -26,11 +27,7 @@ const App: React.FC = () => {
         isFetching.current = true;
         
         try {
-            // Identity Handshake: Claim shadow profiles or reconcile drift
-            if (force) {
-                await supabase.rpc('reconcile_user_profile_id');
-            }
-
+            // Identity Handshake: Check if profile exists
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
@@ -40,12 +37,16 @@ const App: React.FC = () => {
             if (profileError) throw profileError;
 
             if (!profileData) {
-                // Initialize default identity if missing from registry
+                // IMPORTANT: If profile is missing but user exists in Auth, 
+                // initialize it using user_metadata from the signup process
+                const metadata = currentSession.user.user_metadata || {};
                 const { data: newProfile, error: insertError } = await supabase.from('profiles').upsert({
                     id: currentSession.user.id,
                     email: currentSession.user.email,
-                    display_name: currentSession.user.user_metadata?.display_name || 'Anonymous Node',
-                    is_active: true
+                    display_name: metadata.display_name || 'Anonymous Node',
+                    role: metadata.role || null, // Map from metadata.role
+                    is_active: true,
+                    profile_completed: false
                 }).select().maybeSingle();
                 
                 if (insertError) throw insertError;
@@ -53,7 +54,7 @@ const App: React.FC = () => {
             } else {
                 setProfile(profileData as UserProfile);
                 
-                // For administrative nodes, track setup lifecycle
+                // Track administrative onboarding lifecycle
                 if (profileData.role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
                     const { data: adminProfile } = await supabase
                         .from('school_admin_profiles')
@@ -64,7 +65,8 @@ const App: React.FC = () => {
                 }
             }
         } catch (e) {
-            console.error("CRITICAL: Identity Sync Protocol failure.", e);
+            // FIX: Use formatError to prevent [object Object] in logs/telemetry
+            console.error("CRITICAL: Identity Sync Protocol failure.", formatError(e));
         } finally {
             isFetching.current = false;
             setLoading(false);
@@ -101,8 +103,6 @@ const App: React.FC = () => {
             if (error) throw error;
 
             if (session) await loadUserData(session, true);
-            
-            // Navigate back home to reset dashboard context
             navigate('/', { replace: true });
         } catch (err: any) {
             console.error("Role Switch Protocol failed:", err);
@@ -132,7 +132,7 @@ const App: React.FC = () => {
 
     if (!session || !profile) return <AuthPage />;
 
-    // Force Onboarding if role is undefined or profile is incomplete
+    // Force Onboarding if profile is incomplete
     if (!profile.role || (!profile.profile_completed && profile.role !== BuiltInRoles.SUPER_ADMIN)) {
         return (
             <OnboardingFlow 

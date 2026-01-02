@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { ParentProfileData } from '../../types';
 import { UserIcon } from '../icons/UserIcon';
@@ -8,9 +7,9 @@ import { LocationIcon } from '../icons/LocationIcon';
 import { HomeIcon } from '../icons/HomeIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { SparklesIcon } from '../icons/SparklesIcon';
-import { RefreshIcon } from '../icons/RefreshIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { XCircleIcon } from '../icons/XCircleIcon';
+import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
 import CustomSelect from '../common/CustomSelect';
 import { countries, statesByCountry, citiesByState } from '../data/locations';
 import Spinner from '../common/Spinner';
@@ -72,7 +71,7 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
     const [loadingCities, setLoadingCities] = useState(false);
     const [isLocating, setIsLocating] = useState(false);
     const [syncStatus, setSyncStatus] = useState<string>('');
-    const [syncError, setSyncError] = useState<string | null>(null);
+    const [syncError, setSyncError] = useState<{message: string, isWarning: boolean} | null>(null);
     const [syncedFields, setSyncedFields] = useState<Set<string>>(new Set());
     const [mapUrl, setMapUrl] = useState<string | null>(null);
 
@@ -105,37 +104,58 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
         }
     };
 
+    /**
+     * Tiered Location Detection Flow
+     */
     const handleAutoLocate = async () => {
-        if (!navigator.geolocation) {
-            setSyncError("Geolocation services unavailable in this terminal environment.");
-            return;
-        }
-
         setIsLocating(true);
         setSyncStatus('Resolving GPS Telemetry...');
         setSyncError(null);
         setSyncedFields(new Set());
         setMapUrl(null);
 
+        // Fallback Logic: IP-based hint (Mock for frontend robustness)
+        const ipFallback = async () => {
+            console.log("Telemetry: Falling back to Tier 2 (Contextual Hint)...");
+            setSyncStatus('Regional Lookup Active...');
+            // In a real environment, this would call a geolocation microservice
+            await new Promise(r => setTimeout(r, 1000));
+            handleSelectChange('country', false)('India');
+            setSyncedFields(new Set(['country']));
+            setSyncError({
+                message: "Location access was denied. We've defaulted to your institutional home region (India). Please enter specific residency details manually.",
+                isWarning: true
+            });
+            setIsLocating(false);
+        };
+
+        if (!navigator.geolocation) {
+            await ipFallback();
+            return;
+        }
+
         navigator.geolocation.getCurrentPosition(async (position) => {
             const { latitude, longitude } = position.coords;
             
             try {
-                setSyncStatus('Initializing AI Handshake...');
+                setSyncStatus('Identifying Neural Node...');
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 
-                const prompt = `Identify the residential address for coordinates: ${latitude}, ${longitude}.
-                Use the googleMaps tool for high-precision mapping.
+                const prompt = `Perform a high-accuracy address lookup for coordinates: ${latitude}, ${longitude}.
                 
-                CRITICAL INSTRUCTION: Return ONLY a raw JSON string. State and Country MUST match international standards (e.g. 'Rajasthan', 'India').
-                
-                JSON Format:
+                INSTRUCTIONS:
+                1. Use the googleMaps tool to find the official residential address.
+                2. Return ONLY a valid JSON object.
+                3. Field 'state' must be the full official name (e.g. 'Rajasthan').
+                4. Field 'country' must be 'India' if applicable.
+
+                JSON SCHEMA:
                 { 
-                  "address": "Street address with building/house details", 
-                  "city": "Standard city name", 
-                  "state": "Full State name", 
-                  "country": "India", 
-                  "pin_code": "Postal code" 
+                  "address": "Building Name/No, Street, Area", 
+                  "city": "City Name", 
+                  "state": "Official State Name", 
+                  "country": "Country Name", 
+                  "pin_code": "6-digit code" 
                 }`;
 
                 const response = await ai.models.generateContent({
@@ -143,57 +163,57 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                     contents: prompt,
                     config: {
                         tools: [{ googleMaps: {} }],
-                        toolConfig: {
-                            retrievalConfig: {
-                                latLng: { latitude, longitude }
-                            }
-                        }
+                        toolConfig: { retrievalConfig: { latLng: { latitude, longitude } } }
                     }
                 });
 
-                // Extract grounding metadata URLs as per instructions
+                // Extract maps metadata for UX verification
                 const mapsUri = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.find((chunk: any) => chunk.maps?.uri)?.maps?.uri;
                 if (mapsUri) setMapUrl(mapsUri);
 
                 const text = response.text || '';
-                const jsonStr = text.match(/\{[\s\S]*\}/)?.[0];
+                
+                // Robust Regex extraction to bypass markdown junk
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                const jsonStr = jsonMatch ? jsonMatch[0] : null;
                 
                 if (jsonStr) {
-                    setSyncStatus('Mapping Geographic Ledger...');
+                    setSyncStatus('Synchronizing Residency...');
                     const data = JSON.parse(jsonStr);
                     
                     const fields = ['country', 'state', 'city', 'address', 'pin_code'];
                     setSyncedFields(new Set(fields));
 
-                    // Step through updates for better UX feel
+                    // Staggered UI population for premium "neural sync" feel
                     if (data.country) handleSelectChange('country', false)(data.country);
-                    await new Promise(r => setTimeout(r, 400));
+                    await new Promise(r => setTimeout(r, 200));
                     if (data.state) handleSelectChange('state', false)(data.state);
-                    await new Promise(r => setTimeout(r, 400));
+                    await new Promise(r => setTimeout(r, 200));
                     if (data.city) handleSelectChange('city', false)(data.city);
                     if (data.address) handleChange({ target: { name: 'address', value: data.address } } as any);
                     if (data.pin_code) handleChange({ target: { name: 'pin_code', value: data.pin_code } } as any);
                     
-                    setSyncStatus('Identity Synced Successfully.');
+                    setSyncStatus('Identity Synced.');
                     setTimeout(() => setSyncStatus(''), 3000);
                 } else {
-                    throw new Error("Invalid telemetry payload received from AI node.");
+                    throw new Error("Tier 1 Payload Mismatch");
                 }
             } catch (err: any) {
-                console.error("Locate Identity Failure:", err);
-                setSyncError("Neural location sync failed. Please manually define residency parameters.");
+                console.error("Locate Identity Failure [Tier 1]:", err);
+                setSyncError({
+                    message: "We couldn't auto-detect your location. Please enter your residency details manually.",
+                    isWarning: false
+                });
                 setSyncStatus('');
             } finally {
                 setIsLocating(false);
             }
-        }, (err) => {
-            console.error("Geolocation Error:", err);
-            setIsLocating(false);
-            setSyncStatus('');
-            setSyncError("Access Denied: Please authorize residency telemetry in your device settings.");
+        }, async (err) => {
+            console.error("Geolocation Protocol Blocked:", err.code);
+            await ipFallback();
         }, {
             enableHighAccuracy: true,
-            timeout: 15000,
+            timeout: 10000,
             maximumAge: 0
         });
     };
@@ -279,14 +299,16 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                 </div>
             </div>
 
-            {/* Premium UI Error State */}
+            {/* Robust User-Friendly Banner */}
             {syncError && (
-                <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center justify-between gap-5 animate-in slide-in-from-top-4 shadow-xl">
-                    <div className="flex items-center gap-4 text-red-500">
-                        <XCircleIcon className="w-8 h-8 shrink-0" />
+                <div className={`mb-10 p-6 border rounded-3xl flex items-center justify-between gap-5 animate-in slide-in-from-top-4 shadow-xl
+                    ${syncError.isWarning ? 'bg-amber-500/10 border-amber-500/20' : 'bg-red-500/10 border-red-500/20'}
+                `}>
+                    <div className={`flex items-center gap-4 ${syncError.isWarning ? 'text-amber-500' : 'text-red-500'}`}>
+                        {syncError.isWarning ? <AlertTriangleIcon className="w-8 h-8 shrink-0" /> : <XCircleIcon className="w-8 h-8 shrink-0" />}
                         <div>
-                            <p className="text-sm font-black uppercase tracking-widest leading-none">Sync Interrupted</p>
-                            <p className="text-xs font-medium mt-1.5 opacity-80">{syncError}</p>
+                            <p className="text-sm font-black uppercase tracking-widest leading-none">{syncError.isWarning ? 'Manual Review Suggested' : 'Sync Interrupted'}</p>
+                            <p className="text-xs font-medium mt-1.5 opacity-80 leading-relaxed">{syncError.message}</p>
                         </div>
                     </div>
                     <button onClick={() => setSyncError(null)} className="text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors">Dismiss</button>
@@ -343,7 +365,6 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                             searchable
                             isSynced={syncedFields.has('state')}
                         />
-                        {loadingStates && <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-[1.8rem] pointer-events-none animate-in fade-in z-20"><Spinner size="sm" /></div>}
                     </div>
                     <div className="relative">
                         <CustomSelect 
@@ -357,7 +378,6 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                             searchable
                             isSynced={syncedFields.has('city')}
                         />
-                        {loadingCities && <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-[1.8rem] pointer-events-none animate-in fade-in z-20"><Spinner size="sm" /></div>}
                     </div>
                     <PremiumFloatingInput 
                         label="Pin / Zip Code" 

@@ -3,38 +3,30 @@ import { supabase } from './supabase';
 
 export const BUCKETS = {
     PROFILES: 'profile-images',
-    DOCUMENTS: 'guardian-documents'
+    DOCUMENTS: 'student-documents' // Standardized for Admissions
 } as const;
 
 export type BucketName = typeof BUCKETS[keyof typeof BUCKETS];
 
 /**
  * Enterprise Storage Service
- * Enforces strict path conventions for RLS compliance.
+ * Enforces strict path conventions for RLS compliance and School-Parent Sync.
  */
 export const StorageService = {
-    /**
-     * Standardizes profile image paths
-     * Pattern: [type]/[user_id]/avatar_[timestamp].png
-     */
     getProfilePath: (type: 'parent' | 'child' | 'teacher', userId: string) => {
         return `${type}/${userId}/avatar_${Date.now()}.png`;
     },
 
     /**
-     * Standardizes document paths
-     * Pattern: documents/[parent_id]/[admission_id]/[type]/[uuid].[ext]
-     * CRITICAL: parent_id MUST be at index 2 for RLS policies using (storage.foldername(name))[2]
+     * Standardizes document paths for Admission Sync
+     * Pattern: {admission_id}/{artifact_type}/{filename}
      */
-    getDocumentPath: (parentId: string, childId: string | number, type: string, fileName: string) => {
+    getDocumentPath: (admissionId: string, type: string, fileName: string) => {
         const cleanType = type.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
         const ext = fileName.split('.').pop() || 'dat';
-        return `documents/${parentId}/${childId}/${cleanType}/${crypto.randomUUID()}.${ext}`;
+        return `${admissionId}/${cleanType}/${crypto.randomUUID()}.${ext}`;
     },
 
-    /**
-     * Uploads a file with built-in error handling and path management
-     */
     async upload(bucket: BucketName, path: string, file: File) {
         const { data, error } = await supabase.storage
             .from(bucket)
@@ -43,41 +35,16 @@ export const StorageService = {
                 upsert: true
             });
 
-        if (error) {
-            console.error(`Storage Upload Error [${bucket}]:`, error);
-            throw error;
-        }
-
-        return {
-            path: data.path
-        };
+        if (error) throw error;
+        return { path: data.path };
     },
 
-    /**
-     * Resolves a storage path into a public URL
-     */
-    getPublicUrl(bucket: BucketName, path: string) {
-        const { data } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(path);
-        return data.publicUrl;
-    },
-
-    /**
-     * Generates a short-lived signed URL for sensitive document viewing.
-     */
-    async resolveUrl(bucket: BucketName, path: string, expiresIn = 3600) {
-        if (!path) throw new Error("Reference path missing.");
-        
+    async getSignedUrl(path: string, expiresIn = 3600) {
         const { data, error } = await supabase.storage
-            .from(bucket)
+            .from(BUCKETS.DOCUMENTS)
             .createSignedUrl(path, expiresIn);
             
-        if (error) {
-            console.error(`Storage Resolve Error [${bucket}]:`, error);
-            throw error;
-        }
-        
+        if (error) throw error;
         return data.signedUrl;
     }
 };
