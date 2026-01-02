@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../../services/supabase';
+import { supabase, formatError } from '../../services/supabase';
 import { ShareCode, AdmissionApplication, ShareCodeType } from '../../types';
 import Spinner from '../common/Spinner';
 import { KeyIcon } from '../icons/KeyIcon';
@@ -9,7 +9,6 @@ import { RefreshIcon } from '../icons/RefreshIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { MailIcon } from '../icons/MailIcon';
 import { DocumentTextIcon } from '../icons/DocumentTextIcon';
-// Fix: Added missing import for FileTextIcon
 import { FileTextIcon } from '../icons/FileTextIcon';
 import { ChevronRightIcon } from '../icons/ChevronRightIcon';
 import { XCircleIcon } from '../icons/XCircleIcon';
@@ -22,26 +21,14 @@ import { EyeOffIcon } from '../icons/EyeOffIcon';
 import { CopyIcon } from '../icons/CopyIcon';
 import PremiumAvatar from '../common/PremiumAvatar';
 
-/**
- * Standardized error handling for institutional nodes.
- */
-const resolveSystemError = (err: any): string => {
-    if (!err) return "Protocol synchronization failed.";
-    if (typeof err === 'string') {
-        return (err === "[object Object]" || err === "{}") ? "Identity node protocol exception." : err;
-    }
-    const message = err.message || err.error_description || err.details || err.hint;
-    if (message && typeof message === 'string' && message !== "[object Object]") return message;
-    return "Handshake failure: Server context mismatch.";
-};
-
 export default function ShareCodesTab() {
     const [codes, setCodes] = useState<ShareCode[]>([]);
     const [myApplications, setMyApplications] = useState<AdmissionApplication[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [focusedPermitId, setFocusedPermitId] = useState<number | null>(null);
+    // FIX: focusedPermitId should be string to match UUID standard in types.ts
+    const [focusedPermitId, setFocusedPermitId] = useState<string | null>(null);
     const [copyFeedback, setCopyFeedback] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
 
@@ -71,7 +58,7 @@ export default function ShareCodesTab() {
                 setSelectedAdmissionId(appsData[0].id);
             }
         } catch (err: any) {
-            setError(resolveSystemError(err));
+            setError(formatError(err));
         } finally {
             setLoading(false);
         }
@@ -109,13 +96,14 @@ export default function ShareCodesTab() {
             }
             setPermitType(null); 
         } catch (err: any) {
-            setError(resolveSystemError(err));
+            setError(formatError(err));
         } finally {
             setActionLoading(false);
         }
     };
 
-    const handleRevoke = async (id: number) => {
+    // FIX: Parameter id should be string to match UUID standard in types.ts
+    const handleRevoke = async (id: string) => {
         if (!confirm("Terminate this permit immediately? It will be decommissioned from all registries and portals.")) return;
         setActionLoading(true);
         setError(null);
@@ -126,7 +114,7 @@ export default function ShareCodesTab() {
             await fetchData(true);
             setFocusedPermitId(null);
         } catch (err: any) {
-            setError(resolveSystemError(err));
+            setError(formatError(err));
         } finally {
             setActionLoading(false);
         }
@@ -243,7 +231,7 @@ export default function ShareCodesTab() {
                             </div>
                             <div className="grid grid-cols-1 gap-4">
                                 {[
-                                    { id: 'Enquiry', label: 'Inquiry Level', desc: 'Temporary metadata visibility only.', icon: <MailIcon className="w-5 h-5"/> },
+                                    { id: 'Enquiry', label: 'Enquiry Level', desc: 'Temporary metadata visibility only.', icon: <MailIcon className="w-5 h-5"/> },
                                     { id: 'Admission', label: 'Admission Level', desc: 'Full document vault & ledger access.', icon: <DocumentTextIcon className="w-5 h-5"/> }
                                 ].map(type => (
                                     <button
@@ -251,9 +239,9 @@ export default function ShareCodesTab() {
                                         onClick={() => setPermitType(type.id as ShareCodeType)}
                                         className={`p-7 rounded-[2.5rem] border transition-all duration-500 flex items-center gap-6 group/type ${permitType === type.id ? 'bg-primary/10 border-primary shadow-2xl ring-2 ring-primary/5' : 'bg-white/[0.01] border-white/5 hover:border-white/10 hover:bg-white/[0.02]'}`}
                                     >
-                                        <div className={`p-4 rounded-2xl transition-all duration-700 shadow-inner ${permitType === type.id ? 'bg-primary text-white scale-110 rotate-3' : 'bg-white/5 text-white/10 group-hover/type:text-white/30'}`}>{type.icon}</div>
+                                        <div className={`p-4 rounded-2xl transition-all duration-700 shadow-inner ${permitType === type.id ? 'bg-primary text-white scale-110 rotate-3' : 'bg-white/5 text-white/10 group-hover:type:text-white/30'}`}>{type.icon}</div>
                                         <div className="text-left flex-grow">
-                                            <h4 className={`text-sm font-black uppercase tracking-widest ${permitType === type.id ? 'text-primary' : 'text-white/50 group-hover/type:text-white/70'}`}>{type.label}</h4>
+                                            <h4 className={`text-sm font-black uppercase tracking-widest ${permitType === type.id ? 'text-primary' : 'text-white/50 group-hover:type:text-white/70'}`}>{type.label}</h4>
                                             <p className="text-[11px] text-white/20 mt-1.5 font-serif italic leading-relaxed">{type.desc}</p>
                                         </div>
                                     </button>
@@ -294,7 +282,7 @@ export default function ShareCodesTab() {
                                 <button 
                                     key={code.id} 
                                     onClick={() => setFocusedPermitId(code.id)}
-                                    className={`w-full text-left p-7 rounded-[2.5rem] border transition-all duration-700 group relative overflow-hidden ${focusedPermitId === code.id ? 'bg-[#14161d] border-primary shadow-2xl z-10 scale-[1.02]' : 'bg-[#0a0a0c]/60 border-white/5 hover:border-white/10'}`}
+                                    className={`w-full text-left p-7 rounded-[2.5rem] border transition-all duration-700 group relative overflow-hidden ${focusedPermitId === code.id ? 'bg-[#14161d] border-primary shadow-2xl z-10 scale-[1.02]' : 'bg-[#0a0a0c]/60 border-white/5 border-white/10'}`}
                                 >
                                     <div className="flex items-center gap-5 relative z-10">
                                         <div className="relative shrink-0">
@@ -375,7 +363,6 @@ export default function ShareCodesTab() {
                                         <p className="text-[11px] font-black text-[#9AA3B2] uppercase tracking-[0.4em] mb-8 relative z-10">Access Permit Code</p>
                                         
                                         <div className="relative inline-block">
-                                            {/* Reduced font size from text-5xl md:text-7xl to text-[38px] md:text-[46px] */}
                                             <span className={`font-mono font-black text-[38px] md:text-[46px] tracking-[0.25em] transition-all duration-700 relative z-10 select-all block ${copyFeedback ? 'text-[#22C55E] scale-110' : 'text-[#F2F4F8] group-hover:text-primary'}`}>
                                                 {focusedPermit.code}
                                             </span>
@@ -402,7 +389,7 @@ export default function ShareCodesTab() {
                                     </div>
                                     <div className="space-y-1.5">
                                         <p className="text-[11px] font-black text-[#9AA3B2] uppercase tracking-[0.2em]">Data Scope</p>
-                                        <p className="text-sm font-medium text-[#F2F4F8] uppercase tracking-wide">{focusedPermit.code_type === 'Admission' ? 'Vault Access' : 'Inquiry Context'}</p>
+                                        <p className="text-sm font-medium text-[#F2F4F8] uppercase tracking-wide">{focusedPermit.code_type === 'Admission' ? 'Vault Access' : 'Enquiry Context'}</p>
                                     </div>
                                     <div className="space-y-1.5">
                                         <p className="text-[11px] font-black text-[#9AA3B2] uppercase tracking-[0.2em]">Issued On</p>
@@ -410,7 +397,6 @@ export default function ShareCodesTab() {
                                     </div>
                                     <div className="space-y-1.5">
                                         <p className="text-[11px] font-black text-[#9AA3B2] uppercase tracking-[0.2em]">Expiry Date</p>
-                                        {/* Fix: Use toLocaleString instead of toLocaleDateString to support timeStyle and avoid 'Invalid option : timeStyle' error */}
                                         <p className="text-sm font-medium text-[#F2F4F8]">{new Date(focusedPermit.expires_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</p>
                                     </div>
                                     

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { SchoolDepartment, TeacherExtended } from '../../types';
@@ -19,7 +18,8 @@ import { BriefcaseIcon } from '../icons/BriefcaseIcon';
 
 interface DepartmentsTabProps {
     teachers: TeacherExtended[];
-    branchId: number | null;
+    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
+    branchId: string | null;
 }
 
 // Helper to safely format errors

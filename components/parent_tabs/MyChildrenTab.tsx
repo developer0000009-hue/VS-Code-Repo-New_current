@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../services/supabase';
+import { supabase, formatError } from '../../services/supabase';
 import { AdmissionApplication, UserProfile } from '../../types';
 import Spinner from '../common/Spinner';
 import ChildProfileCard from './ChildProfileCard';
@@ -34,7 +34,7 @@ const MyChildrenTab: React.FC<MyChildrenTabProps> = ({ onManageDocuments, profil
             if (rpcError) throw rpcError;
             setApplications((data || []) as AdmissionApplication[]);
         } catch (err: any) {
-            setError(err.message || "Identity synchronization protocol failure.");
+            setError(formatError(err));
         } finally {
             setLoading(false);
         }
@@ -118,6 +118,14 @@ const MyChildrenTab: React.FC<MyChildrenTabProps> = ({ onManageDocuments, profil
                 </div>
             </div>
 
+            {/* Error Display */}
+            {error && (
+                <div className="mb-8 p-6 bg-red-500/10 border border-red-500/20 text-red-500 rounded-[2rem] flex items-center gap-4 animate-in shake">
+                    <AlertTriangleIcon className="w-6 h-6 shrink-0" />
+                    <p className="text-sm font-bold">{error}</p>
+                </div>
+            )}
+
             {/* Card Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {filteredApplications.map((app, idx) => (
@@ -160,5 +168,9 @@ const MyChildrenTab: React.FC<MyChildrenTabProps> = ({ onManageDocuments, profil
         </div>
     );
 };
+
+const AlertTriangleIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+);
 
 export default MyChildrenTab;

@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, formatError } from '../services/supabase';
 import { UserProfile, Role } from '../types';
 import { useRoles } from '../contexts/RoleContext';
 import Spinner from './common/Spinner';
@@ -47,12 +46,8 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onSe
             if (error) throw error;
             setUsers(data || []);
         } catch (err: any) {
-            let finalMessage = 'Failed to fetch users: Please try again later.';
-            if (typeof err === 'object' && err !== null && typeof err.message === 'string') {
-                finalMessage = `Failed to fetch users: ${err.message}`;
-            }
-            setError(finalMessage);
-            console.error('Original error:', err);
+            setError(formatError(err));
+            console.error('SuperAdmin fetch failed:', err);
         } finally {
             setLoading(false);
         }
@@ -81,7 +76,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onSe
         });
 
         if (error) {
-            setRoleError(error.message);
+            setRoleError(formatError(error));
         } else {
             setNewRoleName('');
             setNewRoleIsAdmin(false);
@@ -175,8 +170,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ profile, onSe
             .single();
 
         if (error) {
-            alert('Failed to update user status.');
-            console.error(error);
+            alert('Failed to update user status: ' + formatError(error));
         } else if (data) {
             handleUpdateUser(data as UserProfile);
         }

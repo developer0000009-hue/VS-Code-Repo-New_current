@@ -1,105 +1,23 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, formatError } from '../services/supabase';
+import { EnquiryService } from '../services/enquiry';
 import { Enquiry, TimelineItem, EnquiryStatus } from '../types';
 import Spinner from './common/Spinner';
 import { XIcon } from './icons/XIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { UserIcon } from './icons/UserIcon';
-import { UsersIcon } from './icons/UsersIcon';
-import { ClipboardListIcon } from './icons/ClipboardListIcon';
-import { ClockIcon } from './icons/ClockIcon';
-import { MegaphoneIcon } from './icons/MegaphoneIcon'; 
-import { SearchIcon } from './icons/SearchIcon';
-import { PhoneIcon } from './icons/PhoneIcon';
-import { SparklesIcon } from './icons/SparklesIcon';
-import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 import { GraduationCapIcon } from './icons/GraduationCapIcon';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
-
-const STATUS_CONFIG: Record<EnquiryStatus, { icon: React.ReactNode, label: string, color: string, ring: string, bg: string }> = {
-    'New': { icon: <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"/>, label: 'New', color: 'text-purple-700', ring: 'ring-purple-600', bg: 'bg-purple-50' },
-    'Contacted': { icon: <MegaphoneIcon className="w-4 h-4"/>, label: 'Contacted', color: 'text-amber-700', ring: 'ring-amber-500', bg: 'bg-amber-50' },
-    'In Review': { icon: <SearchIcon className="w-4 h-4"/>, label: 'Review', color: 'text-blue-700', ring: 'ring-blue-500', bg: 'bg-blue-50' },
-    'Inquiry Active': { icon: <div className="w-2 h-2 rounded-full bg-indigo-600"/>, label: 'Integrated', color: 'text-indigo-700', ring: 'ring-indigo-500', bg: 'bg-indigo-50' },
-    'Completed': { icon: <CheckCircleIcon className="w-4 h-4"/>, label: 'Converted', color: 'text-emerald-700', ring: 'ring-emerald-500', bg: 'bg-emerald-50' },
-};
-
-const ORDERED_STATUSES: EnquiryStatus[] = ['New', 'Contacted', 'In Review', 'Inquiry Active', 'Completed'];
-
-const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (diff < 60) return "JUST NOW";
-    if (diff < 3600) return `${Math.floor(diff / 60)}M AGO`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}H AGO`;
-    return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short' }).toUpperCase();
-};
-
-const WorkflowStepper: React.FC<{ 
-    currentStatus: EnquiryStatus, 
-    onChange: (status: EnquiryStatus) => void,
-    disabled?: boolean 
-}> = ({ currentStatus, onChange, disabled }) => {
-    const currentIndex = ORDERED_STATUSES.indexOf(currentStatus);
-    return (
-        <div className="w-full relative py-6 px-2 select-none">
-            <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-white/5 -z-10 rounded-full transform -translate-y-1/2"></div>
-            <div 
-                className="absolute top-1/2 left-4 h-0.5 bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-500 -z-10 rounded-full transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] transform -translate-y-1/2 shadow-[0_0_15px_rgba(99,102,241,0.4)]"
-                style={{ width: `calc(${(currentIndex / (ORDERED_STATUSES.length - 1)) * 100}% - 1rem)` }}
-            ></div>
-            <div className="flex justify-between items-center w-full relative">
-                {ORDERED_STATUSES.map((step, index) => {
-                    const isActive = index === currentIndex;
-                    const isCompleted = index < currentIndex;
-                    const config = STATUS_CONFIG[step];
-                    return (
-                        <button
-                            key={step}
-                            type="button"
-                            onClick={() => !disabled && onChange(step)}
-                            disabled={disabled}
-                            className={`flex flex-col items-center gap-3 group focus:outline-none transition-all duration-500 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-                        >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-700 z-10 
-                                ${isActive ? `bg-background ${config.ring} ring-2 ring-offset-4 ring-offset-[#09090b] scale-125 shadow-[0_0_20px_rgba(139,92,246,0.3)]` : isCompleted ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-[#1a1d23] border-white/5 text-white/10 hover:border-white/20'}
-                            `}>
-                                {isCompleted ? <CheckCircleIcon className="w-5 h-5" /> : (isActive ? config.icon : <div className="w-2 h-2 bg-current opacity-20 group-hover:opacity-100 transition-opacity"></div>)}
-                            </div>
-                            <span className={`text-[9px] font-black uppercase tracking-[0.25em] transition-all duration-500 ${isActive ? 'text-primary' : 'text-white/20 group-hover:text-white/40'}`}>{config.label}</span>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
-const TimelineEntry: React.FC<{ item: TimelineItem }> = ({ item }) => {
-    const isMessage = item.item_type === 'MESSAGE';
-    return (
-        <div className={`flex flex-col ${item.is_admin ? 'items-end' : 'items-start'} w-full animate-in fade-in slide-in-from-bottom-2 duration-700`}>
-            {isMessage ? (
-                <div className={`max-w-[85%] md:max-w-[75%] p-6 rounded-[2rem] text-sm leading-loose shadow-2xl ring-1 ring-white/5 transform transition-transform hover:scale-[1.01] ${item.is_admin ? 'bg-indigo-600 text-white rounded-br-none shadow-indigo-500/20' : 'bg-[#14161d] text-white/80 rounded-bl-none shadow-black/50'}`}>
-                    <p className="whitespace-pre-wrap italic font-serif leading-relaxed">{item.details.message}</p>
-                    <div className="flex items-center justify-between mt-6 opacity-40 pt-4 border-t border-white/10">
-                         <span className="text-[9px] font-black uppercase tracking-[0.3em] truncate max-w-[150px]">{item.created_by_name}</span>
-                         <span className="text-[9px] font-mono font-bold">{formatTimeAgo(item.created_at)}</span>
-                    </div>
-                </div>
-            ) : (
-                <div className="w-full flex justify-center my-6">
-                    <div className="px-6 py-2 rounded-full bg-white/[0.02] border border-white/5 text-white/20 flex items-center gap-3 shadow-inner group hover:bg-white/5 transition-all">
-                        <ClockIcon className="w-3.5 h-3.5 opacity-40 group-hover:text-primary transition-colors"/>
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em]">{item.created_by_name} / {item.details.new || 'LIFECYCLE UPDATE'} / {formatTimeAgo(item.created_at)}</span>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
+import { ClipboardListIcon } from './icons/ClipboardListIcon';
+import { SettingsIcon } from './icons/SettingsIcon';
+import { ClockIcon } from './icons/ClockIcon';
+import { CommunicationIcon } from './icons/CommunicationIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
+import { MegaphoneIcon } from './icons/MegaphoneIcon';
+import { UsersIcon } from './icons/UsersIcon';
+import { PhoneIcon } from './icons/PhoneIcon';
+import { SearchIcon } from './icons/SearchIcon';
+import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
+import { GoogleGenAI } from '@google/genai';
 
 const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -107,14 +25,60 @@ const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+const STATUS_CONFIG: Record<string, { icon: React.ReactNode, label: string, color: string, ring: string, bg: string }> = {
+    'ENQUIRY_ACTIVE': { icon: <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"/>, label: 'Active', color: 'text-blue-700', ring: 'ring-blue-600', bg: 'bg-blue-50' },
+    'ENQUIRY_VERIFIED': { icon: <ShieldCheckIcon className="w-4 h-4"/>, label: 'Verified', color: 'text-teal-700', ring: 'ring-teal-500', bg: 'bg-teal-50' },
+    'ENQUIRY_IN_PROGRESS': { icon: <div className="w-2 h-2 rounded-full bg-purple-600"/>, label: 'In Progress', color: 'text-purple-700', ring: 'ring-purple-500', bg: 'bg-purple-50' },
+    'CONVERTED': { icon: <CheckCircleIcon className="w-4 h-4"/>, label: 'Converted', color: 'text-emerald-700', ring: 'ring-emerald-500', bg: 'bg-emerald-50' },
+};
+
+const ORDERED_STATUSES: EnquiryStatus[] = ['ENQUIRY_ACTIVE', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'];
+
+const TimelineEntry: React.FC<{ item: TimelineItem }> = ({ item }) => {
+    if (item.item_type === 'MESSAGE') {
+        const isParent = !item.is_admin;
+        return (
+             <div className={`flex items-end gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${isParent ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex items-end gap-5 max-w-[85%] sm:max-w-[75%] ${isParent ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className={`w-11 h-11 rounded-[1.1rem] flex items-center justify-center font-black text-sm shadow-2xl text-white flex-shrink-0 border border-white/5 ${isParent ? 'bg-indigo-600' : 'bg-[#252833]'}`}>
+                        {item.created_by_name.charAt(0)}
+                    </div>
+                    <div className={`p-6 md:p-8 rounded-[2.5rem] shadow-2xl ring-1 ring-white/5 overflow-hidden relative ${isParent ? 'bg-[#1a1d23] rounded-br-none' : 'bg-[#221f30] rounded-bl-none text-white/90'}`}>
+                         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
+                         <p className="text-[15px] md:text-[17px] leading-relaxed relative z-10 whitespace-pre-wrap font-medium">{item.details.message}</p>
+                         <div className={`flex items-center gap-3 mt-6 relative z-10 opacity-30 ${isParent ? 'justify-end' : 'justify-start'}`}>
+                            <span className="text-[9px] font-black uppercase tracking-widest">{item.created_by_name}</span>
+                            <span className="w-1 h-1 rounded-full bg-white"></span>
+                            <span className="text-[9px] font-mono">{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="flex justify-center my-10 animate-in fade-in zoom-in-95 duration-1000">
+            <div className="flex items-center gap-4 px-6 py-2.5 rounded-full bg-white/[0.02] border border-white/5 shadow-inner backdrop-blur-sm">
+                <div className="w-1 h-1 rounded-full bg-primary/40 animate-pulse"></div>
+                <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">
+                    {item.item_type.replace(/_/g, ' ')} / {new Date(item.created_at).toLocaleTimeString()}
+                </span>
+                <div className="w-1 h-1 rounded-full bg-primary/40 animate-pulse"></div>
+            </div>
+        </div>
+    );
+};
+
 interface EnquiryDetailsModalProps {
     enquiry: Enquiry;
     onClose: () => void;
     onUpdate: () => void;
-    currentBranchId?: number | null; 
+    currentBranchId?: string | null; 
+    onNavigate?: (component: string) => void;
 }
 
-const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onClose, onUpdate }) => {
+const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onClose, onUpdate, onNavigate }) => {
     const [timeline, setTimeline] = useState<TimelineItem[]>([]);
     const [formData, setFormData] = useState({
         status: enquiry.status,
@@ -122,238 +86,267 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
         applicant_name: enquiry.applicant_name || '',
     });
     const [newMessage, setNewMessage] = useState('');
-    const [loading, setLoading] = useState({ timeline: true, saving: false, sending: false });
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [loading, setLoading] = useState({ timeline: true, saving: false, converting: false, ai: false });
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
     const commsEndRef = useRef<HTMLDivElement>(null);
-    const primaryId = (enquiry.admission_id || enquiry.id).toString();
 
     const fetchTimeline = useCallback(async (isSilent = false) => {
-        if (!primaryId) return;
         if (!isSilent) setLoading(prev => ({ ...prev, timeline: true }));
         try {
-            const { data, error } = await supabase.rpc('get_enquiry_timeline', { p_node_id: primaryId });
+            const { data, error } = await supabase.rpc('get_enquiry_timeline', { p_node_id: enquiry.id });
             if (error) throw error;
             setTimeline(data || []);
         } catch (e) {
-            console.error("Timeline Sync Error:", formatError(e));
+            console.error("Timeline Sync Error:", e);
         } finally {
             if (!isSilent) setLoading(prev => ({ ...prev, timeline: false }));
         }
-    }, [primaryId]);
+    }, [enquiry.id]);
+
+    useEffect(() => { 
+        fetchTimeline(); 
+    }, [fetchTimeline]);
 
     useEffect(() => {
-        fetchTimeline();
-        const channel = supabase.channel(`enquiry-terminal-${primaryId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiry_messages', filter: `admission_id=eq.${primaryId}` }, () => fetchTimeline(true))
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'admission_audit_logs', filter: `admission_id=eq.${primaryId}` }, () => fetchTimeline(true))
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [fetchTimeline, primaryId]);
-
-    useEffect(() => {
-        if (commsEndRef.current) commsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        if (commsEndRef.current) {
+            commsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
     }, [timeline]);
 
-    const handleSave = async (finalize: boolean = false) => {
-        setLoading(prev => ({ ...prev, saving: true }));
-        setSuccessMessage(null);
+    const handleAIGenerateSummary = async () => {
+        setLoading(prev => ({ ...prev, ai: true }));
         try {
-            if (finalize) {
-                const { data, error: transitionError } = await supabase.rpc('admin_transition_admission', {
-                    p_admission_id: primaryId,
-                    p_next_status: 'Approved'
-                });
-                if (transitionError) throw transitionError;
-                if (!data.success) throw new Error(data.message);
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const conversationText = timeline
+                .filter(t => t.item_type === 'MESSAGE')
+                .map(t => `${t.is_admin ? 'Admin' : 'Parent'}: ${t.details.message}`)
+                .join('\n');
                 
-                onUpdate();
-                onClose();
-                return;
-            }
-
-            const { error } = await supabase.rpc('update_enquiry_lifecycle', {
-                p_node_id: primaryId,
-                p_status: formData.status,
-                p_notes: formData.notes,
-                p_metadata: { applicant_name: formData.applicant_name },
-                p_finalize: false
+            const prompt = `Summarize the following school admission enquiry conversation for ${enquiry.applicant_name} (Grade ${enquiry.grade}). Provide a concise analysis of the parent's primary concerns and the current status of the handshake. Tone: Executive and Brief.\n\nConversation:\n${conversationText}`;
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: prompt
             });
             
-            if (error) throw error;
+            setAiSummary(response.text || "Summary unavailable.");
+        } catch (err) {
+            console.error("AI Context Failure:", err);
+        } finally {
+            setLoading(prev => ({ ...prev, ai: false }));
+        }
+    };
+
+    const handleSaveStatus = async (newStatus: EnquiryStatus) => {
+        setLoading(prev => ({ ...prev, saving: true }));
+        try {
+            const { error } = await supabase
+                .from('enquiries')
+                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .eq('id', enquiry.id);
             
-            setSuccessMessage("Node Data Persisted.");
-            setTimeout(() => setSuccessMessage(null), 3000);
+            if (error) throw error;
+            setFormData(prev => ({ ...prev, status: newStatus }));
             onUpdate();
             await fetchTimeline(true);
         } catch (err) {
-            alert(`Protocol Error: ${formatError(err)}`);
+            alert(`Save failed: ${formatError(err)}`);
         } finally {
             setLoading(prev => ({ ...prev, saving: false }));
+        }
+    };
+
+    const handleConvert = async () => {
+        setLoading(prev => ({ ...prev, converting: true }));
+        try {
+            const result = await EnquiryService.convertToAdmission(enquiry.id);
+            if (result.success) {
+                onUpdate();
+                onClose();
+                onNavigate?.('Admissions');
+            }
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setLoading(prev => ({ ...prev, converting: false }));
         }
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         const msg = newMessage.trim();
-        if (!msg || loading.sending) return;
+        if (!msg) return;
         
-        setLoading(prev => ({ ...prev, sending: true }));
         try {
             const { error } = await supabase.rpc('send_enquiry_message', { 
-                p_node_id: primaryId, 
+                p_node_id: enquiry.id, 
                 p_message: msg 
             });
-            
             if (error) throw error;
             setNewMessage('');
             await fetchTimeline(true);
         } catch (err) {
             alert("Transmit Failure: " + formatError(err));
-        } finally {
-            setLoading(prev => ({ ...prev, sending: false }));
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl flex items-center justify-center z-[150] p-4 md:p-6" onClick={onClose}>
-            <div 
-                className="bg-[#09090b] rounded-[3.5rem] shadow-[0_64px_128px_-24px_rgba(0,0,0,1)] w-full max-w-[1500px] h-[92vh] flex flex-col border border-white/10 overflow-hidden animate-in zoom-in-95 duration-700 ring-1 ring-white/5" 
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Station Header */}
-                <header className="px-10 py-8 border-b border-white/5 bg-[#0f1115]/90 backdrop-blur-3xl flex justify-between items-center z-40 relative">
-                    <div className="flex items-center gap-8">
-                        <div className="relative group">
-                             <div className="absolute -inset-1 rounded-2xl bg-indigo-500/20 blur opacity-40 group-hover:opacity-100 transition-opacity"></div>
-                             <div className="relative p-4 bg-indigo-600 rounded-2xl text-white shadow-xl border border-white/10 group-hover:scale-105 group-hover:rotate-2 transition-all">
-                                <ClipboardListIcon className="w-8 h-8" />
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl flex items-center justify-center z-[150] p-0 sm:p-4 md:p-6" onClick={onClose}>
+            <div className="bg-[#09090b] rounded-t-[3.5rem] sm:rounded-[4.5rem] shadow-[0_64px_128px_-32px_rgba(0,0,0,1)] w-full max-w-[1700px] h-full sm:h-[94vh] flex flex-col border border-white/5 overflow-hidden ring-1 ring-white/10 animate-in zoom-in-95 duration-500" onClick={e => e.stopPropagation()}>
+                
+                <header className="px-10 md:px-16 py-10 border-b border-white/5 bg-[#0f1115]/95 backdrop-blur-2xl flex flex-wrap justify-between items-center z-40 relative shadow-2xl">
+                    <div className="flex items-center gap-10">
+                        <div className="relative group shrink-0">
+                            <div className="absolute inset-0 bg-indigo-500/20 blur-2xl opacity-40 group-hover:opacity-100 transition-opacity duration-1000"></div>
+                            <div className="w-20 h-20 bg-indigo-600 rounded-[2.2rem] text-white flex items-center justify-center shadow-2xl border border-white/10 relative z-10 transform group-hover:rotate-6 transition-transform duration-700">
+                                <ClipboardListIcon className="w-10 h-10" />
                             </div>
                         </div>
                         <div>
-                            <h2 className="text-3xl md:text-5xl font-serif font-black text-white tracking-tighter uppercase truncate leading-none">{formData.applicant_name}</h2>
-                            <div className="flex items-center gap-4 mt-3">
-                                <span className="text-[10px] font-mono font-black text-white/20 bg-white/5 px-2.5 py-1 rounded-lg border border-white/5 uppercase tracking-widest">ID: {primaryId.slice(0, 12)}</span>
-                                <div className="h-4 w-px bg-white/10"></div>
-                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] flex items-center gap-2">
-                                    <ShieldCheckIcon className="w-4 h-4" /> Inquiry Lead Node
-                                </span>
+                            <div className="flex flex-wrap items-center gap-6 mb-3">
+                                <h2 className="text-4xl md:text-6xl font-serif font-black text-white tracking-tighter uppercase leading-none drop-shadow-2xl">{enquiry.applicant_name}</h2>
+                                <span className="px-4 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] shadow-inner backdrop-blur-md">Node 0x{enquiry.id.substring(0,6).toUpperCase()}</span>
                             </div>
+                            <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] flex items-center gap-3">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                Domain Sync Active • Grade {enquiry.grade} Context
+                            </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                         {successMessage && (
-                             <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest animate-in slide-in-from-top-4">
-                                 {successMessage}
-                             </div>
-                         )}
-                         <div className="hidden md:flex items-center gap-3 px-6 py-2 rounded-full bg-white/5 border border-white/10">
-                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                             <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Uplink Stable</span>
-                         </div>
-                         <button onClick={onClose} className="p-3 rounded-full bg-white/5 hover:bg-white/10 text-white/30 hover:text-white transition-all"><XIcon className="w-8 h-8"/></button>
-                    </div>
+                    <button onClick={onClose} className="p-4 rounded-[1.5rem] bg-white/5 text-white/20 hover:text-white hover:bg-white/10 transition-all transform active:scale-90 border border-white/5"><XIcon className="w-8 h-8"/></button>
                 </header>
                 
-                <div className="flex-grow flex flex-col lg:flex-row overflow-hidden relative">
-                    <div className="flex-1 flex flex-col bg-[#070708] relative">
-                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/graphy-dark.png')]"></div>
-                        <div className="flex-grow overflow-y-auto p-10 md:p-16 space-y-10 custom-scrollbar relative z-10 flex flex-col">
+                <div className="flex-grow flex-col lg:flex-row overflow-hidden relative">
+                    <div className="absolute inset-0 opacity-[0.02] pointer-events-none z-0" style={{ backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.2) 1px, transparent 0)`, backgroundSize: '40px 40px' }}></div>
+
+                    <div className="flex-1 flex flex-col bg-transparent relative z-10">
+                        <div className="flex-grow overflow-y-auto p-10 md:p-20 space-y-16 custom-scrollbar flex flex-col scroll-smooth">
                             {loading.timeline && timeline.length === 0 ? (
-                                <div className="flex-grow flex flex-col items-center justify-center gap-6">
+                                <div className="m-auto flex flex-col items-center gap-6">
                                     <Spinner size="lg" className="text-primary" />
-                                    <p className="text-[11px] font-black uppercase text-white/20 tracking-[0.5em] animate-pulse">Establishing Secure Context</p>
-                                </div>
-                            ) : timeline.length === 0 ? (
-                                <div className="flex-grow flex flex-col items-center justify-center opacity-20 text-center px-24">
-                                    <MegaphoneIcon className="w-24 h-24 mb-10 text-white/20" />
-                                    <h4 className="text-3xl font-serif font-black uppercase tracking-widest text-white leading-none">Payload Idle</h4>
-                                    <p className="text-xl font-serif italic mt-6 text-white/40 leading-relaxed">No communication signatures found.</p>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/20 animate-pulse">Recalling Conversation Ledger</p>
                                 </div>
                             ) : (
                                 <>
-                                    <div className="space-y-12">
+                                    {timeline.length === 0 && (
+                                        <div className="m-auto flex flex-col items-center text-center opacity-10 space-y-10">
+                                            <CommunicationIcon className="w-48 h-48" />
+                                            <p className="text-4xl font-serif italic text-white max-w-lg leading-relaxed">No encrypted messages exchanged on this channel.</p>
+                                        </div>
+                                    )}
+                                    <div className="space-y-16">
                                         {timeline.map((item, idx) => <TimelineEntry key={idx} item={item} />)}
+                                        <div ref={commsEndRef} className="h-4" />
                                     </div>
-                                    <div ref={commsEndRef} className="h-1" />
                                 </>
                             )}
                         </div>
                         
-                        <div className="p-8 border-t border-white/5 bg-[#0a0a0c]/90 backdrop-blur-3xl relative z-20 shadow-2xl">
-                            <form onSubmit={handleSendMessage} className="flex gap-6 items-end max-w-4xl mx-auto group">
+                        <div className="p-10 md:p-14 border-t border-white/5 bg-[#0a0a0c]/98 backdrop-blur-3xl">
+                            <form onSubmit={handleSendMessage} className="flex gap-8 items-end max-w-5xl mx-auto group">
                                 <div className="flex-grow relative">
                                     <textarea 
                                         value={newMessage} 
                                         onChange={(e) => setNewMessage(e.target.value)} 
-                                        onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) handleSendMessage(e); }}
-                                        placeholder="Type message to parent..." 
-                                        className="w-full p-6 pr-16 rounded-3xl bg-white/[0.02] border border-white/10 text-white text-base focus:border-primary/50 focus:bg-white/[0.04] outline-none resize-none shadow-inner italic font-serif h-18 transition-all"
+                                        placeholder="TYPE PAYLOAD TO PARENT NODE..." 
+                                        className="w-full p-8 md:p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/10 text-white placeholder:text-white/5 outline-none resize-none font-serif text-xl md:text-2xl shadow-inner focus:bg-white/[0.04] focus:border-primary/40 transition-all duration-500 custom-scrollbar"
                                         rows={1}
+                                        onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
                                     />
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity">
-                                        <SparklesIcon className="w-5 h-5 text-primary animate-pulse" />
+                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity duration-700 pointer-events-none">
+                                        <span className="text-[9px] font-black text-primary/40 uppercase tracking-[0.4em]">Secure Uplink Terminal</span>
                                     </div>
                                 </div>
-                                <button type="submit" disabled={loading.sending || !newMessage.trim()} className="w-18 h-18 aspect-square bg-primary text-white rounded-[1.8rem] hover:bg-primary/90 transition-all flex items-center justify-center shadow-2xl shadow-primary/30 transform active:scale-90 disabled:opacity-20 disabled:grayscale group/send">
-                                    {loading.sending ? <Spinner size="md" className="text-white"/> : <LocalSendIcon className="w-8 h-8 group-hover/send:translate-x-1 group-hover/send:-translate-y-1 transition-transform" />}
+                                <button 
+                                    type="submit" 
+                                    disabled={!newMessage.trim()}
+                                    className="w-24 h-24 md:w-32 md:h-32 bg-primary text-white rounded-[3rem] md:rounded-[4rem] flex items-center justify-center shadow-[0_32px_64px_-12px_rgba(var(--primary),0.5)] transform active:scale-90 transition-all duration-500 disabled:opacity-5 disabled:grayscale"
+                                >
+                                    <LocalSendIcon className="w-10 h-10 md:w-14 md:h-14" />
                                 </button>
                             </form>
                         </div>
                     </div>
 
-                    <div className="w-full lg:w-[460px] bg-[#0c0d12] border-l border-white/10 flex flex-col h-full overflow-y-auto custom-scrollbar relative z-30 shadow-[-40px_0_80px_rgba(0,0,0,0.6)]">
-                        <div className="p-12 space-y-14 flex-grow">
-                            <section>
-                                <h3 className="text-[10px] font-black uppercase text-white/40 tracking-[0.4em] mb-8 flex items-center gap-3">
-                                    <ClockIcon className="w-5 h-5 text-primary opacity-60"/> Lead Stage
-                                </h3>
-                                <div className="bg-black/40 rounded-[2.5rem] p-6 border border-white/5 shadow-inner ring-1 ring-white/5">
-                                    <WorkflowStepper currentStatus={formData.status as EnquiryStatus} onChange={s => setFormData(prev => ({...prev, status: s}))} />
-                                </div>
-                            </section>
-
-                            <section className="space-y-6">
-                                <h3 className="text-[10px] font-black uppercase text-white/40 tracking-[0.4em] flex items-center gap-3">
-                                    <ClipboardListIcon className="w-5 h-5 text-amber-500 opacity-60"/> Notes
-                                </h3>
-                                <textarea 
-                                    value={formData.notes} 
-                                    onChange={e => setFormData({...formData, notes: e.target.value})}
-                                    placeholder="Internal notes..."
-                                    className="w-full h-48 p-8 rounded-[2.5rem] bg-amber-500/[0.02] border border-amber-500/10 text-sm italic font-serif leading-loose text-white/80 outline-none focus:border-amber-500/30 transition-all shadow-inner focus:bg-amber-500/[0.05]"
-                                />
-                            </section>
-
-                            <section className="space-y-10">
-                                <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-                                    <UsersIcon className="w-5 h-5 text-indigo-400 opacity-60" />
-                                    <h3 className="text-[10px] font-black uppercase text-white/60 tracking-[0.4em]">Nominal Data</h3>
-                                </div>
-                                <div className="space-y-8">
-                                    <div className="group">
-                                        <label className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em] block mb-3 ml-2 group-focus-within:text-primary transition-colors">Applicant Nominal</label>
-                                        <input value={formData.applicant_name} onChange={e => setFormData({...formData, applicant_name: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-white/[0.02] border border-white/5 text-base font-serif font-bold text-white focus:border-primary/50 outline-none transition-all shadow-inner"/>
-                                    </div>
-                                    <div className="opacity-60 group relative cursor-not-allowed">
-                                        <div className="absolute inset-0 z-10"></div>
-                                        <label className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em] block mb-3 ml-2">Arbiter Contact</label>
-                                        <div className="w-full px-6 py-4 rounded-2xl bg-white/[0.01] border border-white/5 text-sm text-white/40 flex items-center gap-4 shadow-inner">
-                                            <PhoneIcon className="w-5 h-5 opacity-30"/> 
-                                            <span className="font-mono tracking-widest">{enquiry.parent_phone}</span>
+                    <div className="w-full lg:w-[480px] bg-[#0c0d12]/90 backdrop-blur-3xl border-l border-white/10 p-12 md:p-16 space-y-16 overflow-y-auto custom-scrollbar relative z-20">
+                        <section className="space-y-10">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Lifecycle Management</h3>
+                                <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] animate-pulse"></div>
+                            </div>
+                            <div className="space-y-4">
+                                {ORDERED_STATUSES.map(s => (
+                                    <button 
+                                        key={s} 
+                                        onClick={() => handleSaveStatus(s)}
+                                        disabled={loading.saving || enquiry.status === 'CONVERTED'}
+                                        className={`w-full flex items-center justify-between p-6 rounded-[2rem] border transition-all duration-700 group/btn relative overflow-hidden ${enquiry.status === s ? 'bg-primary/10 border-primary text-white shadow-2xl' : 'bg-black/20 border-white/5 text-white/30 hover:bg-white/5 hover:border-white/20'}`}
+                                    >
+                                        <div className="flex items-center gap-5 relative z-10">
+                                            <div className={`p-3 rounded-xl transition-all duration-700 ${enquiry.status === s ? 'bg-primary text-white shadow-lg rotate-3' : 'bg-white/5 text-white/20 group-hover/btn:scale-110'}`}>
+                                                {STATUS_CONFIG[s]?.icon}
+                                            </div>
+                                            <span className={`text-sm font-black uppercase tracking-[0.2em] transition-colors duration-700 ${enquiry.status === s ? 'text-primary' : 'group-hover/btn:text-white'}`}>
+                                                {STATUS_CONFIG[s]?.label}
+                                            </span>
                                         </div>
+                                        {enquiry.status === s && <CheckCircleIcon className="w-5 h-5 text-primary animate-in zoom-in duration-500 relative z-10" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="space-y-10">
+                             <div className="flex items-center justify-between">
+                                <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Identity Intel</h3>
+                                <button 
+                                    onClick={handleAIGenerateSummary} 
+                                    disabled={loading.ai}
+                                    className="p-3 rounded-2xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-90"
+                                    title="AI Summarize Conversation"
+                                >
+                                    {loading.ai ? <Spinner size="sm" /> : <SparklesIcon className="w-5 h-5" />}
+                                </button>
+                             </div>
+                             
+                             {aiSummary ? (
+                                <div className="bg-primary/5 border border-primary/20 p-8 rounded-[2.5rem] relative group overflow-hidden animate-in fade-in slide-in-from-right-8 duration-1000">
+                                     <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:opacity-40 transition-opacity"></div>
+                                     <p className="text-[9px] font-black uppercase tracking-[0.4em] text-primary mb-4 flex items-center gap-2">
+                                         <SparklesIcon className="w-3.5 h-3.5" /> AI Synthesis
+                                     </p>
+                                     <p className="text-sm font-serif italic text-white/70 leading-loose">"{aiSummary}"</p>
+                                     <button onClick={() => setAiSummary(null)} className="mt-6 text-[9px] font-black uppercase tracking-[0.2em] text-white/20 hover:text-white transition-colors">Clear Insight</button>
+                                </div>
+                             ) : (
+                                <div className="space-y-5">
+                                    <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
+                                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Parent Contact</span>
+                                        <p className="text-base text-white/80 font-medium font-serif italic">{enquiry.parent_email}</p>
+                                    </div>
+                                    <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
+                                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Institutional Grade</span>
+                                        <p className="text-base text-white/80 font-black font-serif italic tracking-wider">GRADE {enquiry.grade}</p>
                                     </div>
                                 </div>
+                             )}
+                        </section>
+
+                        {enquiry.status !== 'CONVERTED' && (
+                            <section className="pt-10 border-t border-white/5 space-y-8">
+                                <button 
+                                    onClick={handleConvert}
+                                    disabled={loading.converting || enquiry.status === 'ENQUIRY_ACTIVE'}
+                                    className={`w-full py-7 md:py-8 rounded-[2.8rem] flex items-center justify-center gap-6 font-black text-xs uppercase tracking-[0.5em] transition-all duration-700 shadow-2xl active:scale-95 ${enquiry.status !== 'ENQUIRY_ACTIVE' ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-500/20' : 'bg-white/5 text-white/5 cursor-not-allowed border border-white/5 grayscale'}`}
+                                >
+                                    {loading.converting ? <Spinner size="sm" className="text-white"/> : <><GraduationCapIcon className="w-7 h-7 opacity-60" /> PROMOTE TO ADMISSION</>}
+                                </button>
+                                {enquiry.status === 'ENQUIRY_ACTIVE' && <p className="text-[9px] text-amber-500/60 font-black uppercase tracking-[0.2em] text-center leading-relaxed">Identity verification protocol required <br/> prior to Promotion.</p>}
                             </section>
-                        </div>
-                        
-                        <div className="p-10 border-t border-white/5 bg-[#09090b]/98 backdrop-blur-3xl sticky bottom-0 z-50 flex gap-5 shadow-[0_-20px_40px_rgba(0,0,0,0.6)]">
-                            <button onClick={() => handleSave(false)} disabled={loading.saving} className="flex-1 py-5 bg-white/5 hover:bg-white/10 text-white/70 font-black rounded-[1.8rem] text-[11px] uppercase tracking-[0.3em] transition-all border border-white/5 active:scale-95 disabled:opacity-30">
-                                {loading.saving ? <Spinner size="sm"/> : 'Update Data'}
-                            </button>
-                            <button onClick={() => handleSave(true)} disabled={loading.saving} className="flex-1 py-5 bg-primary text-white font-black rounded-[1.8rem] text-[11px] uppercase tracking-[0.3em] shadow-[0_12px_40px_rgba(var(--primary),0.3)] hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-3 group/finalize">
-                                {loading.saving ? <Spinner size="sm" className="text-white"/> : <><GraduationCapIcon className="w-5 h-5 group-hover/finalize:rotate-6 transition-transform" /> Apply Updates</>}
-                            </button>
+                        )}
+
+                        <div className="mt-auto opacity-5 hover:opacity-100 transition-opacity duration-1000">
+                            <p className="text-[8px] font-mono text-white break-all text-center">HASH: {btoa(enquiry.id).substring(0, 32)}</p>
                         </div>
                     </div>
                 </div>

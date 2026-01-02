@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import Spinner from './common/Spinner';
@@ -19,7 +18,8 @@ import { XCircleIcon } from './icons/XCircleIcon';
 interface AddTeacherModalProps {
     onClose: () => void;
     onSuccess: () => void;
-    branchId?: number | null;
+    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
+    branchId?: string | null;
 }
 
 const STEPS = ['Basic Info', 'Photo', 'Role & Dept', 'Academics', 'Documents', 'Review'];
@@ -166,7 +166,7 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
     const handleBack = () => setCurrentStep(prev => Math.max(prev - 1, 0));
 
     // Render Steps
-    // Fix: Rename renderStep to renderStepContent to match usage on line 392
+    // FIX: Renamed renderStepContent to ensure unique names and clarity.
     const renderStepContent = () => {
         switch (currentStep) {
             case 0: // Basic Info
@@ -273,10 +273,17 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                                 <div className={`p-3 rounded-lg ${resumeFile ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'}`}>
                                     {resumeFile ? <CheckCircleIcon className="w-6 h-6"/> : <FilePlusIcon className="w-6 h-6"/>}
                                 </div>
-                                <div>
-                                    <p className="font-bold text-foreground">Resume / CV</p>
-                                    <p className="text-xs text-muted-foreground">{resumeFile ? resumeFile.name : 'PDF or DOCX (Max 5MB)'}</p>
-                                </div>
+                                {resumeFile ? (
+                                    <div>
+                                        <p className="font-bold text-foreground">Resume / CV</p>
+                                        <p className="text-xs text-muted-foreground">{resumeFile.name}</p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="font-bold text-foreground">Resume / CV</p>
+                                        <p className="text-xs text-muted-foreground">PDF or DOCX (Max 5MB)</p>
+                                    </div>
+                                )}
                             </div>
                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setResumeFile(e.target.files[0])} />
                         </div>
@@ -286,10 +293,17 @@ const AddTeacherModal: React.FC<AddTeacherModalProps> = ({ onClose, onSuccess, b
                                 <div className={`p-3 rounded-lg ${idProofFile ? 'bg-green-100 text-green-600' : 'bg-primary/10 text-primary'}`}>
                                     {idProofFile ? <CheckCircleIcon className="w-6 h-6"/> : <FilePlusIcon className="w-6 h-6"/>}
                                 </div>
-                                <div>
-                                    <p className="font-bold text-foreground">ID Proof</p>
-                                    <p className="text-xs text-muted-foreground">{idProofFile ? idProofFile.name : 'Passport, Driving License, etc.'}</p>
-                                </div>
+                                {idProofFile ? (
+                                    <div>
+                                        <p className="font-bold text-foreground">ID Proof</p>
+                                        <p className="text-xs text-muted-foreground">{idProofFile.name}</p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="font-bold text-foreground">ID Proof</p>
+                                        <p className="text-xs text-muted-foreground">Passport, Driving License, etc.</p>
+                                    </div>
+                                )}
                             </div>
                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setIdProofFile(e.target.files[0])} />
                         </div>

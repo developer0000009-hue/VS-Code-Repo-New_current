@@ -12,8 +12,8 @@ interface HeaderProps {
     activeComponent: string;
     setActiveComponent: (component: string) => void;
     branches?: SchoolBranch[];
-    currentBranchId?: number | null;
-    onSwitchBranch?: (id: number) => void;
+    currentBranchId?: string | null;
+    onSwitchBranch?: (id: string) => void;
     schoolName?: string;
     isBranchAdmin?: boolean;
 }
@@ -54,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({
                                     <>
                                         <select
                                             value={currentBranchId || ''}
-                                            onChange={(e) => onSwitchBranch(parseInt(e.target.value))}
+                                            onChange={(e) => onSwitchBranch(e.target.value)}
                                             className="appearance-none bg-transparent pl-3 pr-8 py-2 text-sm font-semibold text-foreground focus:outline-none cursor-pointer hover:text-primary transition-colors"
                                         >
                                             {branches.map(b => (

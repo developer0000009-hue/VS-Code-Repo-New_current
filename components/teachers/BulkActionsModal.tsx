@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { SchoolBranch, BulkImportResult } from '../../types';
@@ -24,7 +23,8 @@ interface BulkActionsModalProps {
     selectedIds: string[]; // Teacher IDs
     onClose: () => void;
     onSuccess: () => void;
-    branchId: number | null;
+    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
+    branchId: string | null;
 }
 
 // Standard validation for early feedback

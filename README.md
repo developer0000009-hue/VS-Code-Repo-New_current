@@ -14,7 +14,7 @@ This is the stable, production-ready version of the School Management System, re
 ## 🌟 Key Features
 
 *   **Multi-Role Architecture**: Dedicated portals for Super Admins, School Admins, Teachers, Students, Parents, and Staff.
-*   **Admissions & Enquiries**: Full workflow from public enquiry to student enrollment with document verification.
+*   **Admissions & Enquires**: Full workflow from public enquiry to student enrollment with document verification.
 *   **Parent Portal (Enhanced)**: 
     *   **Ultra Document Module**: Drag-and-drop, status tracking, and intuitive UI.
     *   **Child Management**: Seamless switching between student profiles.

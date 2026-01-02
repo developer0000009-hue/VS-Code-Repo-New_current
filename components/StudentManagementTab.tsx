@@ -19,12 +19,13 @@ import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { UserPlusIcon } from './icons/UserPlusIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
-import StudentProfileModal from './students/StudentProfileModal';
+// Fix: Import StudentDetailModal as a replacement for the missing/truncated StudentProfileModal default export
+import StudentProfileModal from './StudentDetailModal';
 import BulkStudentActionsModal, { BulkStudentActionType } from './students/BulkStudentActionsModal';
 import PremiumAvatar from './common/PremiumAvatar';
 
 interface StudentManagementTabProps {
-    branchId?: number | null;
+    branchId?: string | null;
 }
 
 const KPICard: React.FC<{ 
@@ -180,18 +181,6 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
         window.addEventListener('hashchange', handleHashChange);
         handleHashChange(); // Run once on mount
         return () => window.removeEventListener('hashchange', handleHashChange);
-    }, []);
-
-    // Auto-refresh when coming from admissions (enrollment completed)
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
-        const fromAdmission = params.get('from_admission');
-        if (fromAdmission === 'true') {
-            // Clear the param and refresh
-            const newHash = window.location.hash.replace('?from_admission=true', '').replace('&from_admission=true', '');
-            window.location.hash = newHash;
-            setRefreshKey(Date.now());
-        }
     }, []);
 
     useEffect(() => { 

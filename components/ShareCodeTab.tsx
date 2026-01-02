@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { ShareCode, ShareCodeStatus, AdmissionApplication, ShareCodeType } from '../types';
@@ -20,8 +19,8 @@ const ShareIcon: React.FC<{className?: string}> = ({className = "h-5 w-5"}) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
     </svg>
 );
-const RefreshIcon: React.FC<{ className?: string }> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+const RefreshIcon: React.FC<React.SVGProps<SVGSVGElement> & { onClick?: () => void }> = (props) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.18-3.185m-3.181 9.348a8.25 8.25 0 00-11.664 0l-3.18 3.185m3.181-9.348l-3.18-3.183a8.25 8.25 0 00-11.664 0l-3.18 3.185" />
     </svg>
 );
@@ -75,7 +74,7 @@ export default function ShareCodesTab() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleGenerateCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +107,8 @@ export default function ShareCodesTab() {
     }
   };
   
-  const handleRevokeCode = async (id: number) => {
+  // FIX: Parameter id should be string to match UUID format in types.ts
+  const handleRevokeCode = async (id: string) => {
     if (window.confirm('Are you sure you want to revoke this code?')) {
         const { error } = await supabase.rpc('revoke_my_share_code', { p_code_id: id });
         if (error) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { TeacherExtended, UserProfile, SchoolClass, Course, SchoolDepartment } from '../../types';
@@ -30,10 +29,11 @@ const OffboardingModal: React.FC<OffboardingModalProps> = ({ teacher, onClose, o
     const [colleagues, setColleagues] = useState<UserProfile[]>([]);
     
     // Reassignment State
+    // Fix: Key type for Record must be string to match UUID IDs
     const [reassignments, setReassignments] = useState<{
-        hod: Record<number, string>; // deptId -> newTeacherId
-        classTeacher: Record<number, string>; // classId -> newTeacherId
-        courses: Record<number, string>; // courseId -> newTeacherId
+        hod: Record<string, string>; // deptId -> newTeacherId
+        classTeacher: Record<string, string>; // classId -> newTeacherId
+        courses: Record<string, string>; // courseId -> newTeacherId
     }>({ hod: {}, classTeacher: {}, courses: {} });
 
     // 1. Analyze Impact & Fetch Colleagues
@@ -66,9 +66,10 @@ const OffboardingModal: React.FC<OffboardingModalProps> = ({ teacher, onClose, o
             }
         };
         analyze();
-    }, [teacher.id]);
+    }, [teacher.id, onClose]);
 
-    const handleReassignChange = (type: 'hod' | 'classTeacher' | 'courses', id: number, value: string) => {
+    // Fix: id parameter must be string to match UUID format
+    const handleReassignChange = (type: 'hod' | 'classTeacher' | 'courses', id: string, value: string) => {
         setReassignments(prev => ({
             ...prev,
             [type]: { ...prev[type], [id]: value }
@@ -83,12 +84,14 @@ const OffboardingModal: React.FC<OffboardingModalProps> = ({ teacher, onClose, o
             // 1. Reassign Departments
             for (const dept of impact.hodOf) {
                 const newHead = reassignments.hod[dept.id];
+                // Fix: dept.id is already string, used as UUID
                 updates.push(supabase.from('school_departments').update({ hod_id: newHead || null }).eq('id', dept.id));
             }
 
             // 2. Reassign Classes
             for (const cls of impact.classTeacherOf) {
                 const newTeacher = reassignments.classTeacher[cls.id];
+                // Fix: cls.id is already string, used as UUID
                 updates.push(supabase.from('school_classes').update({ class_teacher_id: newTeacher || null }).eq('id', cls.id));
             }
 
@@ -96,6 +99,7 @@ const OffboardingModal: React.FC<OffboardingModalProps> = ({ teacher, onClose, o
             for (const course of impact.courses) {
                 const newTeacher = reassignments.courses[course.id];
                 const status = newTeacher ? 'Active' : 'Pending'; // Mark pending if unassigned
+                // Fix: course.id is already string, used as UUID
                 updates.push(supabase.from('courses').update({ teacher_id: newTeacher || null, status }).eq('id', course.id));
             }
 
@@ -120,7 +124,7 @@ const OffboardingModal: React.FC<OffboardingModalProps> = ({ teacher, onClose, o
     const hasResponsibilities = impact.hodOf.length > 0 || impact.classTeacherOf.length > 0 || impact.courses.length > 0;
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden max-h-[90vh]">
                 
                 {/* Header */}
@@ -250,7 +254,7 @@ const OffboardingModal: React.FC<OffboardingModalProps> = ({ teacher, onClose, o
                                 </div>
                             )}
 
-                             <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm mt-4 dark:bg-red-900/20 dark:border-red-900 dark:text-red-300">
+                             <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm mt-4 dark:bg-red-900/20 dark:text-red-300">
                                 <p className="font-bold mb-1">Final Confirmation:</p>
                                 <p>This action will mark the teacher as <strong>Resigned</strong> and disable their portal access immediately. This cannot be undone easily.</p>
                             </div>

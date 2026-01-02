@@ -18,7 +18,8 @@ export type BulkClassActionType = 'create_classes' | 'assign_teachers' | 'map_su
 interface BulkClassOperationsModalProps {
     onClose: () => void;
     onSuccess: () => void;
-    branchId?: number | null;
+    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
+    branchId?: string | null;
     academicYear: string;
 }
 
@@ -131,8 +132,10 @@ const BulkClassOperationsModal: React.FC<BulkClassOperationsModalProps> = ({ onC
         const a = document.createElement('a');
         a.href = url;
         a.download = `${action}_template.csv`;
+        // Fix: Use correct variable name 'a' instead of undefined 'link'
         document.body.appendChild(a);
         a.click();
+        // Fix: Use correct variable name 'a' instead of undefined 'link'
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };

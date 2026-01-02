@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, formatError } from '../services/supabase';
 import { 
     FinanceData, FeeStructure, 
     StudentFeeSummary, UserProfile 
@@ -100,7 +99,7 @@ const FinanceStatCard: React.FC<{
     </div>
 );
 
-const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> = ({ profile, branchId }) => {
+const FinanceTab: React.FC<{ profile: UserProfile, branchId?: string | null }> = ({ profile, branchId }) => {
     const [activeView, setActiveView] = useState<'overview' | 'accounts' | 'structures' | 'expenses'>('overview');
     
     // Data State
@@ -125,7 +124,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
             const [finRes, structRes, ledgerRes] = await Promise.all([
                 supabase.rpc('get_finance_dashboard_data', { p_branch_id: branchId || null }),
                 supabase.from('fee_structures').select('*, components:fee_components(*)').order('created_at', { ascending: false }),
-                supabase.rpc('get_student_fee_dashboard') // Assuming this RPC exists based on FinanceReports usage
+                supabase.rpc('get_student_fee_dashboard') 
             ]);
 
             if (finRes.error) console.warn("Dashboard metrics unavailable.", finRes.error);
@@ -136,7 +135,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
             setStudentLedgers(ledgerRes.data || []);
 
         } catch (err: any) {
-            setError(err.message || "Failed to synchronize institutional data.");
+            setError(formatError(err));
         } finally {
             setLoading(false);
         }
@@ -167,16 +166,18 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
 
     // --- Handlers ---
 
-    const handlePublishStructure = async (id: number) => {
+    // FIX: Parameter id should be string to match FeeStructure ID type
+    const handlePublishStructure = async (id: string) => {
         const { error } = await supabase.rpc('publish_fee_structure', { p_structure_id: id });
-        if (error) alert(error.message);
+        if (error) alert(formatError(error));
         else fetchAllData();
     };
 
-    const handleDeleteStructure = async (id: number) => {
+    // FIX: Parameter id should be string to match FeeStructure ID type
+    const handleDeleteStructure = async (id: string) => {
         if (!confirm("Delete this fee structure?")) return;
         const { error } = await supabase.from('fee_structures').delete().eq('id', id);
-        if (error) alert(error.message);
+        if (error) alert(formatError(error));
         else fetchAllData();
     };
 
@@ -222,6 +223,12 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
             {/* --- VIEW: OVERVIEW --- */}
             {activeView === 'overview' && financeData && (
                 <div className="space-y-8 animate-in fade-in duration-500">
+                    {error && (
+                        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center gap-3">
+                            <AlertTriangleIcon className="w-5 h-5"/>
+                            <span className="text-xs font-bold uppercase tracking-wider">{error}</span>
+                        </div>
+                    )}
                     {/* Top KPI Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <FinanceStatCard 
@@ -276,7 +283,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
                                 <CollectionDistributionChart 
                                     paid={financeData.revenue_ytd} 
                                     pending={financeData.pending_dues} 
-                                    overdue={financeData.pending_dues * 0.4} // Simulated overdue portion
+                                    overdue={financeData.pending_dues * 0.4} 
                                 />
                              </div>
                         </div>
@@ -432,7 +439,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
             {/* --- VIEW: EXPENSES --- */}
             {activeView === 'expenses' && financeData && (
                  <ExpenseDashboard data={{
-                     total_expenses_month: 0, // Mock or fetch real if available in financeData
+                     total_expenses_month: 0, 
                      pending_approvals: 0,
                      recent_expenses: []
                  }} onRefresh={fetchAllData} />
@@ -441,7 +448,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
             {/* --- VIEW: FEE MASTER (Structures) --- */}
             {activeView === 'structures' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                    <div className="bg-card border border-white/10 rounded-[2rem] p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
+                    <div className="bg-card border border-border rounded-[2rem] p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
                         <div className="flex bg-muted p-1 rounded-2xl shadow-inner border border-white/5">
                             {['All', 'Active', 'Draft'].map(f => (
                                 <button 
@@ -470,7 +477,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
                             {filteredStructures.map((fs) => (
-                                <div key={fs.id} className="bg-card border border-white/10 rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all group flex flex-col h-full hover:-translate-y-1">
+                                <div key={fs.id} className="bg-card border border-border rounded-[2rem] p-6 shadow-sm hover:shadow-xl transition-all group flex flex-col h-full hover:-translate-y-1">
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <h4 className="text-lg font-black text-foreground group-hover:text-primary transition-colors tracking-tight truncate max-w-[200px]">{fs.name}</h4>
@@ -509,7 +516,7 @@ const FinanceTab: React.FC<{ profile: UserProfile, branchId?: number | null }> =
             {isWizardOpen && (
                 <FeeMasterWizard 
                     onClose={() => setIsWizardOpen(false)} 
-                    branchId={branchId || null}
+                    branchId={branchId ? parseInt(branchId) : null}
                     onSuccess={() => {
                         setIsWizardOpen(false);
                         fetchAllData();

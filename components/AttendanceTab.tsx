@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, formatError } from '../services/supabase';
 import { SchoolClass, StudentRosterItem, AttendanceRecord, AttendanceStatus, FunctionComponentWithIcon } from '../types';
 import Spinner from './common/Spinner';
 import { SearchIcon } from './icons/SearchIcon';
@@ -130,7 +129,7 @@ const KPICard: React.FC<{ title: string; value: number | string; total?: number;
                     </div>
                 )}
             </div>
-            <div className={`p-3.5 rounded-xl ${color} bg-opacity-10 shadow-sm ring-1 ring-inset ring-black/5 dark:ring-white/5`}>
+            <div className={`p-3.5 rounded-xl ${color} bg-opacity-10 shadow-sm ring-1 ring-inset ring-black/5 dark:ring-white/5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
                 {icon}
             </div>
         </div>
@@ -415,8 +414,8 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
             setLoading(prev => ({ ...prev, data: true }));
             
             const [rosterRes, attendanceRes] = await Promise.all([
-                supabase.rpc('get_class_roster_for_admin', { p_class_id: parseInt(selectedClassId) }),
-                supabase.rpc('get_attendance_for_admin', { p_class_id: parseInt(selectedClassId), p_attendance_date: selectedDate })
+                supabase.rpc('get_class_roster_for_admin', { p_class_id: selectedClassId }),
+                supabase.rpc('get_attendance_for_admin', { p_class_id: selectedClassId, p_attendance_date: selectedDate })
             ]);
             
             const students = rosterRes.data || [];
@@ -540,11 +539,11 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
         };
         
         const records = Object.values(localAttendance) as ExtendedAttendanceRecord[];
-        records.forEach(rec => {
-            if (rec.status && Object.prototype.hasOwnProperty.call(counts, rec.status)) {
-                counts[rec.status as keyof typeof counts]++;
-            }
-        });
+        counts.Present = records.filter(r => r.status === 'Present').length;
+        counts.Absent = records.filter(r => r.status === 'Absent').length;
+        counts.Late = records.filter(r => r.status === 'Late').length;
+        counts.Excused = records.filter(r => r.status === 'Excused').length;
+        counts['Half-Day'] = records.filter(r => r.status === 'Half-Day').length;
         
         counts.Pending = total - (counts.Present + counts.Absent + counts.Late + counts.Excused + counts['Half-Day']);
         const attendanceRate = total > 0 ? Math.round(((counts.Present + counts.Late) / total) * 100) : 0;
@@ -647,7 +646,7 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
         setLoading(prev => ({ ...prev, saving: true }));
         const recordsData = Object.values(localAttendance) as ExtendedAttendanceRecord[];
         const records = recordsData.filter(r => r.status).map(r => ({
-            class_id: parseInt(selectedClassId),
+            class_id: selectedClassId,
             student_id: r.student_id,
             attendance_date: selectedDate,
             status: r.status === 'Half-Day' || r.status === 'Excused' ? 'Present' : r.status,
@@ -687,7 +686,8 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
                 details: `Updated ${records.length} records.${notificationCount > 0 ? ` Sent ${notificationCount} alerts.` : ''}`
             }, ...prev]);
         } else {
-            alert('Save failed: ' + error.message);
+            // FIX: Use formatError to prevent [object Object] in logs/telemetry
+            alert('Save failed: ' + formatError(error));
         }
         setLoading(prev => ({ ...prev, saving: false }));
     };
@@ -889,7 +889,7 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
     }
 
     const renderMarkingInterface = () => {
-        const currentClassName = classes.find(c => c.id.toString() === selectedClassId)?.name || 'Class';
+        const currentClassName = classes.find(c => c.id === selectedClassId)?.name || 'Class';
 
         return (
         <>

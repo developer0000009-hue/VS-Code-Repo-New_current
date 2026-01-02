@@ -20,7 +20,8 @@ import CustomSelect from '../common/CustomSelect';
 interface CreateClassWizardProps {
     onClose: () => void;
     onSuccess: () => void;
-    branchId?: number | null;
+    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
+    branchId?: string | null;
 }
 
 const STEPS = ['Basic Details', 'Faculty', 'Capacity', 'Subjects', 'Review'];
@@ -128,7 +129,8 @@ const CreateClassWizard: React.FC<CreateClassWizardProps> = ({ onClose, onSucces
             if (formData.subjects.length > 0) {
                 const { error: mapError } = await supabase.rpc('map_class_subjects', {
                     p_class_id: newClass.id,
-                    p_subject_ids: formData.subjects.map(s => parseInt(s))
+                    // FIX: Ensure subject IDs are handled as strings to match course ID type.
+                    p_subject_ids: formData.subjects
                 });
                 if (mapError) throw mapError;
             }

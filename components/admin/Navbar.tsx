@@ -19,8 +19,8 @@ interface NavbarProps {
     onSelectRole: (role: Role, isExisting?: boolean) => void;
     onSignOut: () => void;
     branches: SchoolBranch[];
-    currentBranchId: number | null;
-    onSwitchBranch: (id: number) => void;
+    currentBranchId: string | null;
+    onSwitchBranch: (id: string) => void;
     menuGroups: MenuGroup[];
 }
 
@@ -56,7 +56,7 @@ const Navbar: React.FC<NavbarProps> = ({
                             </div>
                             <select
                                 value={currentBranchId || ''}
-                                onChange={(e) => onSwitchBranch(parseInt(e.target.value))}
+                                onChange={(e) => onSwitchBranch(e.target.value)}
                                 className="appearance-none bg-transparent py-1 text-xs md:text-sm font-black text-foreground focus:outline-none cursor-pointer hover:text-primary transition-colors truncate"
                             >
                                 {branches.map(b => (

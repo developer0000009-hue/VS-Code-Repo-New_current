@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, formatError } from '../services/supabase';
 import { TeacherExtended, UserProfile } from '../types';
 import Spinner from './common/Spinner';
 import { TeacherIcon } from './icons/TeacherIcon';
@@ -73,7 +72,8 @@ const getRandomStatus = () => {
 
 interface TeachersManagementTabProps {
     profile: UserProfile;
-    branchId: number | null;
+    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
+    branchId: string | null;
 }
 
 const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, branchId }) => {
@@ -341,7 +341,7 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                             </div>
                         )}
                         <div className="p-4 border-t border-border bg-muted/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-medium text-muted-foreground">
-                            <div className="flex items-center gap-2"><span>Rows:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-background border border-input rounded px-2 py-1"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><span className="ml-2">Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedTeachers.length)} of {sortedTeachers.length}</span></div>
+                            <div className="flex items-center gap-2"><span>Rows per page:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-background border border-input rounded px-2 py-1"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><span className="ml-2">Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedTeachers.length)} of {sortedTeachers.length}</span></div>
                             <div className="flex items-center gap-2"><button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 border border-transparent hover:border-border transition-all"><ChevronLeftIcon className="w-4 h-4"/></button><span className="mx-2 font-bold text-foreground">Page {currentPage} of {totalPages}</span><button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 border border-transparent hover:border-border transition-all"><ChevronRightIcon className="w-4 h-4"/></button></div>
                         </div>
                     </div>

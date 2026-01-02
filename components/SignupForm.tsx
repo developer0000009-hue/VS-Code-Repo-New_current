@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { supabase, formatError } from '../services/supabase'; 
 import Spinner from './common/Spinner';
@@ -27,7 +28,12 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSuccess, onSwitchToLogin }) =
             const { data, error: signUpError } = await supabase.auth.signUp({
                 email: formData.email,
                 password: formData.password,
-                options: { data: { display_name: formData.displayName } },
+                options: { 
+                    data: { 
+                        display_name: formData.displayName,
+                        role: null // Identity will be provisioned during onboarding
+                    } 
+                },
             });
             if (signUpError) throw signUpError;
             if (data.user) onSuccess(formData.email);

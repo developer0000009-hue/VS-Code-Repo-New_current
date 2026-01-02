@@ -16,7 +16,7 @@ import CoursesTab from './components/CoursesTab';
 import MeetingsTab from './components/MeetingsTab';
 import HomeworkTab from './components/HomeworkTab';
 import StudentManagementTab from './components/StudentManagementTab';
-import { supabase } from './services/supabase';
+import { supabase, formatError } from './services/supabase';
 import TimetableTab from './components/TimetableTab';
 import CodeVerificationTab from './components/CodeVerificationTab';
 import { BranchManagementTab } from './components/BranchManagementTab';
@@ -40,7 +40,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     
     const [branches, setBranches] = useState<SchoolBranch[]>([]);
-    const [currentBranchId, setCurrentBranchId] = useState<number | null>(null);
+    const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);
     const [loadingData, setLoadingData] = useState(true);
     const [dataError, setDataError] = useState<string | null>(null);
 
@@ -55,14 +55,12 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
         return getAdminMenu(isHeadOfficeAdmin, profile.role);
     }, [isHeadOfficeAdmin, profile.role]);
 
-    // SYNC STATE WITH HASH: Enables deep linking and redirection from modals
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash.replace('#/', '');
             const decodedHash = decodeURIComponent(hash);
             
             if (decodedHash) {
-                // Flatten items to find match
                 const allItems = menuGroups.flatMap(g => g.items);
                 const matchedItem = allItems.find(item => item.id === decodedHash);
                 if (matchedItem) {
@@ -72,7 +70,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
         };
 
         window.addEventListener('hashchange', handleHashChange);
-        handleHashChange(); // Run on mount
+        handleHashChange(); 
         
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, [menuGroups]);
@@ -99,7 +97,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
                 const { data: identityMatch } = await supabase
                     .from('school_branches')
                     .select('*')
-                    .or(`admin_email.ilike.${profile.email},id.eq.${profileBranchId || -1}`)
+                    .or(`admin_email.ilike.${profile.email},id.eq.${profileBranchId || '00000000-0000-0000-0000-000000000000'}`)
                     .maybeSingle();
                 
                 if (identityMatch) {
@@ -115,7 +113,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
             
             setBranches(sortedBranches);
 
-            let targetId: number | null = null;
+            let targetId: string | null = null;
             if (isBranchAdmin) {
                 if (profileBranchId) {
                     targetId = profileBranchId;
@@ -138,7 +136,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
 
         } catch (e: any) {
             console.error("Institutional Context Sync Error:", e);
-            setDataError(e.message || "Failed to synchronize institutional context.");
+            setDataError(formatError(e));
         } finally {
             setLoadingData(false);
         }
@@ -159,6 +157,8 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
             fetchDashboardData();
         }
     };
+
+    const handleSwitchBranch = (id: string) => setCurrentBranchId(id);
 
     if (loadingData && branches.length === 0) {
         return (
@@ -188,10 +188,10 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
         switch (activeComponent) {
             case 'Dashboard': return <DashboardOverview schoolProfile={schoolData} currentBranch={currentBranch} profile={profile} onNavigate={setActiveComponent} />;
             case 'Profile': return <ProfileCreationPage profile={profile} role={profile.role!} onComplete={onProfileUpdate} onBack={() => setActiveComponent('Dashboard')} showBackButton={true} />;
-            case 'Branches': return <BranchManagementTab isHeadOfficeAdmin={isHeadOfficeAdmin} branches={branches} isLoading={loadingData} error={dataError} onBranchUpdate={handleBranchUpdate} onSelectBranch={setCurrentBranchId} schoolProfile={schoolData} />;
+            case 'Branches': return <BranchManagementTab isHeadOfficeAdmin={isHeadOfficeAdmin} branches={branches} isLoading={loadingData} error={dataError} onBranchUpdate={handleBranchUpdate} onSelectBranch={handleSwitchBranch} schoolProfile={schoolData} />;
             case 'Admissions': return <AdmissionsTab branchId={currentBranchId} />;
             case 'Enquiries': return <EnquiryTab branchId={currentBranchId} onNavigate={setActiveComponent} />;
-            case 'Code Verification': return <CodeVerificationTab branchId={currentBranchId} />;
+            case 'Code Verification': return <CodeVerificationTab branchId={currentBranchId} onNavigate={setActiveComponent} />;
             case 'Student Management': return <StudentManagementTab branchId={currentBranchId} />;
             case 'Teacher Management': return <TeachersManagementTab profile={profile} branchId={currentBranchId} />;
             case 'Classes': return <ClassesTab branchId={currentBranchId} />;
@@ -232,7 +232,7 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
                     onSignOut={onSignOut}
                     branches={branches}
                     currentBranchId={currentBranchId}
-                    onSwitchBranch={setCurrentBranchId}
+                    onSwitchBranch={handleSwitchBranch}
                     menuGroups={menuGroups}
                 />
                 

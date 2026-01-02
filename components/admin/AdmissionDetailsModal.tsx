@@ -31,7 +31,8 @@ const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({ admission
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [fetching, setFetching] = useState(true);
     const [activeView, setActiveView] = useState<'audit' | 'history'>('audit');
-    const [actioningId, setActioningId] = useState<number | null>(null);
+    // Fix: actioningId must be string | null to match UUID format.
+    const [actioningId, setActioningId] = useState<string | null>(null);
     const [finalizeState, setFinalizeState] = useState<'idle' | 'processing' | 'success'>('idle');
     const [provisionedData, setProvisionedData] = useState<{ student_id: string; student_id_number?: string } | null>(null);
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -75,7 +76,8 @@ const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({ admission
         return () => { isMounted.current = false; };
     }, [fetchRegistry]);
 
-    const handleVerify = async (reqId: number, status: 'Verified' | 'Rejected') => {
+    // Fix: reqId must be string to match UUID type.
+    const handleVerify = async (reqId: string, status: 'Verified' | 'Rejected') => {
         setActioningId(reqId);
         try {
             const { data: authData } = await supabase.auth.getUser();
@@ -160,17 +162,18 @@ const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({ admission
             });
             
             if (error) throw error;
-            if (data?.success === false) throw new Error(data.message || "Protocol rejection.");
+            
+            // Check for both success boolean or direct object presence
+            const isSuccess = data.success === true || (data.student_id && !data.error);
+            if (!isSuccess) throw new Error(data.message || "Protocol rejection.");
 
             if (isMounted.current) {
-                setProvisionedData({ student_id: data.student_id });
+                setProvisionedData({ 
+                    student_id: data.student_id,
+                    student_id_number: data.student_id_number
+                });
                 setFinalizeState('success');
                 onUpdate();
-
-                // Navigate to Student Management with refresh trigger
-                setTimeout(() => {
-                    window.location.hash = '#/Student Management?from_admission=true';
-                }, 2000);
             }
         } catch (err) { 
             alert("Enrollment Protocol Blocked: " + formatError(err)); 
@@ -218,8 +221,22 @@ const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({ admission
                              <div className="text-center space-y-3">
                                 <h2 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tighter uppercase leading-none">Protocol <span className="text-white/20 italic">Finalized.</span></h2>
                                 <p className="text-white/40 text-lg font-serif italic">Identity node integrated successfully.</p>
+                                {provisionedData?.student_id_number && (
+                                    <div className="mt-4 p-4 bg-white/5 border border-white/10 rounded-2xl">
+                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Generated Institutional ID</p>
+                                        <p className="text-2xl font-mono font-black text-primary tracking-widest">{provisionedData.student_id_number}</p>
+                                    </div>
+                                )}
                              </div>
-                             <button onClick={onClose} className="px-12 py-4 bg-white text-black font-black text-[10px] uppercase tracking-[0.5em] rounded-xl hover:bg-white/90 transition-all active:scale-95">Return to Console</button>
+                             <button 
+                                onClick={() => {
+                                    onUpdate();
+                                    onClose();
+                                }} 
+                                className="px-12 py-4 bg-white text-black font-black text-[10px] uppercase tracking-[0.5em] rounded-xl hover:bg-white/90 transition-all active:scale-95"
+                             >
+                                Return to Console
+                             </button>
                         </div>
                     ) : activeView === 'history' ? (
                         <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-right-12 duration-700">
@@ -311,6 +328,7 @@ const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({ admission
                                                                 </button>
                                                                 {!isVerified && (
                                                                     <div className="flex gap-2">
+                                                                        {/* Fix: req.id is correctly compared as a string here */}
                                                                         <button onClick={() => handleVerify(req.id, 'Verified')} disabled={actioningId === req.id} className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all">{actioningId === req.id ? <Spinner size="sm"/> : <CheckCircleIcon className="w-4 h-4"/>}</button>
                                                                         <button onClick={() => handleVerify(req.id, 'Rejected')} disabled={actioningId === req.id} className="p-3 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-red-500/20 border border-rose-500/20 transition-all">{actioningId === req.id ? <Spinner size="sm"/> : <XCircleIcon className="w-4 h-4"/>}</button>
                                                                     </div>
@@ -349,7 +367,7 @@ const AdmissionDetailsModal: React.FC<AdmissionDetailsModalProps> = ({ admission
                             className={`w-full md:w-auto px-12 h-16 rounded-[2rem] flex items-center justify-center gap-4 font-black text-[11px] uppercase tracking-[0.3em] transition-all duration-700 shadow-2xl ${isCleared ? 'bg-[#8B5CF6] text-white hover:bg-[#7C3AED] hover:scale-105 active:scale-95 shadow-[#8B5CF6]/30' : 'bg-white/5 text-white/5 cursor-not-allowed grayscale border border-white/5'}`}
                         >
                             <GraduationCapIcon className="w-6 h-6 opacity-60" />
-                            <span>FINALIZE ENROLLMENT</span>
+                            <span>{finalizeState === 'processing' ? 'PROCESSING IDENTITY...' : 'FINALIZE ENROLLMENT'}</span>
                         </button>
                     </footer>
                 )}

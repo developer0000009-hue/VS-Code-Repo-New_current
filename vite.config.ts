@@ -39,8 +39,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
-        // FIX: Using path.resolve() instead of __dirname as __dirname is not available in Node.js ESM environments.
-        '@': path.resolve(), 
+        // The '@' alias is not used by the browser's native module loader and is removed to avoid confusion.
       },
     },
     server: {

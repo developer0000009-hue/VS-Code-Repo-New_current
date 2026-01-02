@@ -38,7 +38,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ profile, onSwitchRo
         'My Classes': <MyClassesTab currentUserId={profile.id} />,
         'Attendance': <AttendanceTab />,
         'Lesson Planner': <LessonPlannerTab currentUserId={profile.id} />,
-        'Communication': <CommunicationTab profile={profile} />,
+        // FIX: The CommunicationTab component expects a 'currentUserId' prop, not a 'profile' object. Changed to pass profile.id for consistency and to resolve the type error.
+        'Communication': <CommunicationTab currentUserId={profile.id} />,
         'Performance': <PerformanceTab currentUserId={profile.id} />,
         'Professional Development': <ProfessionalDevelopmentTab currentUserId={profile.id} />,
         'My Profile': <ProfileCreationPage 

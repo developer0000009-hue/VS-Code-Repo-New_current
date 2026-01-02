@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { AdmissionApplication, AdmissionStatus } from '../types';
@@ -12,7 +11,6 @@ import { FilterIcon } from './icons/FilterIcon';
 import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import AdmissionDetailsModal from './admin/AdmissionDetailsModal';
-// Fix: Imported PremiumAvatar to resolve 'Cannot find name' error on line 295.
 import PremiumAvatar from './common/PremiumAvatar';
 
 const statusColors: Record<string, string> = {
@@ -64,7 +62,7 @@ export const RequestDocumentsModal: React.FC<{
         setStatus(null);
 
         try {
-            const { data, error } = await supabase.rpc('admin_request_documents', {
+            const { error } = await supabase.rpc('admin_request_documents', {
                 p_admission_id: admissionId,
                 p_documents: selectedDocs,
                 p_message: message
@@ -74,7 +72,6 @@ export const RequestDocumentsModal: React.FC<{
 
             setStatus({ type: 'success', message: 'Request Transmitted: Identity verification cycle initialized.' });
             
-            // Allow user to see success message before closing
             setTimeout(() => {
                 onSuccess();
                 onClose();
@@ -90,8 +87,6 @@ export const RequestDocumentsModal: React.FC<{
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[400] p-4" onClick={onClose}>
             <div className="bg-[#0c0d12] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-white/10 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 ring-1 ring-white/5" onClick={e => e.stopPropagation()}>
-                
-                {/* Compact Header */}
                 <div className="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-xl text-primary">
@@ -102,7 +97,7 @@ export const RequestDocumentsModal: React.FC<{
                             <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Verification Protocol</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
                         <XIcon className="w-5 h-5"/>
                     </button>
                 </div>
@@ -131,7 +126,7 @@ export const RequestDocumentsModal: React.FC<{
                                 return (
                                     <label 
                                         key={doc} 
-                                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group relative overflow-hidden ${isSelected ? 'bg-primary/10 border-primary ring-2 ring-primary/5' : 'bg-white/[0.02] border-white/5 hover:border-white/10'}`}
+                                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer group relative overflow-hidden ${isSelected ? 'bg-primary/10 border-primary ring-2 ring-primary/5' : 'bg-white/[0.02] border-white/10 hover:border-white/10'}`}
                                     >
                                         <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center shrink-0 ${isSelected ? 'bg-primary border-primary' : 'bg-black/20 border-white/10 group-hover:border-primary/40'}`}>
                                             {isSelected && <CheckCircleIcon className="w-3.5 h-3.5 text-white" />}
@@ -155,7 +150,6 @@ export const RequestDocumentsModal: React.FC<{
                     </div>
                 </div>
 
-                {/* Compact Footer */}
                 <div className="px-8 py-6 border-t border-white/5 bg-white/[0.01] flex flex-col sm:flex-row justify-end items-center gap-4">
                     <button 
                         onClick={onClose} 
@@ -176,7 +170,7 @@ export const RequestDocumentsModal: React.FC<{
     );
 };
 
-const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => {
+const AdmissionsTab: React.FC<{ branchId?: string | null }> = ({ branchId }) => {
     const [applicants, setApplicants] = useState<AdmissionApplication[]>([]);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -184,7 +178,7 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
     const [selectedAdmission, setSelectedAdmission] = useState<AdmissionApplication | null>(null);
     
     const fetchApplicants = useCallback(async () => {
-        if (!branchId) {
+        if (branchId === undefined) {
             setLoading(false);
             return;
         }
@@ -194,7 +188,9 @@ const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => 
             const { data, error } = await supabase.rpc('get_admissions', { p_branch_id: branchId });
             if (error) throw error;
             
-            const admissionOnlyRoster = (data || []).filter((a: any) => a.status !== 'Inquiry Active');
+            const admissionOnlyRoster = (data || []).filter((a: any) => 
+                !['Enquiry Active', 'ENQUIRY_ACTIVE', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(a.status)
+            );
             setApplicants(admissionOnlyRoster as AdmissionApplication[]);
         } catch (err) {
             console.error("Fetch failure:", err);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { TeacherExtended, TeacherDocument, SchoolClass, Course, TeacherSubjectMapping } from '../types';
 import { supabase } from '../services/supabase';
@@ -142,7 +141,8 @@ const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher, onClos
     const [processingAction, setProcessingAction] = useState(false);
     const [isOffboarding, setIsOffboarding] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-    const [confirmationAction, setConfirmationAction] = useState<{ type: 'reset_password' | 'toggle_active' | 'unmap_subject', title: string, message: string, targetId?: number } | null>(null);
+    // FIX: Changed targetId from number to string to match UUID format of TeacherSubjectMapping IDs.
+    const [confirmationAction, setConfirmationAction] = useState<{ type: 'reset_password' | 'toggle_active' | 'unmap_subject', title: string, message: string, targetId?: string } | null>(null);
 
     const [formData, setFormData] = useState({
         display_name: teacher.display_name,
@@ -283,6 +283,7 @@ const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher, onClos
                 if (error) throw error;
                 onUpdate();
             } else if (confirmationAction.type === 'unmap_subject' && confirmationAction.targetId) {
+                // FIX: Used string comparison for subject mapping ID.
                 const { error } = await supabase.from('class_subjects').update({ teacher_id: null }).eq('id', confirmationAction.targetId);
                 if (error) throw error;
                 fetchMappings();
@@ -482,7 +483,7 @@ const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher, onClos
                                         </div>
                                     ) : (
                                         mappings.map(map => (
-                                            <div key={map.id} className="flex items-center gap-5 p-6 bg-card border border-border rounded-3xl shadow-sm hover:shadow-xl hover:border-primary/30 transition-all group overflow-hidden relative">
+                                            <div key={map.id} className="flex items-center gap-5 p-6 bg-card border border-border rounded-3xl shadow-sm hover:shadow-xl hover:border-primary/50 transition-all group overflow-hidden relative">
                                                 <div className="absolute top-0 left-0 w-1.5 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex flex-col items-center justify-center font-black border border-indigo-500/20 shadow-inner group-hover:scale-105 transition-transform shrink-0">
                                                     <span className="text-[10px] uppercase opacity-60 font-bold leading-none mb-1">Grade</span>

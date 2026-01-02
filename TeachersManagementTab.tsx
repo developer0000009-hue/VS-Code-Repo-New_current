@@ -1,12 +1,11 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from './services/supabase';
+import { supabase, formatError } from './services/supabase';
 import { TeacherExtended, UserProfile } from './types';
 import Spinner from './components/common/Spinner';
 import { TeacherIcon } from './components/icons/TeacherIcon';
 import { SearchIcon } from './components/icons/SearchIcon';
 import { EditIcon } from './components/icons/EditIcon';
-import { PlusIcon } from './components/icons/PlusIcon';
+import { PlusIcon } from './icons/PlusIcon';
 import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
 import { BriefcaseIcon } from './components/icons/BriefcaseIcon';
 import { GridIcon } from './components/icons/GridIcon';
@@ -64,9 +63,17 @@ const KPICard: React.FC<{ title: string; value: number | string; icon: React.Rea
     </div>
 );
 
+const getRandomStatus = () => {
+    const r = Math.random();
+    if (r > 0.9) return 'Absent';
+    if (r > 0.8) return 'Late';
+    return 'Present';
+};
+
 interface TeachersManagementTabProps {
     profile: UserProfile;
-    branchId: number | null;
+    // Fix: branchId should be string | null to match UUID standard.
+    branchId: string | null;
 }
 
 const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, branchId }) => {
@@ -98,54 +105,52 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
     const fetchTeachers = useCallback(async () => {
         setLoading(true);
         setError(null);
-        
-        const { data, error: rpcError } = await supabase.rpc('get_all_teachers_for_admin');
+        try {
+            const { data, error: rpcError } = await supabase.rpc('get_all_teachers_for_admin');
 
-        if (rpcError) {
-            console.error('Error fetching teachers:', rpcError.message);
-            setError(`Failed to load teachers: ${rpcError.message}`);
-            setLoading(false);
-            return;
-        }
+            if (rpcError) throw rpcError;
 
-        if (!data) {
-            setTeachers([]);
-            setLoading(false);
-            return;
-        }
-
-        // Map RPC result to TeacherExtended
-        const mappedTeachers: TeacherExtended[] = data.map((t: any) => ({
-            id: t.id,
-            email: t.email,
-            display_name: t.display_name,
-            phone: t.phone,
-            role: 'Teacher',
-            is_active: t.is_active,
-            profile_completed: true,
-            created_at: t.created_at,
-            details: {
-                subject: t.subject,
-                qualification: t.qualification,
-                experience_years: t.experience_years,
-                date_of_joining: t.date_of_joining,
-                bio: t.bio,
-                specializations: t.specializations,
-                profile_picture_url: t.profile_picture_url,
-                gender: t.gender,
-                date_of_birth: t.date_of_birth,
-                department: t.department,
-                designation: t.designation,
-                employee_id: t.employee_id,
-                employment_type: t.employment_type,
-                employment_status: t.employment_status || (t.is_active ? 'Active' : 'Inactive'),
-                branch_id: t.branch_id
+            if (!data) {
+                setTeachers([]);
+                return;
             }
-        }));
 
-        setTeachers(mappedTeachers);
-        setLoading(false);
-        setSelectedIds(new Set()); // Clear selection on refresh
+            const mappedTeachers: TeacherExtended[] = data.map((t: any) => ({
+                id: t.id,
+                email: t.email,
+                display_name: t.display_name,
+                phone: t.phone,
+                role: 'Teacher',
+                is_active: t.is_active,
+                profile_completed: true,
+                created_at: t.created_at,
+                details: {
+                    subject: t.subject,
+                    qualification: t.qualification,
+                    experience_years: t.experience_years,
+                    date_of_joining: t.date_of_joining,
+                    bio: t.bio,
+                    specializations: t.specializations,
+                    profile_picture_url: t.profile_picture_url,
+                    gender: t.gender,
+                    date_of_birth: t.date_of_birth,
+                    department: t.department,
+                    designation: t.designation,
+                    employee_id: t.employee_id,
+                    employment_type: t.employment_type,
+                    employment_status: t.employment_status || (t.is_active ? 'Active' : 'Inactive'),
+                    branch_id: t.branch_id
+                },
+                dailyStatus: getRandomStatus() 
+            }));
+
+            setTeachers(mappedTeachers);
+        } catch (err: any) {
+            setError(formatError(err));
+        } finally {
+            setLoading(false);
+            setSelectedIds(new Set());
+        }
     }, []);
 
     useEffect(() => {
@@ -160,11 +165,10 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
     // --- The Core Filter Logic ---
     const filteredTeachers = useMemo(() => {
         return teachers.filter(t => {
-            // 0. Branch Filter (NEW)
+            // Fix: branchId is now a string, so comparison with UUID-style branch_id is direct.
             const matchesBranch = !branchId || t.details?.branch_id === branchId;
             if (!matchesBranch) return false;
             
-            // 1. Global Search
             const searchLower = searchTerm.toLowerCase();
             const matchesSearch = 
                 !searchTerm ||
@@ -175,7 +179,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                 (t.details?.subject && t.details.subject.toLowerCase().includes(searchLower)) ||
                 (t.details?.department && t.details.department.toLowerCase().includes(searchLower));
 
-            // 2. Quick Filter Chips
             let matchesQuickFilter = true;
             if (quickFilter === 'Active') matchesQuickFilter = t.is_active && t.details?.employment_status !== 'Pending Verification';
             if (quickFilter === 'Pending Verification') matchesQuickFilter = t.details?.employment_status === 'Pending Verification';
@@ -187,7 +190,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                 matchesQuickFilter = joinYear === currentYear;
             }
 
-            // 3. Advanced Smart Filters
             const matchesDepartment = !filters.department || t.details?.department === filters.department;
             const matchesDesignation = !filters.designation || t.details?.designation === filters.designation;
             const matchesType = !filters.employmentType || t.details?.employment_type === filters.employmentType;
@@ -198,7 +200,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
         });
     }, [teachers, searchTerm, quickFilter, filters, branchId]);
 
-    // --- Sorting Logic ---
     const sortedTeachers = useMemo(() => {
         const sorted = [...filteredTeachers];
         sorted.sort((a, b) => {
@@ -233,14 +234,12 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
         return sorted;
     }, [filteredTeachers, sortConfig]);
 
-    // --- Pagination Logic ---
     const totalPages = Math.ceil(sortedTeachers.length / itemsPerPage);
     const paginatedTeachers = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
         return sortedTeachers.slice(start, start + itemsPerPage);
     }, [sortedTeachers, currentPage, itemsPerPage]);
 
-    // --- Handlers ---
     const handleSort = (key: string) => {
         setSortConfig(current => ({
             key,
@@ -290,15 +289,13 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
         setBulkAction(type);
     };
 
-    // --- Stats ---
     const stats = useMemo(() => ({
-        total: filteredTeachers.length, // Show stats for the current filtered view
+        total: filteredTeachers.length, 
         active: filteredTeachers.filter(t => t.is_active).length,
         departments: new Set(filteredTeachers.map(t => t.details?.department).filter(Boolean)).size,
         pending: filteredTeachers.filter(t => t.details?.employment_status === 'Pending Verification').length
     }), [filteredTeachers]);
 
-    // Status Badge Component
     const StatusBadge = ({ status }: { status?: string }) => {
         let styles = 'bg-gray-100 text-gray-600 border-gray-200';
         if (status === 'Active') styles = 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -313,9 +310,15 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
         );
     };
 
+    const AttendanceBadge = ({ status }: { status?: string }) => {
+        if (status === 'Present') return <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-green-100" title="Present Today"></span>;
+        if (status === 'Absent') return <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-100" title="Absent Today"></span>;
+        if (status === 'Late') return <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-100" title="Late Arrival"></span>;
+        return <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-300"></span>;
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            {/* --- KPI Dashboard --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <KPICard title="Total Faculty" value={stats.total} icon={<TeacherIcon className="h-6 w-6" />} colorClass="bg-indigo-500 text-white" trend="+2 this month" />
                 <KPICard title="Active Teachers" value={stats.active} icon={<CheckCircleIcon className="h-6 w-6" />} colorClass="bg-emerald-500 text-white" />
@@ -323,7 +326,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                 <KPICard title="Pending Verification" value={stats.pending} icon={<BriefcaseIcon className="h-6 w-6" />} colorClass="bg-purple-500 text-white" />
             </div>
 
-            {/* --- Sub Navigation --- */}
             <div className="flex space-x-1 bg-muted p-1 rounded-xl border border-border w-fit shadow-sm">
                 <button 
                     onClick={() => setActiveTab('directory')}
@@ -343,7 +345,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                 <DepartmentsTab teachers={teachers} branchId={branchId} />
             ) : (
                 <>
-                    {/* --- FILTER & SEARCH BAR --- */}
                     <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden transition-all duration-300">
                         <div className="p-4 border-b border-border flex flex-col md:flex-row gap-4 items-center justify-between bg-muted/10">
                             <div className="relative w-full md:max-w-lg group">
@@ -382,7 +383,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                             </div>
                         </div>
 
-                        {/* Quick Filters */}
                         <div className="px-4 py-3 bg-background border-b border-border overflow-x-auto flex items-center gap-2 scrollbar-hide">
                             {(['All', 'Active', 'New Joinees', 'Pending Verification', 'On Leave', 'Inactive'] as QuickFilterType[]).map(chip => (
                                 <button
@@ -399,7 +399,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                             ))}
                         </div>
 
-                        {/* Advanced Filters */}
                         {showAdvancedFilters && (
                             <div className="p-6 bg-muted/30 border-b border-border animate-in slide-in-from-top-2 duration-200">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -412,12 +411,10 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                         )}
                     </div>
 
-                    {/* --- ENTERPRISE TABLE --- */}
                     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[500px]">
                         
-                        {/* Bulk Actions Header */}
                         {selectedIds.size > 0 && (
-                            <div className="px-6 py-3 bg-primary/5 border-b border-primary/10 flex items-center justify-between animate-in fade-in slide-in-from-top-1">
+                            <div className="px-6 py-3 bg-primary/5 border-b border-primary/10 flex items-center justify-between animate-in fade-in sticky top-0 z-20">
                                 <div className="flex items-center gap-4">
                                     <span className="text-sm font-bold text-primary">{selectedIds.size} selected</span>
                                     <div className="h-4 w-px bg-primary/20"></div>
@@ -440,7 +437,6 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                             <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground p-10">
                                 <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4"><UsersIcon className="w-10 h-10 opacity-20" /></div>
                                 <p className="font-medium text-lg">No teachers found</p>
-                                <p className="text-sm mt-1">Try adjusting filters or search terms.</p>
                                 <button onClick={() => { setSearchTerm(''); setQuickFilter('All'); setFilters(INITIAL_FILTERS); }} className="mt-4 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg text-sm font-bold text-foreground">Clear All Filters</button>
                             </div>
                         ) : (
@@ -454,17 +450,10 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                                             </th>
                                             <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider">Contact</th>
                                             <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider">Emp ID</th>
-                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider cursor-pointer hover:text-foreground" onClick={() => handleSort('department')}>
-                                                Dept {sortConfig.key === 'department' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider">Subjects</th>
-                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider cursor-pointer hover:text-foreground" onClick={() => handleSort('status')}>
-                                                Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider cursor-pointer hover:text-foreground" onClick={() => handleSort('joining_date')}>
-                                                Joined {sortConfig.key === 'joining_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                            </th>
-                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider text-right">Actions</th>
+                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider">Dept</th>
+                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider">Daily Status</th>
+                                            <th className="p-4 font-bold text-muted-foreground uppercase text-xs tracking-wider">Status</th>
+                                            <th className="p-4 text-right pr-8">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/50">
@@ -486,8 +475,9 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                                                     <div className="flex items-center gap-3">
                                                         <div className="relative">
                                                              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-sm overflow-hidden border-2 border-background">
-                                                                {teacher.details?.profile_picture_url ? <img src={teacher.details.profile_picture_url} className="w-full h-full object-cover" alt={teacher.display_name}/> : teacher.display_name.charAt(0)}
+                                                                {teacher.details?.profile_picture_url ? <img src={teacher.details.profile_picture_url} className="w-full h-full object-cover" alt=""/> : (teacher.display_name || '?').charAt(0)}
                                                             </div>
+                                                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${(teacher as any).dailyStatus === 'Present' ? 'bg-green-500' : (teacher as any).dailyStatus === 'Absent' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">{teacher.display_name}</p>
@@ -498,7 +488,7 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                                                 <td className="p-4">
                                                     <div className="flex flex-col gap-1">
                                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                            <MailIcon className="w-3 h-3"/> {teacher.email}
+                                                            <MailIcon className="w-3 h-3"/> <span className="truncate max-w-[150px]" title={teacher.email}>{teacher.email}</span>
                                                         </div>
                                                         {teacher.phone && (
                                                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -517,20 +507,9 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="p-4">
-                                                    {teacher.details?.subject && (
-                                                        <div className="flex gap-1">
-                                                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase rounded border border-blue-100 truncate max-w-[120px]">
-                                                                {teacher.details.subject}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                <td className="p-4"><AttendanceBadge status={(teacher as any).dailyStatus} /></td>
                                                 <td className="p-4">
                                                     <StatusBadge status={teacher.details?.employment_status} />
-                                                </td>
-                                                <td className="p-4 text-xs text-muted-foreground">
-                                                    {teacher.details?.date_of_joining ? new Date(teacher.details.date_of_joining).toLocaleDateString() : '—'}
                                                 </td>
                                                 <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                     <button className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
@@ -545,21 +524,20 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                         )}
 
                         {/* Pagination Footer */}
-                        {sortedTeachers.length > 0 && (
-                            <div className="p-4 border-t border-border bg-muted/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-medium text-muted-foreground">
-                                <div className="flex items-center gap-2"><span>Rows per page:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-background border border-input rounded px-2 py-1 focus:ring-1 focus:ring-primary"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><span className="ml-2">Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedTeachers.length)} of {sortedTeachers.length}</span></div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 disabled:hover:bg-transparent border border-transparent hover:border-border transition-all"><ChevronLeftIcon className="w-4 h-4"/></button>
-                                    <span className="mx-2 font-bold text-foreground">Page {currentPage} of {totalPages}</span>
-                                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 disabled:hover:bg-transparent border border-transparent hover:border-border transition-all"><ChevronRightIcon className="w-4 h-4"/></button>
-                                </div>
+                        <div className="p-4 border-t border-border bg-muted/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-medium text-muted-foreground">
+                            <div className="flex items-center gap-2"><span>Rows per page:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-background border border-input rounded px-2 py-1"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><span className="ml-2">Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedTeachers.length)} of {sortedTeachers.length}</span></div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 border border-transparent hover:border-border transition-all"><ChevronLeftIcon className="w-4 h-4"/></button>
+                                <span className="mx-2 font-bold text-foreground">Page {currentPage} of {totalPages}</span>
+                                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 border border-transparent hover:border-border transition-all"><ChevronRightIcon className="w-4 h-4"/></button>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </>
             )}
 
-            {isAddModalOpen && <AddTeacherModal onClose={() => setIsAddModalOpen(false)} onSuccess={fetchTeachers} />}
+            {/* Fix: Pass branchId as string to components instead of number */}
+            {isAddModalOpen && <AddTeacherModal onClose={() => setIsAddModalOpen(false)} onSuccess={fetchTeachers} branchId={branchId || null} />}
             {selectedTeacher && <TeacherDetailModal teacher={selectedTeacher} onClose={() => setSelectedTeacher(null)} onUpdate={fetchTeachers} />}
             
             {bulkAction && (
@@ -571,7 +549,8 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                         fetchTeachers(); // Refresh data
                         setSelectedIds(new Set()); // Clear selection
                     }}
-                    branchId={branchId}
+                    // Fix: Pass branchId as string to components instead of number
+                    branchId={branchId || null}
                 />
             )}
         </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../../services/supabase';
+import { supabase, formatError } from '../../services/supabase';
 import { MyEnquiry, TimelineItem, EnquiryStatus, Communication } from '../../types';
 import Spinner from '../common/Spinner';
 import { MegaphoneIcon } from '../icons/MegaphoneIcon'; 
@@ -14,12 +14,17 @@ import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 
 type Tab = 'inbox' | 'enquiries';
 
+// Updated to include all EnquiryStatus values used in the UI
 const statusColors: { [key in EnquiryStatus]: string } = {
   'New': 'bg-blue-400/10 text-blue-400 border-blue-400/20',
   'Contacted': 'bg-amber-400/10 text-amber-400 border-amber-400/20',
+  'Verified': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
+  'ENQUIRY_VERIFIED': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
   'In Review': 'bg-purple-400/10 text-purple-400 border-purple-400/20',
-  'Inquiry Active': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
+  'ENQUIRY_IN_PROGRESS': 'bg-purple-400/10 text-purple-400 border-purple-400/20',
+  'ENQUIRY_ACTIVE': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
   'Completed': 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
+  'CONVERTED': 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
 };
 
 const formatTimeAgo = (dateString: string) => {
@@ -33,6 +38,12 @@ const formatTimeAgo = (dateString: string) => {
     if (hours < 24) return `${hours}H AGO`;
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
 };
+
+const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+    </svg>
+);
 
 const MessagesTab: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('inbox');
@@ -144,7 +155,7 @@ const MessagesTab: React.FC = () => {
                                             </div>
                                             <h4 className={`font-black text-[10px] uppercase tracking-[0.3em] transition-colors ${selectedEnquiry?.id === enq.id ? 'text-indigo-400' : 'text-white/30'}`}>{enq.applicant_name}</h4>
                                         </div>
-                                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">{formatTimeAgo(enq.last_updated)}</span>
+                                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">{formatTimeAgo(enq.updated_at)}</span>
                                     </div>
                                     <div className="flex items-center gap-5">
                                         <span className={`text-[10px] font-black uppercase px-4 py-2 rounded-xl border shadow-inner tracking-[0.2em] transition-all duration-700 ${statusColors[enq.status] || 'bg-white/5 text-white/20'}`}>
@@ -186,7 +197,7 @@ const ReadingStandby = ({ type }: { type: Tab }) => (
         <div className="w-40 h-40 bg-white/[0.01] rounded-[4rem] flex items-center justify-center mb-16 border border-white/5 shadow-[0_64px_128px_-12px_rgba(0,0,0,0.8)] relative group overflow-hidden">
             {type === 'inbox' ? <MegaphoneIcon className="w-20 h-20 text-white/10 group-hover:text-primary group-hover:scale-110 transition-all duration-700" /> : <CommunicationIcon className="w-20 h-20 text-white/10 group-hover:text-indigo-400 group-hover:scale-110 transition-all duration-700" />}
         </div>
-        <h3 className="text-5xl font-serif font-black text-white tracking-tighter uppercase leading-none mb-8">Payload <span className="text-white/20 italic">Standby.</span></h3>
+        <h3 className="text-5xl font-serif font-black text-white tracking-tighter uppercase leading-none mb-8">Enquiry Payload <span className="text-white/20 italic">Standby.</span></h3>
         <p className="text-white/40 text-[20px] font-medium leading-relaxed italic max-w-sm font-serif">Select a node from the registry to decrypt and establish an institutional handshake.</p>
     </div>
 );
@@ -201,7 +212,7 @@ const AnnouncementDetail = ({ announcement, onClose }: any) => (
                     <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{formatTimeAgo(announcement.sent_at)} • ID: {announcement.id?.slice(0,12)}</p>
                 </div>
             </div>
-            <button className="p-4 rounded-3xl bg-white/5 text-white/20 hover:text-white transition-all"><XIcon className="w-8 h-8"/></button>
+            <button onClick={onClose} className="p-4 rounded-3xl bg-white/5 text-white/20 hover:text-white transition-all"><XIcon className="w-8 h-8"/></button>
          </div>
          
          <div className="flex-grow overflow-y-auto p-10 md:p-24 lg:p-32 custom-scrollbar bg-transparent">
@@ -242,7 +253,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
     const [timeline, setTimeline] = useState<TimelineItem[]>([]);
     const [loading, setLoading] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const primaryId = (enquiry.admission_id || enquiry.id).toString();
+    const primaryId = (enquiry.id).toString();
 
     const fetchTimeline = useCallback(async () => {
         setLoading(true);
@@ -267,11 +278,13 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
         e.preventDefault();
         if (!newMessage.trim() || sending) return;
         setSending(true);
-        const { error } = await supabase.rpc('send_enquiry_message_from_parent', { p_node_id: primaryId, p_message: newMessage });
+        const { error } = await supabase.rpc('send_enquiry_message', { p_node_id: primaryId, p_message: newMessage });
         if (!error) {
             setNewMessage('');
             await fetchTimeline();
             refreshEnquiries(true);
+        } else {
+            alert(formatError(error));
         }
         setSending(false);
     };
@@ -304,12 +317,12 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
                 ) : timeline.map((item, idx) => (
                     <div key={idx} className={`flex ${item.is_admin ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-4 duration-700`} style={{ animationDelay: `${idx * 30}ms` }}>
                          <div className={`max-w-[85%] md:max-w-[70%] p-8 md:p-12 rounded-[3rem] text-[18px] md:text-[20px] leading-loose shadow-3xl ring-1 ring-white/5 ${
-                            item.is_admin 
-                            ? 'bg-[#1a1d24]/90 backdrop-blur-3xl text-white/70 rounded-bl-none' 
-                            : 'bg-gradient-to-br from-primary to-indigo-700 text-white rounded-br-none'
+                            !item.is_admin 
+                            ? 'bg-[#1a1d23]/90 backdrop-blur-3xl text-white/70 rounded-br-none' 
+                            : 'bg-gradient-to-br from-primary to-indigo-700 text-white rounded-bl-none'
                          }`}>
                              <p className="font-serif italic">{item.details.message}</p>
-                             <div className={`text-[10px] font-black uppercase mt-10 tracking-[0.4em] opacity-40 border-t border-white/5 pt-6 flex items-center gap-3 ${item.is_admin ? 'justify-start' : 'justify-end'}`}>
+                             <div className={`text-[10px] font-black uppercase mt-10 tracking-[0.4em] opacity-40 border-t border-white/5 pt-6 flex items-center gap-3 ${!item.is_admin ? 'justify-end' : 'justify-start'}`}>
                                 {item.created_by_name} • {formatTimeAgo(item.created_at)}
                              </div>
                          </div>
