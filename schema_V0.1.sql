@@ -16,7 +16,7 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
 -- Drop Functions (Cascading drops to ensure clean slate)
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.reconcile_user_profile_id() CASCADE; 
+DROP FUNCTION IF EXISTS public.reconcile_user_profile_id() CASCADE;
 DROP FUNCTION IF EXISTS public.complete_user_profile(text, jsonb, text, boolean) CASCADE;
 DROP FUNCTION IF EXISTS public.get_my_branch_ids() CASCADE;
 DROP FUNCTION IF EXISTS public.get_all_students_for_admin() CASCADE;
@@ -67,6 +67,8 @@ DROP FUNCTION IF EXISTS public.create_admission(text, text, date, text, text, te
 DROP FUNCTION IF EXISTS public.update_admission(bigint, text, text, date, text, text, text, text) CASCADE;
 DROP FUNCTION IF EXISTS public.complete_student_onboarding(uuid, jsonb) CASCADE;
 DROP FUNCTION IF EXISTS public.parent_get_document_requirements() CASCADE;
+DROP FUNCTION IF EXISTS public.parent_initialize_vault_slots(bigint) CASCADE;
+DROP FUNCTION IF EXISTS public.parent_complete_document_upload(bigint, bigint, text, text, bigint, text) CASCADE;
 DROP FUNCTION IF EXISTS public.submit_admission_document(bigint, bigint, text, text) CASCADE;
 DROP FUNCTION IF EXISTS public.update_secondary_parent_details(text, text, text, text, text, uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.request_admission_documents(bigint, text[], text) CASCADE;
@@ -142,6 +144,42 @@ DROP FUNCTION IF EXISTS public.get_expense_summary_report(date, date) CASCADE;
 DROP FUNCTION IF EXISTS public.get_student_ledger_report(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.admin_create_student(text, text, text, text, text, bigint) CASCADE;
 
+-- Drop RLS Policies (to avoid conflicts when re-running schema)
+DROP POLICY IF EXISTS "Users can manage their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Owner can manage school admin profile" ON public.school_admin_profiles;
+DROP POLICY IF EXISTS "Users can view their associated branches" ON public.school_branches;
+DROP POLICY IF EXISTS "School admins can manage their branches" ON public.school_branches;
+DROP POLICY IF EXISTS "Users can view departments in their branch" ON public.school_departments;
+DROP POLICY IF EXISTS "Admins can manage departments in their branch" ON public.school_departments;
+DROP POLICY IF EXISTS "Teachers can manage their own profile" ON public.teacher_profiles;
+DROP POLICY IF EXISTS "Admins can view teachers in their branch" ON public.teacher_profiles;
+DROP POLICY IF EXISTS "Users can view classes in their branch" ON public.school_classes;
+DROP POLICY IF EXISTS "Admins can manage classes in their branch" ON public.school_classes;
+DROP POLICY IF EXISTS "Students can view their own profile" ON public.student_profiles;
+DROP POLICY IF EXISTS "Admins and teachers can view students in their branch/class" ON public.student_profiles;
+DROP POLICY IF EXISTS "Parents can view their children's profiles" ON public.student_profiles;
+DROP POLICY IF EXISTS "Parents can manage their own admissions" ON public.admissions;
+DROP POLICY IF EXISTS "Admins can view admissions in their branch" ON public.admissions;
+DROP POLICY IF EXISTS "Parents can view their own enquiries" ON public.enquiries;
+DROP POLICY IF EXISTS "Admins can manage enquiries in their branch" ON public.enquiries;
+DROP POLICY IF EXISTS "Admins can manage vendors in their branch" ON public.vendors;
+DROP POLICY IF EXISTS "Admins can manage expenses in their branch" ON public.expenses;
+DROP POLICY IF EXISTS "Public read course_teachers" ON public.course_teachers;
+DROP POLICY IF EXISTS "Admin manage course_teachers" ON public.course_teachers;
+DROP POLICY IF EXISTS "Public read course_units" ON public.course_units;
+DROP POLICY IF EXISTS "Admin manage course_units" ON public.course_units;
+DROP POLICY IF EXISTS "Public read course_materials" ON public.course_materials;
+DROP POLICY IF EXISTS "Admin manage course_materials" ON public.course_materials;
+DROP POLICY IF EXISTS "Admin manage course_drafts" ON public.course_drafts;
+DROP POLICY IF EXISTS "Admin read course_logs" ON public.course_logs;
+DROP POLICY IF EXISTS "Authenticated users can view storage buckets" ON public.storage_buckets;
+DROP POLICY IF EXISTS "Users can view their uploaded files" ON public.storage_files;
+DROP POLICY IF EXISTS "Admins can view files in their branch" ON public.storage_files;
+DROP POLICY IF EXISTS "Parents can view their children's files" ON public.storage_files;
+DROP POLICY IF EXISTS "Users can view their own role assignments" ON public.user_role_assignments;
+DROP POLICY IF EXISTS "Admins can manage role assignments in their branch" ON public.user_role_assignments;
+DROP POLICY IF EXISTS "Authenticated users can view user roles" ON public.user_roles;
+
 
 -- Drop Tables (Order matters for FK constraints)
 DROP TABLE IF EXISTS public.expenses CASCADE;
@@ -191,7 +229,7 @@ DROP TABLE IF EXISTS public.teacher_profiles CASCADE;
 DROP TABLE IF EXISTS public.school_departments CASCADE;
 DROP TABLE IF EXISTS public.school_branches CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
-DROP FUNCTION IF EXISTS public.admin_transition_admission(bigint, text) CASCADE;
+
 -- -----------------------------------------------------------------------------------------------
 -- 2. CONFIGURATION & EXTENSIONS
 -- -----------------------------------------------------------------------------------------------
@@ -199,89 +237,6 @@ DROP FUNCTION IF EXISTS public.admin_transition_admission(bigint, text) CASCADE;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-
--- -----------------------------------------------------------------------------------------------
--- 2.5 SUPABASE STORAGE BUCKET CONFIGURATION
--- -----------------------------------------------------------------------------------------------
--- IMPORTANT: The following storage buckets must be created in Supabase Dashboard → Storage
--- These buckets are required for the application to function properly.
---
--- CRITICAL: The "SYNC PROTOCOL EXCEPTION – Bucket not found" error occurs when the application
--- tries to upload child biometric/profile documents during Register Child → Identity Enrollment flow.
--- The application expects a bucket named 'guardian-documents' to exist.
---
--- Required Storage Buckets:
--- 1. profile-images: For storing user profile pictures and avatars
---    - Public access: Yes (for displaying profile images)
---    - RLS Policies: Allow authenticated users to upload their own profile images
---    - Bucket ID: profile-images
---    - File types: image/* (PNG, JPG, GIF)
---    - Max file size: 5MB
---
--- 2. student-documents: For storing general student-related documents (certificates, reports, etc.)
---    - Public access: No (admin-only access)
---    - RLS Policies: Restrict to admin and authorized users only
---    - Bucket ID: student-documents
---    - File types: application/pdf, image/*, application/msword, application/vnd.openxmlformats-officedocument.*
---    - Max file size: 10MB
---
--- 3. guardian-documents: For storing admission documents uploaded by parents (CRITICAL FOR CHILD REGISTRATION)
---    - Public access: No (parent and admin access only)
---    - RLS Policies: Allow parents to upload/view their own child's documents, allow admins to view all documents
---    - Bucket ID: guardian-documents (MUST MATCH EXACTLY - case-sensitive)
---    - File types: application/pdf, image/*, application/msword, application/vnd.openxmlformats-officedocument.*
---    - Max file size: 10MB
---    - Path structure: parent/{parent_id}/adm-{admission_id}/req-{requirement_id}_{timestamp}
---
--- Bucket Creation Instructions:
--- 1. Go to Supabase Dashboard → Storage
--- 2. Click "Create bucket" for each bucket above
--- 3. Use EXACT bucket names as specified (case-sensitive)
--- 4. Set appropriate permissions and RLS policies
--- 5. Configure CORS settings if needed for file uploads
---
--- Alternative: Use Supabase CLI to create buckets programmatically:
--- supabase storage create profile-images --public
--- supabase storage create student-documents
--- supabase storage create guardian-documents
---
--- STORAGE RLS POLICIES (Apply these after bucket creation):
---
--- For guardian-documents bucket:
--- Policy: Allow parents to upload documents for their children
--- SELECT: auth.uid() IN (
---   SELECT a.parent_id FROM public.admissions a
---   JOIN public.document_requirements dr ON dr.admission_id = a.id
---   WHERE dr.id = get_path_requirement_id(storage.foldername(1))
--- )
---
--- Policy: Allow admins to view all documents in their branch
--- SELECT: EXISTS (
---   SELECT 1 FROM public.profiles p
---   WHERE p.id = auth.uid()
---   AND p.role IN ('School Administration', 'Branch Admin')
---   AND EXISTS (
---     SELECT 1 FROM public.admissions a
---     WHERE a.id = get_admission_id_from_path(storage.foldername(1))
---     AND a.branch_id IN (SELECT get_my_branch_ids())
---   )
--- )
---
--- INSERT: Same as SELECT for upload permissions
--- UPDATE: Admin only for status changes
--- DELETE: Admin only
---
--- For profile-images bucket:
--- Policy: Users can manage their own profile images
--- SELECT/INSERT/UPDATE/DELETE: auth.uid() = get_user_id_from_path(storage.foldername(1))
---
--- For student-documents bucket:
--- Policy: Admin only access
--- SELECT/INSERT/UPDATE/DELETE: EXISTS (
---   SELECT 1 FROM public.profiles p
---   WHERE p.id = auth.uid()
---   AND p.role IN ('School Administration', 'Branch Admin')
--- )
 
 -- -----------------------------------------------------------------------------------------------
 -- 3. CORE TABLES & PROFILES
@@ -524,10 +479,10 @@ CREATE TABLE IF NOT EXISTS public.share_codes (
     id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     code text NOT NULL UNIQUE,
     admission_id bigint NOT NULL REFERENCES public.admissions(id) ON DELETE CASCADE,
-    code_type text NOT NULL, 
+    code_type text NOT NULL,
     status text DEFAULT 'Active',
     purpose text,
-    expires_at timestamptz DEFAULT now() + interval '7 days',
+    expires_at timestamptz DEFAULT now() + interval '1 day',
     created_at timestamptz DEFAULT now()
 );
 
@@ -865,13 +820,95 @@ CREATE TABLE IF NOT EXISTS public.course_logs (
 );
 
 -- -----------------------------------------------------------------------------------------------
+-- 5.5. SUPABASE STORAGE BUCKETS & FILE METADATA
+-- -----------------------------------------------------------------------------------------------
+
+-- Storage Buckets Declaration (for documentation and reference)
+CREATE TABLE IF NOT EXISTS public.storage_buckets (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name text NOT NULL UNIQUE,
+    description text,
+    file_size_limit bigint DEFAULT 5242880, -- 5MB default
+    allowed_mime_types text[],
+    is_public boolean DEFAULT false,
+    created_at timestamptz DEFAULT now()
+);
+
+-- Insert required buckets
+INSERT INTO public.storage_buckets (name, description, file_size_limit, allowed_mime_types, is_public) VALUES
+    ('profile-images', 'User profile pictures and avatars', 5242880, ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true),
+    ('guardian-documents', 'Parent-uploaded admission documents', 10485760, ARRAY['application/pdf', 'image/jpeg', 'image/png'], false),
+    ('student-documents', 'Student records and certificates', 10485760, ARRAY['application/pdf', 'image/jpeg', 'image/png'], false)
+ON CONFLICT (name) DO NOTHING;
+
+-- Storage Files Metadata (links uploaded files to application entities)
+CREATE TABLE IF NOT EXISTS public.storage_files (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    bucket_name text NOT NULL,
+    file_path text NOT NULL,
+    file_name text NOT NULL,
+    file_size bigint,
+    mime_type text,
+    uploaded_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    entity_type text NOT NULL, -- 'profile', 'admission', 'teacher_document', etc.
+    entity_id text NOT NULL, -- UUID or bigint as text
+    metadata jsonb DEFAULT '{}',
+    is_deleted boolean DEFAULT false,
+    created_at timestamptz DEFAULT now(),
+    UNIQUE(bucket_name, file_path)
+);
+
+-- -----------------------------------------------------------------------------------------------
+-- 5.6. ROLE & ACCESS CONTROL
+-- -----------------------------------------------------------------------------------------------
+
+-- Predefined Roles
+CREATE TABLE IF NOT EXISTS public.user_roles (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name text NOT NULL UNIQUE,
+    display_name text NOT NULL,
+    description text,
+    is_system_role boolean DEFAULT false,
+    permissions jsonb DEFAULT '{}',
+    created_at timestamptz DEFAULT now()
+);
+
+-- Seed system roles
+INSERT INTO public.user_roles (name, display_name, description, is_system_role) VALUES
+    ('School Administration', 'School Administration', 'Govern institutional operations, multi-branch strategy, and global oversight', true),
+    ('Branch Admin', 'Branch Admin', 'Manage specific branch operations and staff', true),
+    ('Principal', 'Principal / Director', 'Lead academic excellence and oversee institutional growth', true),
+    ('HR Manager', 'HR Management', 'Manage human capital, recruitment, and organizational compliance', true),
+    ('Academic Coordinator', 'Academic Coordinator', 'Synchronize curriculum delivery and maintain pedagogical standards', true),
+    ('Accountant', 'Financial Controller', 'Oversee fiscal health, fee collections, and institutional financial reporting', true),
+    ('Teacher', 'Faculty Member', 'Empower students, manage classrooms, and curate learning experiences', true),
+    ('Student', 'Student Portal', 'Access academic timeline, assignments, and digital learning resources', true),
+    ('Parent/Guardian', 'Parent / Guardian', 'Partner in child''s educational journey and manage family needs', true),
+    ('Transport Staff', 'Transport Operations', 'Manage logistical operations, routes, and student transit safety', true),
+    ('E-commerce Operator', 'E-commerce Operator', 'Administer institutional storefront, inventory, and supply chain', true),
+    ('Super Admin', 'Super Admin', 'System-wide administrative access', true),
+    ('Minimal Admin', 'Minimal Admin', 'Limited administrative access for setup', true)
+ON CONFLICT (name) DO NOTHING;
+
+-- User Role Assignments
+CREATE TABLE IF NOT EXISTS public.user_role_assignments (
+    id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    role_name text NOT NULL REFERENCES public.user_roles(name) ON DELETE CASCADE,
+    assigned_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    branch_id bigint REFERENCES public.school_branches(id) ON DELETE CASCADE,
+    assigned_at timestamptz DEFAULT now(),
+    UNIQUE(user_id, role_name, branch_id)
+);
+
+-- -----------------------------------------------------------------------------------------------
 -- 6. FUNCTIONS (CORE LOGIC & FIXES)
 -- -----------------------------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = public
+SECURITY DEFINER
 AS $$
 DECLARE
   existing_profile_id uuid;
@@ -1052,8 +1089,37 @@ CREATE OR REPLACE FUNCTION public.convert_enquiry_to_admission(p_enquiry_id bigi
 CREATE OR REPLACE FUNCTION public.admin_verify_share_code(p_code text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_share record; v_admission record; v_enquiry record; BEGIN SELECT * INTO v_share FROM public.share_codes WHERE code = p_code AND status = 'Active' AND expires_at > now(); IF v_share IS NULL THEN RETURN jsonb_build_object('error', 'Invalid or expired code'); END IF; SELECT * INTO v_admission FROM public.admissions WHERE id = v_share.admission_id; RETURN jsonb_build_object( 'admission_id', v_admission.id, 'code_type', v_share.code_type, 'applicant_name', v_admission.applicant_name, 'grade', v_admission.grade, 'date_of_birth', v_admission.date_of_birth, 'gender', v_admission.gender, 'parent_name', v_admission.parent_name, 'parent_email', v_admission.parent_email, 'parent_phone', v_admission.parent_phone, 'already_imported', FALSE ); END; $$;
 CREATE OR REPLACE FUNCTION public.admin_import_record_from_share_code( p_admission_id bigint, p_code_type text, p_branch_id bigint ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN IF p_code_type = 'Enquiry' THEN UPDATE public.admissions SET branch_id = p_branch_id, status = 'Enquiry' WHERE id = p_admission_id; INSERT INTO public.enquiries (admission_id, applicant_name, grade, branch_id, parent_name, parent_email, parent_phone) SELECT id, applicant_name, grade, p_branch_id, parent_name, parent_email, parent_phone FROM public.admissions WHERE id = p_admission_id ON CONFLICT DO NOTHING; ELSE UPDATE public.admissions SET branch_id = p_branch_id, status = 'Pending Review' WHERE id = p_admission_id; END IF; UPDATE public.share_codes SET status = 'Redeemed' WHERE admission_id = p_admission_id; END; $$;
 CREATE OR REPLACE FUNCTION public.get_my_share_codes() RETURNS SETOF public.share_codes LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN RETURN QUERY SELECT sc.* FROM public.share_codes sc JOIN public.admissions a ON sc.admission_id = a.id WHERE a.parent_id = auth.uid(); END; $$;
-CREATE OR REPLACE FUNCTION public.generate_admission_share_code(p_admission_id bigint, p_purpose text, p_code_type text) RETURNS text LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_code text; BEGIN v_code := upper(substring(md5(random()::text) from 1 for 8)); INSERT INTO public.share_codes (code, admission_id, purpose, code_type) VALUES (v_code, p_admission_id, p_purpose, p_code_type); RETURN v_code; END; $$;
-CREATE OR REPLACE FUNCTION public.revoke_my_share_code(p_code_id bigint) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN UPDATE public.share_codes SET status = 'Revoked' WHERE id = p_code_id; END; $$;
+CREATE OR REPLACE FUNCTION public.generate_admission_share_code(p_admission_id bigint, p_purpose text, p_code_type text) RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_code text;
+BEGIN
+    -- Verify that the admission belongs to the authenticated parent
+    IF NOT EXISTS (SELECT 1 FROM public.admissions WHERE id = p_admission_id AND parent_id = auth.uid()) THEN
+        RAISE EXCEPTION 'Unauthorized access to admission';
+    END IF;
+    v_code := upper(substring(md5(random()::text), 1, 12));
+    INSERT INTO public.share_codes (code, admission_id, purpose, code_type, expires_at) VALUES (v_code, p_admission_id, p_purpose, p_code_type, now() + interval '1 day');
+    RETURN v_code;
+END;
+$$;
+CREATE OR REPLACE FUNCTION public.revoke_my_share_code(p_code_id bigint) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.share_codes
+  SET status = 'Revoked'
+  WHERE id = p_code_id
+  AND EXISTS (
+    SELECT 1 FROM public.admissions
+    WHERE id = share_codes.admission_id
+    AND parent_id = auth.uid()
+  );
+END;
+$$;
 CREATE OR REPLACE FUNCTION public.get_linked_parent_for_student(p_student_id uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_admission_id bigint; v_parent_id uuid; v_parent_profile record; BEGIN SELECT admission_id INTO v_admission_id FROM public.student_profiles WHERE user_id = p_student_id; SELECT parent_id INTO v_parent_id FROM public.admissions WHERE id = v_admission_id; IF v_parent_id IS NULL THEN RETURN jsonb_build_object('found', false); END IF; SELECT p.display_name, p.email, p.phone, pp.relationship_to_student, pp.address, pp.city, pp.state, pp.country INTO v_parent_profile FROM public.profiles p JOIN public.parent_profiles pp ON p.id = pp.user_id WHERE p.id = v_parent_id; RETURN jsonb_build_object( 'found', true, 'name', v_parent_profile.display_name, 'email', v_parent_profile.email, 'phone', v_parent_profile.phone, 'relationship', v_parent_profile.relationship_to_student, 'address', v_parent_profile.address, 'city', v_parent_profile.city, 'state', v_parent_profile.state, 'country', v_parent_profile.country ); END; $$;
 CREATE OR REPLACE FUNCTION public.update_student_details_admin( p_student_id uuid, p_display_name text, p_phone text, p_dob date, p_gender text, p_address text, p_parent_details text, p_student_id_number text, p_grade text ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN UPDATE public.profiles SET display_name = p_display_name, phone = p_phone WHERE id = p_student_id; UPDATE public.student_profiles SET date_of_birth = p_dob, gender = p_gender, address = p_address, parent_guardian_details = p_parent_details, student_id_number = p_student_id_number, grade = p_grade WHERE user_id = p_student_id; END; $$;
 CREATE OR REPLACE FUNCTION public.manage_class( p_id bigint, p_name text, p_grade_level text, p_section text, p_academic_year text, p_class_teacher_id uuid, p_branch_id bigint, p_capacity integer ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN IF p_id IS NULL THEN INSERT INTO public.school_classes (name, grade_level, section, academic_year, class_teacher_id, branch_id, capacity) VALUES (p_name, p_grade_level, p_section, p_academic_year, p_class_teacher_id, p_branch_id, p_capacity); ELSE UPDATE public.school_classes SET name=p_name, grade_level=p_grade_level, section=p_section, academic_year=p_academic_year, class_teacher_id=p_class_teacher_id, capacity=p_capacity WHERE id = p_id; END IF; END; $$;
@@ -1068,23 +1134,103 @@ CREATE OR REPLACE FUNCTION public.submit_unsolicited_document( p_admission_id bi
 CREATE OR REPLACE FUNCTION public.create_admission( p_applicant_name text, p_grade text, p_date_of_birth date, p_gender text, p_profile_photo_url text, p_medical_info text, p_emergency_contact text, p_admission_id bigint ) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_id bigint; BEGIN INSERT INTO public.admissions ( parent_id, applicant_name, grade, date_of_birth, gender, profile_photo_url, medical_info, emergency_contact, submitted_by, status ) VALUES ( auth.uid(), p_applicant_name, p_grade, p_date_of_birth, p_gender, p_profile_photo_url, p_medical_info, p_emergency_contact, auth.uid(), 'Pending Review' ) RETURNING id INTO v_id; RETURN v_id; END; $$;
 CREATE OR REPLACE FUNCTION public.update_admission( p_admission_id bigint, p_applicant_name text, p_grade text, p_date_of_birth date, p_gender text, p_profile_photo_url text, p_medical_info text, p_emergency_contact text ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN UPDATE public.admissions SET applicant_name = p_applicant_name, grade = p_grade, date_of_birth = p_date_of_birth, gender = p_gender, profile_photo_url = COALESCE(p_profile_photo_url, profile_photo_url), medical_info = p_medical_info, emergency_contact = p_emergency_contact, updated_at = now() WHERE id = p_admission_id AND parent_id = auth.uid(); END; $$;
 CREATE OR REPLACE FUNCTION public.complete_student_onboarding(p_student_id uuid, p_data jsonb) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN UPDATE public.student_profiles SET parent_guardian_details = p_data->>'parent_name', address = p_data->>'address' WHERE user_id = p_student_id; UPDATE public.profiles SET phone = p_data->>'phone', profile_completed = true WHERE id = p_student_id; END; $$;
-CREATE OR REPLACE FUNCTION public.parent_get_document_requirements() RETURNS TABLE ( id bigint, admission_id bigint, document_name text, status text, is_mandatory boolean, notes_for_parent text, rejection_reason text, applicant_name text, admission_documents jsonb ) LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN RETURN QUERY SELECT dr.id, dr.admission_id, dr.document_name, dr.status, dr.is_mandatory, dr.notes_for_parent, dr.rejection_reason, a.applicant_name, COALESCE( ( SELECT jsonb_agg( jsonb_build_object( 'id', ad.id, 'file_name', ad.file_name, 'storage_path', ad.storage_path, 'uploaded_at', ad.uploaded_at ) ) FROM public.admission_documents ad WHERE ad.requirement_id = dr.id ), '[]'::jsonb ) as admission_documents FROM public.document_requirements dr JOIN public.admissions a ON dr.admission_id = a.id WHERE a.parent_id = auth.uid() OR a.student_user_id = auth.uid(); END; $$;
+
+DROP FUNCTION IF EXISTS public.parent_initialize_vault_slots(bigint);
+CREATE OR REPLACE FUNCTION public.parent_initialize_vault_slots(p_admission_id bigint) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_admission record;
+    v_existing_count int;
+BEGIN
+    -- Verify admission belongs to current user
+    SELECT * INTO v_admission FROM public.admissions WHERE id = p_admission_id AND parent_id = auth.uid();
+    IF v_admission IS NULL THEN
+        RAISE EXCEPTION 'Admission not found or access denied';
+    END IF;
+
+    -- Check if requirements already exist
+    SELECT COUNT(*) INTO v_existing_count FROM public.document_requirements WHERE admission_id = p_admission_id;
+    IF v_existing_count > 0 THEN
+        RETURN; -- Already initialized
+    END IF;
+
+    -- Insert the 5 required documents
+    INSERT INTO public.document_requirements (admission_id, document_name, status, is_mandatory, notes_for_parent) VALUES
+    (p_admission_id, 'Student Birth Certificate', 'Pending', true, 'Official birth certificate issued by the local registrar'),
+    (p_admission_id, 'Student Aadhaar Card / National ID', 'Pending', true, 'Government-issued national identity document'),
+    (p_admission_id, 'Parent/Guardian Aadhaar Card / ID Proof', 'Pending', true, 'Government-issued identity proof of parent/guardian'),
+    (p_admission_id, 'Previous School Transfer Certificate (TC)', 'Pending', false, 'Transfer certificate from previous school (if applicable)'),
+    (p_admission_id, 'Recent Passport-size Photograph of Student', 'Pending', true, 'Recent passport-sized photograph with white background');
+
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.parent_complete_document_upload(
+    p_requirement_id bigint,
+    p_admission_id bigint,
+    p_file_name text,
+    p_storage_path text,
+    p_file_size bigint,
+    p_mime_type text
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_admission record;
+    v_requirement record;
+BEGIN
+    -- Verify admission belongs to current user
+    SELECT * INTO v_admission FROM public.admissions WHERE id = p_admission_id AND parent_id = auth.uid();
+    IF v_admission IS NULL THEN
+        RAISE EXCEPTION 'Admission not found or access denied';
+    END IF;
+
+    -- Verify requirement exists and belongs to admission
+    SELECT * INTO v_requirement FROM public.document_requirements WHERE id = p_requirement_id AND admission_id = p_admission_id;
+    IF v_requirement IS NULL THEN
+        RAISE EXCEPTION 'Document requirement not found';
+    END IF;
+
+    -- Insert the document record
+    INSERT INTO public.admission_documents (
+        admission_id,
+        requirement_id,
+        uploaded_by,
+        file_name,
+        storage_path,
+        status
+    ) VALUES (
+        p_admission_id,
+        p_requirement_id,
+        auth.uid(),
+        p_file_name,
+        p_storage_path,
+        'Pending'
+    );
+
+    -- Update requirement status to Submitted
+    UPDATE public.document_requirements SET status = 'Submitted' WHERE id = p_requirement_id;
+
+    -- Update admission status if it's still in initial state
+    UPDATE public.admissions SET status = 'Documents Requested', updated_at = now()
+    WHERE id = p_admission_id AND status IN ('Pending Review', 'Approved');
+
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.parent_get_document_requirements() RETURNS TABLE ( id bigint, admission_id bigint, document_name text, status text, is_mandatory boolean, notes_for_parent text, rejection_reason text, applicant_name text, profile_photo_url text, admission_documents jsonb ) LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN RETURN QUERY SELECT dr.id, dr.admission_id, dr.document_name, dr.status, dr.is_mandatory, dr.notes_for_parent, dr.rejection_reason, a.applicant_name, a.profile_photo_url, COALESCE( ( SELECT jsonb_agg( jsonb_build_object( 'id', ad.id, 'file_name', ad.file_name, 'storage_path', ad.storage_path, 'uploaded_at', ad.uploaded_at ) ) FROM public.admission_documents ad WHERE ad.requirement_id = dr.id ), '[]'::jsonb ) as admission_documents FROM public.document_requirements dr JOIN public.admissions a ON dr.admission_id = a.id WHERE a.parent_id = auth.uid() OR a.student_user_id = auth.uid(); END; $$;
 CREATE OR REPLACE FUNCTION public.submit_admission_document( p_admission_id bigint, p_requirement_id bigint, p_file_name text, p_storage_path text ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN INSERT INTO public.admission_documents (admission_id, requirement_id, uploaded_by, file_name, storage_path, status) VALUES (p_admission_id, p_requirement_id, auth.uid(), p_file_name, p_storage_path, 'Pending'); UPDATE public.document_requirements SET status = 'Submitted' WHERE id = p_requirement_id; UPDATE public.admissions SET status = 'Documents Requested' WHERE id = p_admission_id AND status = 'Pending Review'; END; $$;
 CREATE OR REPLACE FUNCTION public.request_admission_documents(p_admission_id bigint, p_documents text[], p_note text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE doc_name text; BEGIN FOREACH doc_name IN ARRAY p_documents LOOP INSERT INTO public.document_requirements (admission_id, document_name, notes_for_parent) VALUES (p_admission_id, doc_name, p_note); END LOOP; UPDATE public.admissions SET status = 'Documents Requested' WHERE id = p_admission_id; END; $$;
 
 CREATE OR REPLACE FUNCTION public.approve_admission_application(p_admission_id bigint) 
 RETURNS jsonb 
-LANGUAGE plpgsql 
-SECURITY DEFINER 
-SET search_path = public
-AS $$ 
-DECLARE 
-    v_admission record; 
-    v_new_user_id uuid; 
-    v_email text; 
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_admission record;
+    v_new_user_id uuid;
+    v_email text;
     v_existing_user_id uuid;
     v_unverified_docs_count int;
-BEGIN 
+BEGIN
     -- 1. Get Admission Record
     SELECT * INTO v_admission FROM public.admissions WHERE id = p_admission_id; 
     IF v_admission IS NULL THEN 
@@ -1247,344 +1393,6 @@ CREATE OR REPLACE FUNCTION public.get_student_ledger_report(p_student_id uuid) R
 -- 7. ADMIN FUNCTIONS (BYPASSING RLS FOR SETUP)
 -- -----------------------------------------------------------------------------------------------
 
--- -----------------------------------------------------------------------------------------------
--- 8. ADDITIONAL MISSING FUNCTIONS
--- -----------------------------------------------------------------------------------------------
-
--- Admin User Management
-CREATE OR REPLACE FUNCTION public.get_all_users_for_admin()
-RETURNS TABLE (
-    id uuid,
-    email text,
-    display_name text,
-    phone text,
-    role text,
-    is_active boolean,
-    profile_completed boolean,
-    created_at timestamptz,
-    branch_id bigint,
-    branch_name text
-)
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        p.id,
-        p.email,
-        p.display_name,
-        p.phone,
-        p.role,
-        p.is_active,
-        p.profile_completed,
-        p.created_at,
-        COALESCE(sp.branch_id, tp.branch_id, sap.branch_id) as branch_id,
-        b.name as branch_name
-    FROM public.profiles p
-    LEFT JOIN public.student_profiles sp ON p.id = sp.user_id
-    LEFT JOIN public.teacher_profiles tp ON p.id = tp.user_id
-    LEFT JOIN public.school_admin_profiles sap ON p.id = sap.user_id
-    LEFT JOIN public.school_branches b ON COALESCE(sp.branch_id, tp.branch_id, sap.branch_id) = b.id
-    WHERE p.role IN ('Student', 'Teacher', 'School Administration', 'Parent/Guardian', 'Transport Staff', 'E-commerce Operator')
-    ORDER BY p.created_at DESC;
-END;
-$$;
-
--- Role Management
-CREATE OR REPLACE FUNCTION public.add_new_role(p_role_name text, p_description text DEFAULT NULL)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    -- Only super admin can add roles (this would need to be implemented based on your auth system)
-    -- For now, just return success as this might be handled at application level
-    RETURN jsonb_build_object('success', true, 'message', 'Role added successfully', 'role_name', p_role_name);
-END;
-$$;
-
--- Admission Document Management
-CREATE OR REPLACE FUNCTION public.admin_request_documents(p_admission_id bigint, p_document_names text[])
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-    doc_name text;
-BEGIN
-    -- Check if user has admin access
-    IF NOT EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.id = auth.uid()
-        AND p.role IN ('School Administration')
-        AND EXISTS (
-            SELECT 1 FROM public.admissions a
-            WHERE a.id = p_admission_id
-            AND a.branch_id IN (SELECT get_my_branch_ids())
-        )
-    ) THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access');
-    END IF;
-
-    -- Create document requirements
-    FOREACH doc_name IN ARRAY p_document_names LOOP
-        INSERT INTO public.document_requirements (admission_id, document_name, status, notes_for_parent)
-        VALUES (p_admission_id, doc_name, 'Pending', 'Please upload this required document')
-        ON CONFLICT (admission_id, document_name) DO NOTHING;
-    END LOOP;
-
-    -- Update admission status
-    UPDATE public.admissions SET
-        status = 'Documents Requested'
-    WHERE id = p_admission_id;
-
-    RETURN jsonb_build_object('success', true, 'message', 'Document requirements created');
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
--- Admission Status Transition
-CREATE OR REPLACE FUNCTION public.admin_transition_admission(p_admission_id bigint, p_new_status text)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-    v_admission record;
-BEGIN
-    -- Check if user has admin access
-    IF NOT EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.id = auth.uid()
-        AND p.role IN ('School Administration')
-        AND EXISTS (
-            SELECT 1 FROM public.admissions a
-            WHERE a.id = p_admission_id
-            AND a.branch_id IN (SELECT get_my_branch_ids())
-        )
-    ) THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access');
-    END IF;
-
-    -- Get admission details
-    SELECT * INTO v_admission FROM public.admissions WHERE id = p_admission_id;
-
-    IF v_admission IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Admission not found');
-    END IF;
-
-    -- Update status
-    UPDATE public.admissions SET
-        status = p_new_status,
-        updated_at = now()
-    WHERE id = p_admission_id;
-
-    RETURN jsonb_build_object('success', true, 'message', 'Admission status updated', 'new_status', p_new_status);
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
--- Parent Document Vault Management
-CREATE OR REPLACE FUNCTION public.parent_initialize_vault_slots(p_admission_id bigint)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-    v_admission record;
-    v_mandatory_docs text[] := ARRAY[
-        'Birth Certificate',
-        'Student Aadhaar Card / Government ID',
-        'Parent / Guardian Aadhaar Card',
-        'Address Proof',
-        'Previous School Transfer Certificate (TC)'
-    ];
-    v_optional_docs text[] := ARRAY[
-        'Passport-size Photograph',
-        'Vaccination / Medical Record'
-    ];
-    v_doc_name text;
-BEGIN
-    -- Check if user is the parent
-    SELECT * INTO v_admission FROM public.admissions WHERE id = p_admission_id AND parent_id = auth.uid();
-
-    IF v_admission IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access to admission');
-    END IF;
-
-    -- Initialize mandatory document requirements
-    FOREACH v_doc_name IN ARRAY v_mandatory_docs LOOP
-        INSERT INTO public.document_requirements (admission_id, document_name, is_mandatory, status, notes_for_parent)
-        VALUES (p_admission_id, v_doc_name, true, 'Pending', 'Required for student verification and enrollment')
-        ON CONFLICT (admission_id, document_name) DO NOTHING;
-    END LOOP;
-
-    -- Initialize optional document requirements
-    FOREACH v_doc_name IN ARRAY v_optional_docs LOOP
-        INSERT INTO public.document_requirements (admission_id, document_name, is_mandatory, status, notes_for_parent)
-        VALUES (p_admission_id, v_doc_name, false, 'Pending', 'Optional but recommended')
-        ON CONFLICT (admission_id, document_name) DO NOTHING;
-    END LOOP;
-
-    RETURN jsonb_build_object('success', true, 'message', 'Document vault initialized with predefined requirements');
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
--- Parent Document Upload Completion
-CREATE OR REPLACE FUNCTION public.parent_complete_document_upload(p_requirement_id bigint, p_file_name text, p_storage_path text)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-    v_requirement record;
-BEGIN
-    -- Get requirement details
-    SELECT dr.*, a.parent_id INTO v_requirement
-    FROM public.document_requirements dr
-    JOIN public.admissions a ON dr.admission_id = a.id
-    WHERE dr.id = p_requirement_id;
-
-    IF v_requirement IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Document requirement not found');
-    END IF;
-
-    -- Check if user is the parent
-    IF v_requirement.parent_id != auth.uid() THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access');
-    END IF;
-
-    -- Update or create document
-    INSERT INTO public.admission_documents (admission_id, requirement_id, uploaded_by, file_name, storage_path, status)
-    VALUES (v_requirement.admission_id, p_requirement_id, auth.uid(), p_file_name, p_storage_path, 'Pending')
-    ON CONFLICT (admission_id, requirement_id) DO UPDATE SET
-        file_name = p_file_name,
-        storage_path = p_storage_path,
-        uploaded_at = now();
-
-    -- Update requirement status
-    UPDATE public.document_requirements SET status = 'Submitted' WHERE id = p_requirement_id;
-
-    RETURN jsonb_build_object('success', true, 'message', 'Document uploaded successfully');
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
--- Finance Fee Structure Publishing
-CREATE OR REPLACE FUNCTION public.publish_fee_structure(p_structure_id bigint)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    -- Check if user has admin access
-    IF NOT EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.id = auth.uid()
-        AND p.role IN ('School Administration')
-    ) THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access');
-    END IF;
-
-    -- Update fee structure status (assuming there's a status field)
-    -- For now, just return success
-    RETURN jsonb_build_object('success', true, 'message', 'Fee structure published');
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
--- School Plan Updates
-CREATE OR REPLACE FUNCTION public.update_school_plan(p_plan_id text)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-    -- Check if user is school admin
-    IF NOT EXISTS (
-        SELECT 1 FROM public.school_admin_profiles WHERE user_id = auth.uid()
-    ) THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access');
-    END IF;
-
-    -- Update school plan
-    UPDATE public.school_admin_profiles SET
-        plan_id = p_plan_id,
-        updated_at = now()
-    WHERE user_id = auth.uid();
-
-    RETURN jsonb_build_object('success', true, 'message', 'School plan updated');
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
--- Quick Student Addition
-CREATE OR REPLACE FUNCTION public.admin_quick_add_student(
-    p_display_name text,
-    p_email text,
-    p_phone text,
-    p_grade text,
-    p_parent_name text,
-    p_parent_email text,
-    p_parent_phone text
-)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-    v_student_id uuid;
-    v_parent_id uuid;
-    v_admission_id bigint;
-BEGIN
-    -- Check if user has admin access
-    IF NOT EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.id = auth.uid()
-        AND p.role IN ('School Administration')
-    ) THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access');
-    END IF;
-
-    -- Create parent profile if doesn't exist
-    SELECT id INTO v_parent_id FROM public.profiles WHERE email = p_parent_email;
-    IF v_parent_id IS NULL THEN
-        v_parent_id := gen_random_uuid();
-        INSERT INTO public.profiles (id, email, display_name, phone, role, is_active, profile_completed)
-        VALUES (v_parent_id, p_parent_email, p_parent_name, p_parent_phone, 'Parent/Guardian', true, true);
-
-        INSERT INTO public.parent_profiles (user_id, relationship_to_student)
-        VALUES (v_parent_id, 'Parent');
-    END IF;
-
-    -- Create student profile
-    v_student_id := gen_random_uuid();
-    INSERT INTO public.profiles (id, email, display_name, phone, role, is_active, profile_completed)
-    VALUES (v_student_id, p_email, p_display_name, p_phone, 'Student', true, true);
-
-    -- Create admission record
-    INSERT INTO public.admissions (
-        parent_id, applicant_name, grade, status, parent_name, parent_email, parent_phone,
-        student_user_id, submitted_by
-    )
-    VALUES (
-        v_parent_id, p_display_name, p_grade, 'Approved', p_parent_name, p_parent_email, p_parent_phone,
-        v_student_id, auth.uid()
-    )
-    RETURNING id INTO v_admission_id;
-
-    -- Create student profile
-    INSERT INTO public.student_profiles (user_id, admission_id, grade, parent_guardian_details)
-    VALUES (v_student_id, v_admission_id, p_grade, p_parent_name || ' (' || p_parent_phone || ')');
-
-    -- Create parent-student relationship
-    INSERT INTO public.student_parents (student_id, parent_id, relationship)
-    VALUES (v_student_id, v_parent_id, 'Parent')
-    ON CONFLICT (student_id, parent_id) DO NOTHING;
-
-    RETURN jsonb_build_object('success', true, 'student_id', v_student_id, 'parent_id', v_parent_id);
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'message', SQLERRM);
-END;
-$$;
-
 CREATE OR REPLACE FUNCTION public.admin_create_student(
     p_email text,
     p_display_name text,
@@ -1603,7 +1411,7 @@ DECLARE
 BEGIN
     -- 1. Check if email already exists in profiles
     SELECT email INTO v_check_email FROM public.profiles WHERE email = p_email;
-
+    
     IF v_check_email IS NOT NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'User with this email already exists.');
     END IF;
@@ -1708,6 +1516,20 @@ DROP POLICY IF EXISTS "Admins can view admissions in their branch" ON public.adm
 CREATE POLICY "Admins can view admissions in their branch" ON public.admissions
 FOR SELECT USING (branch_id IN (SELECT get_my_branch_ids()));
 
+-- Share Codes
+ALTER TABLE public.share_codes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Parents can manage share codes for their admissions" ON public.share_codes;
+CREATE POLICY "Parents can manage share codes for their admissions" ON public.share_codes
+FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.admissions WHERE id = admission_id AND parent_id = auth.uid())
+);
+DROP POLICY IF EXISTS "Admins can view all share codes" ON public.share_codes;
+CREATE POLICY "Admins can view all share codes" ON public.share_codes
+FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.school_admin_profiles WHERE user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM public.school_branches WHERE branch_admin_id = auth.uid())
+);
+
 ALTER TABLE public.enquiries ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Parents can view their own enquiries" ON public.enquiries;
 CREATE POLICY "Parents can view their own enquiries" ON public.enquiries
@@ -1769,5 +1591,74 @@ CREATE POLICY "Admin read course_logs" ON public.course_logs FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.school_admin_profiles WHERE user_id = auth.uid()) OR
     EXISTS (SELECT 1 FROM public.school_branches WHERE branch_admin_id = auth.uid())
 );
+
+-- -- 9.3 Storage Tables -- --
+
+-- Storage Buckets (Read-only for authenticated users)
+ALTER TABLE public.storage_buckets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can view storage buckets" ON public.storage_buckets FOR SELECT USING (auth.uid() IS NOT NULL);
+
+-- Storage Files (Users can access their own uploaded files and files they're authorized to view)
+ALTER TABLE public.storage_files ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view their uploaded files" ON public.storage_files;
+CREATE POLICY "Users can view their uploaded files" ON public.storage_files
+FOR SELECT USING (uploaded_by = auth.uid());
+DROP POLICY IF EXISTS "Admins can view files in their branch" ON public.storage_files;
+CREATE POLICY "Admins can view files in their branch" ON public.storage_files
+FOR SELECT USING (
+    entity_type IN ('admission', 'teacher_document') AND
+    (
+        entity_id::bigint IN (
+            SELECT id FROM public.admissions WHERE branch_id IN (SELECT get_my_branch_ids())
+            UNION
+            SELECT id FROM public.teacher_profiles WHERE branch_id IN (SELECT get_my_branch_ids())
+        )
+    )
+);
+DROP POLICY IF EXISTS "Parents can view their children's files" ON public.storage_files;
+CREATE POLICY "Parents can view their children's files" ON public.storage_files
+FOR SELECT USING (
+    entity_type = 'admission' AND
+    entity_id::bigint IN (
+        SELECT id FROM public.admissions WHERE parent_id = auth.uid()
+    )
+);
+
+-- -- 9.4 Role & Access Control Tables -- --
+
+-- User Roles (Read-only for authenticated users)
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can view user roles" ON public.user_roles FOR SELECT USING (auth.uid() IS NOT NULL);
+
+-- User Role Assignments (Users can view their own assignments, admins can view all)
+ALTER TABLE public.user_role_assignments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view their own role assignments" ON public.user_role_assignments;
+CREATE POLICY "Users can view their own role assignments" ON public.user_role_assignments
+FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Admins can manage role assignments in their branch" ON public.user_role_assignments;
+CREATE POLICY "Admins can manage role assignments in their branch" ON public.user_role_assignments
+FOR ALL USING (branch_id IN (SELECT get_my_branch_ids()));
+
+
+-- -----------------------------------------------------------------------------------------------
+-- 11. INDEXES FOR PERFORMANCE
+-- -----------------------------------------------------------------------------------------------
+
+-- Additional indexes for frequently queried columns
+CREATE INDEX IF NOT EXISTS idx_admissions_parent_id ON public.admissions(parent_id);
+CREATE INDEX IF NOT EXISTS idx_admissions_branch_id ON public.admissions(branch_id);
+CREATE INDEX IF NOT EXISTS idx_admissions_status ON public.admissions(status);
+CREATE INDEX IF NOT EXISTS idx_student_profiles_assigned_class_id ON public.student_profiles(assigned_class_id);
+CREATE INDEX IF NOT EXISTS idx_student_profiles_branch_id ON public.student_profiles(branch_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_profiles_branch_id ON public.teacher_profiles(branch_id);
+CREATE INDEX IF NOT EXISTS idx_school_classes_branch_id ON public.school_classes(branch_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_student_class_date ON public.attendance(student_id, class_id, attendance_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_student_id ON public.invoices(student_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices(status);
+CREATE INDEX IF NOT EXISTS idx_expenses_branch_id ON public.expenses(branch_id);
+CREATE INDEX IF NOT EXISTS idx_storage_files_entity ON public.storage_files(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_storage_files_uploaded_by ON public.storage_files(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_user_role_assignments_user ON public.user_role_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_role_assignments_branch ON public.user_role_assignments(branch_id);
 
 NOTIFY pgrst, 'reload schema';

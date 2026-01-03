@@ -29,6 +29,17 @@ export const StorageService = {
     },
 
     async upload(bucket: BucketName, path: string, file: File) {
+        // Validate file size (5MB limit for profile images)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            throw new Error(`File size exceeds 5MB limit. Please choose a smaller image.`);
+        }
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            throw new Error('Only image files are allowed for profile pictures.');
+        }
+
         const { data, error } = await supabase.storage
             .from(bucket)
             .upload(path, file, {
@@ -40,6 +51,10 @@ export const StorageService = {
             // Handle bucket not found error gracefully
             if (error.message?.includes('Bucket not found')) {
                 throw new Error(`Storage bucket '${bucket}' not found. Please ensure the bucket exists in Supabase Storage and has proper permissions.`);
+            }
+            // Handle permission errors
+            if (error.message?.includes('permission') || error.message?.includes('unauthorized')) {
+                throw new Error(`Upload failed due to permission restrictions. Please contact support.`);
             }
             throw error;
         }

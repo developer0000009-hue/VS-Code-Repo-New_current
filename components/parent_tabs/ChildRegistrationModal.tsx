@@ -81,6 +81,8 @@ const ChildRegistrationModal: React.FC<ChildRegistrationModalProps> = ({ child, 
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Prevent background scrolling when modal is active
@@ -150,12 +152,25 @@ const ChildRegistrationModal: React.FC<ChildRegistrationModalProps> = ({ child, 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+
+            // Validate file size
             if (file.size > 5 * 1024 * 1024) {
-                alert("Magnitude exceeds limits. Max 5MB.");
+                setUploadError("File size exceeds 5MB limit. Please choose a smaller image.");
+                setUploadStatus('error');
                 return;
             }
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                setUploadError("Only image files are allowed for profile pictures.");
+                setUploadStatus('error');
+                return;
+            }
+
             setPhotoFile(file);
             setPhotoPreview(URL.createObjectURL(file));
+            setUploadError(null);
+            setUploadStatus('idle');
         }
     };
 
@@ -180,20 +195,29 @@ const ChildRegistrationModal: React.FC<ChildRegistrationModalProps> = ({ child, 
             let finalPhotoPath = child?.profile_photo_url || null;
 
             if (photoFile) {
-                const storagePath = StorageService.getProfilePath('child', currentUserId);
-                const { path } = await StorageService.upload(BUCKETS.PROFILES, storagePath, photoFile);
-                finalPhotoPath = StorageService.getPublicUrl(BUCKETS.PROFILES, path);
-
-                // Verify the uploaded image is accessible
+                setUploadStatus('uploading');
                 try {
-                    const response = await fetch(finalPhotoPath, { method: 'HEAD' });
-                    if (!response.ok) {
-                        console.warn('Uploaded image not accessible:', finalPhotoPath);
-                        // Continue anyway - some buckets may not be immediately accessible
+                    const storagePath = StorageService.getProfilePath('child', currentUserId);
+                    const { path } = await StorageService.upload(BUCKETS.PROFILES, storagePath, photoFile);
+                    finalPhotoPath = StorageService.getPublicUrl(BUCKETS.PROFILES, path);
+
+                    // Verify the uploaded image is accessible
+                    try {
+                        const response = await fetch(finalPhotoPath, { method: 'HEAD' });
+                        if (!response.ok) {
+                            console.warn('Uploaded image not accessible:', finalPhotoPath);
+                            // Continue anyway - some buckets may not be immediately accessible
+                        }
+                    } catch (verifyError) {
+                        console.warn('Could not verify uploaded image accessibility:', verifyError);
+                        // Continue anyway
                     }
-                } catch (verifyError) {
-                    console.warn('Could not verify uploaded image accessibility:', verifyError);
-                    // Continue anyway
+
+                    setUploadStatus('success');
+                } catch (uploadErr: any) {
+                    setUploadError(resolveSyncError(uploadErr));
+                    setUploadStatus('error');
+                    throw uploadErr; // Re-throw to be caught by outer catch
                 }
             }
 
@@ -286,22 +310,36 @@ const ChildRegistrationModal: React.FC<ChildRegistrationModalProps> = ({ child, 
 
                             <div className="flex flex-col items-center gap-4 group/avatar">
                                 <div className="relative">
-                                    <PremiumAvatar 
-                                        src={photoPreview} 
-                                        name={formData.applicant_name || 'C'} 
-                                        size="md" 
+                                    <PremiumAvatar
+                                        src={photoPreview}
+                                        name={formData.applicant_name || 'C'}
+                                        size="md"
                                         className="ring-[12px] ring-white/[0.02] border-4 border-[#0a0a0c] shadow-2xl transition-transform duration-500 group-hover/avatar:scale-105"
                                     />
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="absolute bottom-0 right-0 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-2xl ring-4 ring-[#0a0a0c] hover:scale-110 active:scale-95 transition-all z-30"
+                                        className={`absolute bottom-0 right-0 w-10 h-10 text-white rounded-xl flex items-center justify-center shadow-2xl ring-4 ring-[#0a0a0c] hover:scale-110 active:scale-95 transition-all z-30 ${
+                                            uploadStatus === 'uploading' ? 'bg-yellow-500 animate-pulse' :
+                                            uploadStatus === 'success' ? 'bg-emerald-500' :
+                                            uploadStatus === 'error' ? 'bg-red-500' : 'bg-primary'
+                                        }`}
                                     >
-                                        <UploadIcon className="w-5 h-5"/>
+                                        {uploadStatus === 'uploading' ? <Spinner size="sm" className="text-white" /> :
+                                         uploadStatus === 'success' ? <CheckCircleIcon className="w-5 h-5" /> :
+                                         <UploadIcon className="w-5 h-5" />}
                                     </button>
                                     <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
                                 </div>
-                                <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.6em] animate-pulse">Biometric Interface</p>
+                                <div className="flex flex-col items-center gap-2">
+                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.6em] animate-pulse">Biometric Interface</p>
+                                    {uploadError && (
+                                        <p className="text-[8px] font-bold text-red-400 uppercase tracking-[0.2em] text-center max-w-xs">{uploadError}</p>
+                                    )}
+                                    {uploadStatus === 'success' && (
+                                        <p className="text-[8px] font-bold text-emerald-400 uppercase tracking-[0.2em] text-center">Image uploaded successfully</p>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
