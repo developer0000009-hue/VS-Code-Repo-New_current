@@ -503,6 +503,7 @@ CREATE TABLE IF NOT EXISTS public.document_requirements (
     admission_id bigint NOT NULL REFERENCES public.admissions(id) ON DELETE CASCADE,
     document_name text NOT NULL,
     status text DEFAULT 'Pending',
+    is_mandatory boolean DEFAULT true,
     notes_for_parent text,
     rejection_reason text,
     created_at timestamptz DEFAULT now()
@@ -1067,7 +1068,7 @@ CREATE OR REPLACE FUNCTION public.submit_unsolicited_document( p_admission_id bi
 CREATE OR REPLACE FUNCTION public.create_admission( p_applicant_name text, p_grade text, p_date_of_birth date, p_gender text, p_profile_photo_url text, p_medical_info text, p_emergency_contact text, p_admission_id bigint ) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_id bigint; BEGIN INSERT INTO public.admissions ( parent_id, applicant_name, grade, date_of_birth, gender, profile_photo_url, medical_info, emergency_contact, submitted_by, status ) VALUES ( auth.uid(), p_applicant_name, p_grade, p_date_of_birth, p_gender, p_profile_photo_url, p_medical_info, p_emergency_contact, auth.uid(), 'Pending Review' ) RETURNING id INTO v_id; RETURN v_id; END; $$;
 CREATE OR REPLACE FUNCTION public.update_admission( p_admission_id bigint, p_applicant_name text, p_grade text, p_date_of_birth date, p_gender text, p_profile_photo_url text, p_medical_info text, p_emergency_contact text ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN UPDATE public.admissions SET applicant_name = p_applicant_name, grade = p_grade, date_of_birth = p_date_of_birth, gender = p_gender, profile_photo_url = COALESCE(p_profile_photo_url, profile_photo_url), medical_info = p_medical_info, emergency_contact = p_emergency_contact, updated_at = now() WHERE id = p_admission_id AND parent_id = auth.uid(); END; $$;
 CREATE OR REPLACE FUNCTION public.complete_student_onboarding(p_student_id uuid, p_data jsonb) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN UPDATE public.student_profiles SET parent_guardian_details = p_data->>'parent_name', address = p_data->>'address' WHERE user_id = p_student_id; UPDATE public.profiles SET phone = p_data->>'phone', profile_completed = true WHERE id = p_student_id; END; $$;
-CREATE OR REPLACE FUNCTION public.parent_get_document_requirements() RETURNS TABLE ( id bigint, admission_id bigint, document_name text, status text, notes_for_parent text, rejection_reason text, applicant_name text, admission_documents jsonb ) LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN RETURN QUERY SELECT dr.id, dr.admission_id, dr.document_name, dr.status, dr.notes_for_parent, dr.rejection_reason, a.applicant_name, COALESCE( ( SELECT jsonb_agg( jsonb_build_object( 'id', ad.id, 'file_name', ad.file_name, 'storage_path', ad.storage_path, 'uploaded_at', ad.uploaded_at ) ) FROM public.admission_documents ad WHERE ad.requirement_id = dr.id ), '[]'::jsonb ) as admission_documents FROM public.document_requirements dr JOIN public.admissions a ON dr.admission_id = a.id WHERE a.parent_id = auth.uid() OR a.student_user_id = auth.uid(); END; $$;
+CREATE OR REPLACE FUNCTION public.parent_get_document_requirements() RETURNS TABLE ( id bigint, admission_id bigint, document_name text, status text, is_mandatory boolean, notes_for_parent text, rejection_reason text, applicant_name text, admission_documents jsonb ) LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN RETURN QUERY SELECT dr.id, dr.admission_id, dr.document_name, dr.status, dr.is_mandatory, dr.notes_for_parent, dr.rejection_reason, a.applicant_name, COALESCE( ( SELECT jsonb_agg( jsonb_build_object( 'id', ad.id, 'file_name', ad.file_name, 'storage_path', ad.storage_path, 'uploaded_at', ad.uploaded_at ) ) FROM public.admission_documents ad WHERE ad.requirement_id = dr.id ), '[]'::jsonb ) as admission_documents FROM public.document_requirements dr JOIN public.admissions a ON dr.admission_id = a.id WHERE a.parent_id = auth.uid() OR a.student_user_id = auth.uid(); END; $$;
 CREATE OR REPLACE FUNCTION public.submit_admission_document( p_admission_id bigint, p_requirement_id bigint, p_file_name text, p_storage_path text ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN INSERT INTO public.admission_documents (admission_id, requirement_id, uploaded_by, file_name, storage_path, status) VALUES (p_admission_id, p_requirement_id, auth.uid(), p_file_name, p_storage_path, 'Pending'); UPDATE public.document_requirements SET status = 'Submitted' WHERE id = p_requirement_id; UPDATE public.admissions SET status = 'Documents Requested' WHERE id = p_admission_id AND status = 'Pending Review'; END; $$;
 CREATE OR REPLACE FUNCTION public.request_admission_documents(p_admission_id bigint, p_documents text[], p_note text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE doc_name text; BEGIN FOREACH doc_name IN ARRAY p_documents LOOP INSERT INTO public.document_requirements (admission_id, document_name, notes_for_parent) VALUES (p_admission_id, doc_name, p_note); END LOOP; UPDATE public.admissions SET status = 'Documents Requested' WHERE id = p_admission_id; END; $$;
 
@@ -1386,6 +1387,18 @@ RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_admission record;
+    v_mandatory_docs text[] := ARRAY[
+        'Birth Certificate',
+        'Student Aadhaar Card / Government ID',
+        'Parent / Guardian Aadhaar Card',
+        'Address Proof',
+        'Previous School Transfer Certificate (TC)'
+    ];
+    v_optional_docs text[] := ARRAY[
+        'Passport-size Photograph',
+        'Vaccination / Medical Record'
+    ];
+    v_doc_name text;
 BEGIN
     -- Check if user is the parent
     SELECT * INTO v_admission FROM public.admissions WHERE id = p_admission_id AND parent_id = auth.uid();
@@ -1394,9 +1407,21 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'message', 'Unauthorized access to admission');
     END IF;
 
-    -- Initialize document vault slots (this is handled by document_requirements table)
-    -- Return success as the vault is ready
-    RETURN jsonb_build_object('success', true, 'message', 'Document vault initialized');
+    -- Initialize mandatory document requirements
+    FOREACH v_doc_name IN ARRAY v_mandatory_docs LOOP
+        INSERT INTO public.document_requirements (admission_id, document_name, is_mandatory, status, notes_for_parent)
+        VALUES (p_admission_id, v_doc_name, true, 'Pending', 'Required for student verification and enrollment')
+        ON CONFLICT (admission_id, document_name) DO NOTHING;
+    END LOOP;
+
+    -- Initialize optional document requirements
+    FOREACH v_doc_name IN ARRAY v_optional_docs LOOP
+        INSERT INTO public.document_requirements (admission_id, document_name, is_mandatory, status, notes_for_parent)
+        VALUES (p_admission_id, v_doc_name, false, 'Pending', 'Optional but recommended')
+        ON CONFLICT (admission_id, document_name) DO NOTHING;
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true, 'message', 'Document vault initialized with predefined requirements');
 EXCEPTION
     WHEN OTHERS THEN
         RETURN jsonb_build_object('success', false, 'message', SQLERRM);

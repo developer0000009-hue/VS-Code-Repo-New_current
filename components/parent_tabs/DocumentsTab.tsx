@@ -92,7 +92,7 @@ const DocumentCard: React.FC<{
 
                 <div className="flex-grow">
                     <h4 className="font-serif font-black text-white text-base mb-1 group-hover:text-primary transition-colors uppercase tracking-tight">{req.document_name}</h4>
-                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">{req.is_mandatory ? 'Mandatory Artifact' : 'Supplemental'}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${req.is_mandatory ? 'text-amber-400' : 'text-white/20'}`}>{req.is_mandatory ? 'Required Document' : 'Optional'}</p>
                     
                     {isRejected && (
                         <div className="mt-4 p-3 bg-rose-500/5 border border-rose-500/10 rounded-2xl animate-pulse">
@@ -245,8 +245,8 @@ const DocumentsTab: React.FC<{ focusOnAdmissionId?: string | null; onClearFocus?
                 </div>
                 
                 <div className="flex items-center gap-4 bg-white/[0.02] p-4 rounded-[2rem] border border-white/5">
-                     <span className="text-[10px] font-black uppercase text-white/20 tracking-widest px-4 border-r border-white/5">Active Nodes</span>
-                     <span className="text-2xl font-black text-white px-2">{childIds.length}</span>
+                     <span className="text-[10px] font-black uppercase text-white/20 tracking-widest px-4 border-r border-white/5">Vault Status</span>
+                     <span className={`text-lg font-black px-2 ${childIds.length > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>{childIds.length > 0 ? 'Active' : 'Dormant'}</span>
                 </div>
             </div>
 
@@ -255,9 +255,10 @@ const DocumentsTab: React.FC<{ focusOnAdmissionId?: string | null; onClearFocus?
                 {childIds.map(admId => {
                     const group = groupedRequirements[admId];
                     const isExpanded = expandedChildIds.has(admId);
-                    const verifiedCount = group.requirements.filter(r => r.status === 'Verified').length;
-                    const totalCount = group.requirements.length;
-                    const completion = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
+                    const mandatoryDocs = group.requirements.filter(r => r.is_mandatory);
+                    const verifiedMandatoryCount = mandatoryDocs.filter(r => r.status === 'Verified').length;
+                    const totalMandatoryCount = mandatoryDocs.length;
+                    const completion = totalMandatoryCount > 0 ? Math.round((verifiedMandatoryCount / totalMandatoryCount) * 100) : 0;
                     const isFullySealed = completion === 100;
 
                     return (
@@ -316,15 +317,31 @@ const DocumentsTab: React.FC<{ focusOnAdmissionId?: string | null; onClearFocus?
                             {/* --- EXPANDED GRID --- */}
                             {isExpanded && (
                                 <div className="p-8 md:p-14 border-t border-white/5 bg-black/20 animate-in slide-in-from-top-4 duration-700">
+                                    {/* Warning for missing mandatory documents */}
+                                    {mandatoryDocs.some(r => r.status !== 'Verified') && (
+                                        <div className="mb-8 p-6 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] flex items-center gap-4 animate-in slide-in-from-top-2 duration-500">
+                                            <div className="p-3 bg-amber-500/10 rounded-xl text-amber-500 border border-amber-500/20">
+                                                <AlertTriangleIcon className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex-grow">
+                                                <h4 className="text-sm font-bold text-amber-400 uppercase tracking-widest mb-1">Mandatory Documents Required</h4>
+                                                <p className="text-xs text-amber-200/80 leading-relaxed">
+                                                    {mandatoryDocs.filter(r => r.status !== 'Verified').length} required document(s) are not yet verified.
+                                                    Please upload and submit all mandatory documents to complete enrollment verification.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-[1400px] mx-auto">
                                         {group.requirements.map(req => (
-                                            <DocumentCard 
-                                                key={req.id} 
-                                                req={req} 
-                                                onUpload={handleUpload} 
+                                            <DocumentCard
+                                                key={req.id}
+                                                req={req}
+                                                onUpload={handleUpload}
                                             />
                                         ))}
-                                        
+
                                         <div className="rounded-[2.5rem] border-2 border-dashed border-white/5 hover:border-primary/20 transition-all duration-500 flex flex-col items-center justify-center p-10 bg-white/[0.01] hover:bg-white/[0.03] group/plus cursor-pointer min-h-[240px]">
                                             <div className="w-16 h-16 rounded-3xl bg-white/5 flex items-center justify-center mb-6 group-hover/plus:scale-110 group-hover/plus:bg-primary/10 transition-all duration-700 shadow-inner border border-white/5">
                                                 <PlusIcon className="w-8 h-8 text-white/10 group-hover/plus:text-primary transition-colors" />
