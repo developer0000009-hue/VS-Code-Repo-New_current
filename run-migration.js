@@ -7,8 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-const supabaseUrl = 'https://lnqfoffbmafwkhgdadgw.supabase.co';
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxucWZvZmZibWFmd2toZ2RhZGd3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjkyMzY2NSwiZXhwIjoyMDc4NDk5NjY1fQ.rj0eAt_vm9JTV1Ct471UYwmo8FRvkwkxWR-n-LPDOic';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://jforwngnlqyvlpqzuqpz.supabase.co';
+const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impmb3J3bmdubHF5dmxwcXp1cXB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzM2NjQ1OSwiZXhwIjoyMDgyOTQyNDU5fQ.f3WXFI972q4P-PKD_vWQo6fKzh9bedoQ6FzIgpJxU8M';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
@@ -19,41 +19,26 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 async function runMigration() {
   try {
-    console.log('🚀 Starting enrollment workflow migration...');
+    console.log('🚀 Starting schema migration...');
 
-    // Read the SQL file
-    const sqlFilePath = path.join(__dirname, 'schema_updates.sql');
+    // Read the main schema file
+    const sqlFilePath = path.join(__dirname, 'schema_V0.1.sql');
     const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
 
-    console.log('📄 SQL file loaded, executing migration...');
+    console.log('📄 Schema file loaded, executing migration...');
 
-    // Execute the SQL using rpc function
-    const { data, error } = await supabase.rpc('exec_sql', {
-      sql: sqlContent
-    });
+    // For complete schema replacement, you need to run this in Supabase SQL Editor
+    // The schema contains DDL statements that cannot be executed via RPC
+    console.log('⚠️  DDL operations cannot be executed via client RPC.');
+    console.log('📋 Please copy and paste the contents of schema_V0.1.sql into your Supabase SQL Editor.');
+    console.log('🔗 Supabase Dashboard: https://supabase.com/dashboard/project/jforwngnlqyvlpqzuqpz');
 
-    if (error) {
-      console.error('❌ Migration failed:', error);
-      return;
-    }
-
-    console.log('✅ Migration completed successfully!');
-    console.log('📋 Migration results:', data);
-
-    // Verify the enrollments table was created
-    const { data: tables, error: tableError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'enrollments');
-
-    if (tableError) {
-      console.error('❌ Error checking table creation:', tableError);
-    } else if (tables && tables.length > 0) {
-      console.log('✅ Enrollments table verified!');
-    } else {
-      console.log('⚠️ Enrollments table not found - migration may have failed');
-    }
+    // You could try to split DDL and DML operations, but for simplicity:
+    console.log('💡 The schema includes:');
+    console.log('   ✅ Role-specific profile tables (school_admin, teacher, parent, student)');
+    console.log('   ✅ Branch invitation system');
+    console.log('   ✅ All required RPC functions for role selection');
+    console.log('   ✅ Fixed UUID vs BIGINT type mismatch in identity provisioning');
 
   } catch (err) {
     console.error('💥 Unexpected error during migration:', err);
@@ -105,16 +90,17 @@ async function runMigrationAlternative() {
 // Since direct SQL execution via client is limited, let's provide instructions
 console.log('🔧 MIGRATION INSTRUCTIONS:');
 console.log('');
-console.log('1. Open your Supabase dashboard: https://supabase.com/dashboard/project/lnqfoffbmafwkhgdadgw');
+console.log('1. Open your Supabase dashboard: https://supabase.com/dashboard/project/jforwngnlqyvlpqzuqpz');
 console.log('2. Go to the SQL Editor');
-console.log('3. Copy and paste the contents of schema_updates.sql');
+console.log('3. Copy and paste the contents of schema_V0.1.sql');
 console.log('4. Click "Run" to execute the migration');
 console.log('');
 console.log('This will:');
-console.log('  ✅ Create the missing enrollments table');
-console.log('  ✅ Add branch_id to student_enrollments table');
-console.log('  ✅ Create the required RPC functions');
-console.log('  ✅ Fix the enrollment workflow');
+console.log('  ✅ Create complete database schema with role-specific profile tables');
+console.log('  ✅ Add branch invitation system for secure admin access');
+console.log('  ✅ Create all required RPC functions for identity provisioning');
+console.log('  ✅ Fix the UUID vs BIGINT type mismatch in role selection');
+console.log('  ✅ Enable proper onboarding flow without database errors');
 console.log('');
 
 export { runMigration, runMigrationAlternative };

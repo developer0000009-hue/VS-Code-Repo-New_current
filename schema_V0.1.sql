@@ -806,6 +806,100 @@ CREATE TABLE public.enrollments (
 );
 
 -- ===============================================================================================
+-- ROLE-SPECIFIC PROFILE TABLES
+-- ===============================================================================================
+
+-- School admin profiles table
+DROP TABLE IF EXISTS public.school_admin_profiles CASCADE;
+CREATE TABLE public.school_admin_profiles (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    school_name TEXT,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    country TEXT DEFAULT 'India',
+    admin_contact_name TEXT,
+    admin_contact_phone TEXT,
+    onboarding_step TEXT DEFAULT 'profile',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+-- Parent profiles table
+DROP TABLE IF EXISTS public.parent_profiles CASCADE;
+CREATE TABLE public.parent_profiles (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    relationship_to_student TEXT,
+    gender TEXT,
+    number_of_children INTEGER DEFAULT 1,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    country TEXT DEFAULT 'India',
+    pin_code TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+-- Teacher profiles table
+DROP TABLE IF EXISTS public.teacher_profiles CASCADE;
+CREATE TABLE public.teacher_profiles (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    display_name TEXT,
+    email TEXT,
+    phone TEXT,
+    department TEXT,
+    designation TEXT,
+    subject TEXT,
+    qualification TEXT,
+    experience_years INTEGER DEFAULT 0,
+    date_of_joining DATE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+-- Student profiles table
+DROP TABLE IF EXISTS public.student_profiles CASCADE;
+CREATE TABLE public.student_profiles (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    grade TEXT,
+    date_of_birth DATE,
+    gender TEXT,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    country TEXT DEFAULT 'India',
+    pin_code TEXT,
+    emergency_contact TEXT,
+    medical_info TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+-- School branch invitations table
+DROP TABLE IF EXISTS public.school_branch_invitations CASCADE;
+CREATE TABLE public.school_branch_invitations (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    branch_id BIGINT REFERENCES public.school_branches(id) ON DELETE CASCADE,
+    code TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_revoked BOOLEAN DEFAULT false,
+    redeemed_at TIMESTAMPTZ,
+    redeemed_by UUID REFERENCES public.profiles(id),
+    created_by UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ===============================================================================================
 -- 5. FOREIGN KEYS / CONSTRAINTS / INDEXES
 -- ===============================================================================================
 
@@ -915,6 +1009,17 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_table_name ON public.audit_logs(table_
 CREATE INDEX IF NOT EXISTS idx_audit_logs_record_id ON public.audit_logs(record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_changed_by ON public.audit_logs(changed_by);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_changed_at ON public.audit_logs(changed_at);
+
+-- Indexes for role-specific profile tables
+CREATE INDEX IF NOT EXISTS idx_school_admin_profiles_user_id ON public.school_admin_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_parent_profiles_user_id ON public.parent_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_profiles_user_id ON public.teacher_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_student_profiles_user_id ON public.student_profiles(user_id);
+
+-- Indexes for branch invitations
+CREATE INDEX IF NOT EXISTS idx_school_branch_invitations_code ON public.school_branch_invitations(code);
+CREATE INDEX IF NOT EXISTS idx_school_branch_invitations_branch_id ON public.school_branch_invitations(branch_id);
+CREATE INDEX IF NOT EXISTS idx_school_branch_invitations_redeemed_by ON public.school_branch_invitations(redeemed_by);
 
 
 
@@ -1027,6 +1132,279 @@ BEGIN
         'profile_restored', v_profile_restored,
         'target_role', p_target_role
     );
+END;
+$$;
+
+-- Function to initialize school admin
+DROP FUNCTION IF EXISTS public.initialize_school_admin();
+CREATE OR REPLACE FUNCTION public.initialize_school_admin()
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_user_id UUID;
+BEGIN
+    -- Get current user ID
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN json_build_object('success', false, 'message', 'User not authenticated');
+    END IF;
+
+    -- Insert initial school admin profile
+    INSERT INTO public.school_admin_profiles (user_id, onboarding_step)
+    VALUES (v_user_id, 'profile')
+    ON CONFLICT (user_id) DO NOTHING;
+
+    -- Update main profile
+    UPDATE public.profiles
+    SET role = 'school_admin', profile_completed = false, updated_at = now()
+    WHERE id = v_user_id;
+
+    RETURN json_build_object('success', true, 'message', 'School admin initialized successfully');
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
+END;
+$$;
+
+-- Function to upsert teacher profile
+DROP FUNCTION IF EXISTS public.upsert_teacher_profile(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, DATE);
+CREATE OR REPLACE FUNCTION public.upsert_teacher_profile(
+    p_user_id UUID,
+    p_display_name TEXT,
+    p_email TEXT,
+    p_phone TEXT,
+    p_department TEXT,
+    p_designation TEXT,
+    p_subject TEXT,
+    p_qualification TEXT,
+    p_experience INTEGER,
+    p_doj DATE
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Check if user is authorized
+    IF auth.uid() != p_user_id AND NOT (SELECT is_admin(auth.uid())) THEN
+        RETURN json_build_object('success', false, 'message', 'Unauthorized');
+    END IF;
+
+    -- Upsert teacher profile
+    INSERT INTO public.teacher_profiles (
+        user_id, display_name, email, phone, department, designation,
+        subject, qualification, experience_years, date_of_joining
+    )
+    VALUES (
+        p_user_id, p_display_name, p_email, p_phone, p_department, p_designation,
+        p_subject, p_qualification, p_experience, p_doj
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+        display_name = EXCLUDED.display_name,
+        email = EXCLUDED.email,
+        phone = EXCLUDED.phone,
+        department = EXCLUDED.department,
+        designation = EXCLUDED.designation,
+        subject = EXCLUDED.subject,
+        qualification = EXCLUDED.qualification,
+        experience_years = EXCLUDED.experience_years,
+        date_of_joining = EXCLUDED.date_of_joining,
+        updated_at = now();
+
+    RETURN json_build_object('success', true, 'message', 'Teacher profile updated successfully');
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
+END;
+$$;
+
+-- Function to complete branch step
+DROP FUNCTION IF EXISTS public.complete_branch_step();
+CREATE OR REPLACE FUNCTION public.complete_branch_step()
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_user_id UUID;
+BEGIN
+    -- Get current user ID
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN json_build_object('success', false, 'message', 'User not authenticated');
+    END IF;
+
+    -- Update school admin profile
+    UPDATE public.school_admin_profiles
+    SET onboarding_step = 'completed', updated_at = now()
+    WHERE user_id = v_user_id;
+
+    -- Update main profile
+    UPDATE public.profiles
+    SET profile_completed = true, updated_at = now()
+    WHERE id = v_user_id;
+
+    RETURN json_build_object('success', true, 'message', 'Onboarding completed successfully');
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
+END;
+$$;
+
+-- Function to generate branch access key
+DROP FUNCTION IF EXISTS public.generate_branch_access_key(BIGINT);
+CREATE OR REPLACE FUNCTION public.generate_branch_access_key(p_branch_id BIGINT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_code TEXT;
+    v_expires_at TIMESTAMPTZ;
+BEGIN
+    -- Check if user is authorized (school admin)
+    IF NOT (SELECT is_admin(auth.uid())) THEN
+        RETURN json_build_object('success', false, 'message', 'Unauthorized');
+    END IF;
+
+    -- Generate unique code
+    v_code := UPPER(SUBSTRING(MD5(RANDOM()::TEXT) FROM 1 FOR 8));
+    v_expires_at := now() + INTERVAL '7 days';
+
+    -- Insert invitation
+    INSERT INTO public.school_branch_invitations (
+        branch_id, code, expires_at, created_by
+    ) VALUES (
+        p_branch_id, v_code, v_expires_at, auth.uid()
+    );
+
+    RETURN json_build_object('success', true, 'code', v_code, 'expires_at', v_expires_at);
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
+END;
+$$;
+
+-- Function to revoke branch access key
+DROP FUNCTION IF EXISTS public.revoke_branch_access_key(BIGINT);
+CREATE OR REPLACE FUNCTION public.revoke_branch_access_key(p_branch_id BIGINT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Check if user is authorized
+    IF NOT (SELECT is_admin(auth.uid())) THEN
+        RETURN json_build_object('success', false, 'message', 'Unauthorized');
+    END IF;
+
+    -- Revoke active invitations for this branch
+    UPDATE public.school_branch_invitations
+    SET is_revoked = true, updated_at = now()
+    WHERE branch_id = p_branch_id
+    AND is_revoked = false
+    AND redeemed_at IS NULL
+    AND expires_at > now();
+
+    RETURN json_build_object('success', true, 'message', 'Access key revoked');
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
+END;
+$$;
+
+-- Function to verify and link branch admin
+DROP FUNCTION IF EXISTS public.verify_and_link_branch_admin(TEXT);
+CREATE OR REPLACE FUNCTION public.verify_and_link_branch_admin(p_invitation_code TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_invitation RECORD;
+    v_user_id UUID;
+BEGIN
+    -- Get current user ID
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RETURN json_build_object('success', false, 'message', 'User not authenticated');
+    END IF;
+
+    -- Find and validate invitation
+    SELECT * INTO v_invitation
+    FROM public.school_branch_invitations
+    WHERE code = UPPER(p_invitation_code)
+    AND is_revoked = false
+    AND redeemed_at IS NULL
+    AND expires_at > now();
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'message', 'Invalid, expired, or revoked invitation code');
+    END IF;
+
+    -- Mark invitation as redeemed
+    UPDATE public.school_branch_invitations
+    SET redeemed_at = now(), redeemed_by = v_user_id, updated_at = now()
+    WHERE id = v_invitation.id;
+
+    -- Update user profile with branch_id and role
+    UPDATE public.profiles
+    SET branch_id = v_invitation.branch_id,  -- This is BIGINT, correct
+        role = 'school_admin',
+        updated_at = now()
+    WHERE id = v_user_id;
+
+    -- Initialize school admin profile
+    INSERT INTO public.school_admin_profiles (user_id, onboarding_step)
+    VALUES (v_user_id, 'profile')
+    ON CONFLICT (user_id) DO NOTHING;
+
+    RETURN json_build_object('success', true, 'message', 'Successfully linked to branch', 'branch_id', v_invitation.branch_id);
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
+END;
+$$;
+
+-- Function to delete school branch
+DROP FUNCTION IF EXISTS public.delete_school_branch(BIGINT);
+CREATE OR REPLACE FUNCTION public.delete_school_branch(p_branch_id BIGINT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Check if user is authorized
+    IF NOT (SELECT is_admin(auth.uid())) THEN
+        RETURN json_build_object('success', false, 'message', 'Unauthorized');
+    END IF;
+
+    -- Check if branch has active users
+    IF EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE branch_id = p_branch_id
+        AND is_active = true
+        AND deleted_at IS NULL
+    ) THEN
+        RETURN json_build_object('success', false, 'message', 'Cannot delete branch with active users');
+    END IF;
+
+    -- Delete branch (cascade will handle related records)
+    DELETE FROM public.school_branches WHERE id = p_branch_id;
+
+    RETURN json_build_object('success', true, 'message', 'Branch deleted successfully');
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN json_build_object('success', false, 'message', 'Database error: ' || SQLERRM);
 END;
 $$;
 
@@ -1168,6 +1546,28 @@ CREATE TRIGGER trigger_transport_vehicles_updated_at
 
 CREATE TRIGGER trigger_student_transport_assignments_updated_at
     BEFORE UPDATE ON public.student_transport_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Triggers for role-specific profile tables
+CREATE TRIGGER trigger_school_admin_profiles_updated_at
+    BEFORE UPDATE ON public.school_admin_profiles
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER trigger_parent_profiles_updated_at
+    BEFORE UPDATE ON public.parent_profiles
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER trigger_teacher_profiles_updated_at
+    BEFORE UPDATE ON public.teacher_profiles
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER trigger_student_profiles_updated_at
+    BEFORE UPDATE ON public.student_profiles
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Trigger for branch invitations
+CREATE TRIGGER trigger_school_branch_invitations_updated_at
+    BEFORE UPDATE ON public.school_branch_invitations
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Trigger for auto-creating profiles
@@ -1688,7 +2088,66 @@ BEGIN
 END;
 $$;
 
+-- Role-specific profile tables RLS
+DROP POLICY IF EXISTS "School admins can manage their profiles" ON public.school_admin_profiles;
+CREATE POLICY "School admins can manage their profiles" ON public.school_admin_profiles
+    FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins can view all school admin profiles" ON public.school_admin_profiles;
+CREATE POLICY "Admins can view all school admin profiles" ON public.school_admin_profiles
+    FOR SELECT USING (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Parents can manage their profiles" ON public.parent_profiles;
+CREATE POLICY "Parents can manage their profiles" ON public.parent_profiles
+    FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins can view all parent profiles" ON public.parent_profiles;
+CREATE POLICY "Admins can view all parent profiles" ON public.parent_profiles
+    FOR SELECT USING (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Teachers can manage their profiles" ON public.teacher_profiles;
+CREATE POLICY "Teachers can manage their profiles" ON public.teacher_profiles
+    FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins can view all teacher profiles" ON public.teacher_profiles;
+CREATE POLICY "Admins can view all teacher profiles" ON public.teacher_profiles
+    FOR SELECT USING (is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "Students can manage their profiles" ON public.student_profiles;
+CREATE POLICY "Students can manage their profiles" ON public.student_profiles
+    FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Admins can view all student profiles" ON public.student_profiles;
+CREATE POLICY "Admins can view all student profiles" ON public.student_profiles
+    FOR SELECT USING (is_admin(auth.uid()));
+
+-- Branch invitations RLS
+DROP POLICY IF EXISTS "Admins can manage branch invitations" ON public.school_branch_invitations;
+CREATE POLICY "Admins can manage branch invitations" ON public.school_branch_invitations
+    FOR ALL USING (is_admin(auth.uid()));
+
+-- Enable RLS for new tables
+ALTER TABLE public.school_admin_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.parent_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_branch_invitations ENABLE ROW LEVEL SECURITY;
+
 -- Grant permissions for new functions
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT ALL ON public.school_admin_profiles TO authenticated;
+GRANT ALL ON public.parent_profiles TO authenticated;
+GRANT ALL ON public.teacher_profiles TO authenticated;
+GRANT ALL ON public.student_profiles TO authenticated;
+GRANT ALL ON public.school_branch_invitations TO authenticated;
+
+GRANT EXECUTE ON FUNCTION public.initialize_school_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.upsert_teacher_profile(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, DATE) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_branch_step() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.generate_branch_access_key(BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_branch_access_key(BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.verify_and_link_branch_admin(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_school_branch(BIGINT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_transition_admission(BIGINT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_all_students_for_admin() TO authenticated;
 
