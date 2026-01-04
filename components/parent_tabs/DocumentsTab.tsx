@@ -14,6 +14,7 @@ import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
 import { RefreshIcon } from '../icons/RefreshIcon';
 import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 import { PlusIcon } from '../icons/PlusIcon';
+import { DownloadIcon } from '../icons/DownloadIcon';
 import PremiumAvatar from '../common/PremiumAvatar';
 
 // --- Internal Types ---
@@ -53,12 +54,12 @@ const IntegritySeal = () => (
     </div>
 );
 
-const DocumentCard: React.FC<{ 
-    req: RequirementWithDocs; 
+const DocumentCard: React.FC<{
+    req: RequirementWithDocs;
     onUpload: (file: File, reqId: number, admId: string) => Promise<void>;
 }> = ({ req, onUpload }) => {
     const [isUploading, setIsUploading] = useState(false);
-    const [actionLoading, setActionLoading] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const latestDoc = req.admission_documents?.[0];
@@ -75,6 +76,28 @@ const DocumentCard: React.FC<{
             console.error("Sync Failure", err);
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    const handleDownload = async () => {
+        if (!latestDoc) return;
+        setIsDownloading(true);
+        try {
+            const fileBlob = await StorageService.download(BUCKETS.GUARDIAN_DOCUMENTS, latestDoc.storage_path);
+            const blob = new Blob([fileBlob], { type: fileBlob.type });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = latestDoc.file_name;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error: any) {
+            console.error('Download failed:', error);
+            alert('Failed to download document: ' + (error.message || 'Please try again.'));
+        } finally {
+            setIsDownloading(false);
         }
     };
 
@@ -104,14 +127,15 @@ const DocumentCard: React.FC<{
 
                 <div className="mt-6 pt-4 border-t border-white/5 flex gap-2">
                     {hasFile ? (
-                        <button 
-                            disabled={actionLoading || isUploading}
+                        <button
+                            onClick={handleDownload}
+                            disabled={isDownloading || isUploading}
                             className="flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-[10px] font-black bg-white/5 border border-white/5 text-white/50 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
                         >
-                            <EyeIcon className="w-4 h-4" /> View
+                            {isDownloading ? <Spinner size="sm" className="text-white"/> : <><DownloadIcon className="w-4 h-4" /> Download</>}
                         </button>
                     ) : (
-                        <button 
+                        <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
                             className="w-full h-11 flex items-center justify-center gap-2 rounded-xl text-[10px] font-black text-white bg-primary hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95 uppercase tracking-widest"
