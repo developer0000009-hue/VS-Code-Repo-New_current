@@ -79,8 +79,7 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
                 const { data, error: impError } = await supabase.rpc('admin_import_record_from_share_code', {
                     p_admission_id: verificationResult.admission_id,
                     p_code_type: verificationResult.code_type,
-                    p_branch_id: branchId || null,
-                    p_code_id: verificationResult.id
+                    p_branch_id: branchId || null
                 });
                 
                 if (impError) throw impError;

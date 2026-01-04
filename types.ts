@@ -375,10 +375,17 @@ export interface VerifiedShareCodeData {
     id?: string;
     found: boolean;
     admission_id: string;
+    enquiry_id?: string;
     applicant_name: string;
     grade: string;
     code_type: ShareCodeType;
     error?: string;
+    date_of_birth?: string;
+    gender?: string;
+    parent_name?: string;
+    parent_email?: string;
+    parent_phone?: string;
+    already_imported?: boolean;
 }
 
 export interface TeacherClassOverview {
