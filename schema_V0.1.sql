@@ -1122,7 +1122,7 @@ BEGIN
     UPDATE public.share_codes SET admission_id = v_adm_id, code_type = 'Admission' WHERE enquiry_id = p_enquiry_id;
 END;
 $$;
-CREATE OR REPLACE FUNCTION public.admin_verify_share_code(p_code text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_share record; v_admission record; v_enquiry record; v_main_id bigint; BEGIN SELECT * INTO v_share FROM public.share_codes WHERE code = p_code AND status = 'Active' AND expires_at > now(); IF v_share IS NULL THEN RETURN jsonb_build_object('found', false, 'error', 'Invalid or expired code'); END IF; SELECT * INTO v_admission FROM public.admissions WHERE id = v_share.admission_id; IF v_share.code_type = 'Enquiry' THEN SELECT * INTO v_enquiry FROM public.enquiries WHERE admission_id = v_share.admission_id; END IF; v_main_id := v_admission.id; RETURN jsonb_build_object( 'found', true, 'id', v_main_id, 'admission_id', v_admission.id, 'enquiry_id', v_enquiry.id, 'code_type', v_share.code_type, 'applicant_name', v_admission.applicant_name, 'grade', v_admission.grade, 'date_of_birth', v_admission.date_of_birth, 'gender', v_admission.gender, 'parent_name', v_admission.parent_name, 'parent_email', v_admission.parent_email, 'parent_phone', v_admission.parent_phone, 'already_imported', FALSE ); END; $$;
+CREATE OR REPLACE FUNCTION public.admin_verify_share_code(p_code text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$ DECLARE v_share record; v_admission record; v_enquiry record; v_main_id bigint; BEGIN SELECT * INTO v_share FROM public.share_codes WHERE code = p_code AND status = 'Active' AND expires_at > now(); IF v_share IS NULL THEN RETURN jsonb_build_object('found', false, 'error', 'Invalid or expired code'); END IF; IF v_share.code_type = 'Admission' THEN SELECT * INTO v_admission FROM public.admissions WHERE id = v_share.admission_id; ELSIF v_share.code_type = 'Enquiry' THEN SELECT * INTO v_enquiry FROM public.enquiries WHERE id = v_share.enquiry_id; IF v_enquiry IS NULL THEN RETURN jsonb_build_object('found', false, 'error', 'Enquiry record not found for this code'); END IF; SELECT * INTO v_admission FROM public.admissions WHERE id = v_enquiry.admission_id; END IF; IF v_admission IS NULL THEN RETURN jsonb_build_object('found', false, 'error', 'Admission record not found'); END IF; v_main_id := v_admission.id; RETURN jsonb_build_object( 'found', true, 'id', v_main_id, 'admission_id', v_admission.id, 'enquiry_id', v_enquiry.id, 'code_type', v_share.code_type, 'applicant_name', v_admission.applicant_name, 'grade', v_admission.grade, 'date_of_birth', v_admission.date_of_birth, 'gender', v_admission.gender, 'parent_name', v_admission.parent_name, 'parent_email', v_admission.parent_email, 'parent_phone', v_admission.parent_phone, 'already_imported', FALSE ); END; $$;
 CREATE OR REPLACE FUNCTION public.admin_import_record_from_share_code( p_admission_id bigint, p_code_type text, p_branch_id bigint ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN IF p_code_type = 'Enquiry' THEN UPDATE public.admissions SET branch_id = p_branch_id, status = 'Enquiry Node' WHERE id = p_admission_id; INSERT INTO public.enquiries (admission_id, applicant_name, grade, branch_id, parent_name, parent_email, parent_phone) SELECT id, applicant_name, grade, p_branch_id, parent_name, parent_email, parent_phone FROM public.admissions WHERE id = p_admission_id ON CONFLICT DO NOTHING; ELSE UPDATE public.admissions SET branch_id = p_branch_id, status = 'Pending Review' WHERE id = p_admission_id; END IF; UPDATE public.share_codes SET status = 'Redeemed' WHERE admission_id = p_admission_id; END; $$;
 CREATE OR REPLACE FUNCTION public.get_my_share_codes() RETURNS TABLE (
     id bigint,
@@ -1181,10 +1181,10 @@ BEGIN
         SELECT id INTO v_enquiry_id FROM public.enquiries WHERE admission_id = p_admission_id;
     END IF;
 
-    -- Generate and store the code linked to enquiry
+    -- Generate and store the code linked to enquiry (also set admission_id for consistency)
     v_code := upper(substring(md5(random()::text), 1, 12));
-    INSERT INTO public.share_codes (code, enquiry_id, purpose, code_type, expires_at)
-    VALUES (v_code, v_enquiry_id, p_purpose, 'Enquiry', now() + interval '1 day');
+    INSERT INTO public.share_codes (code, admission_id, enquiry_id, purpose, code_type, expires_at)
+    VALUES (v_code, p_admission_id, v_enquiry_id, p_purpose, 'Enquiry', now() + interval '1 day');
 
     RETURN v_code;
 END;
@@ -1209,9 +1209,9 @@ BEGIN
 
     v_code := upper(substring(md5(random()::text), 1, 12));
 
-    -- Fix: Ensure code_type is set to 'Admission' for admission codes to satisfy the CHECK constraint
+    -- Fix: Use the provided code_type parameter to properly set Enquiry vs Admission codes
     INSERT INTO public.share_codes (code, admission_id, purpose, code_type, expires_at)
-    VALUES (v_code, p_admission_id, p_purpose, 'Admission', now() + interval '1 day');
+    VALUES (v_code, p_admission_id, p_purpose, p_code_type, now() + interval '1 day');
 
     -- For Admission permits, update admission status to indicate document request phase
     UPDATE public.admissions SET status = 'Pending Review' WHERE id = p_admission_id;

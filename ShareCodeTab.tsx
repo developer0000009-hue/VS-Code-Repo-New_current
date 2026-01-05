@@ -87,11 +87,19 @@ export default function ShareCodesTab() {
     setError(null);
 
     try {
-      const { data, error } = await supabase.rpc('generate_admission_share_code', {
-        p_admission_id: selectedAdmission,
-        p_purpose: purpose,
-        p_code_type: codeType,
-      });
+      const { data, error } = await supabase.rpc(
+        codeType === 'Enquiry' ? 'generate_enquiry_share_code' : 'generate_admission_share_code',
+        codeType === 'Enquiry'
+          ? {
+              p_admission_id: selectedAdmission,
+              p_purpose: purpose,
+            }
+          : {
+              p_admission_id: selectedAdmission,
+              p_purpose: purpose,
+              p_code_type: codeType,
+            }
+      );
 
       if (error) throw error;
 
