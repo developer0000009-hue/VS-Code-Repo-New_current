@@ -32,7 +32,7 @@ const STATUS_CONFIG: Record<string, { icon: React.ReactNode, label: string, colo
     'CONVERTED': { icon: <CheckCircleIcon className="w-4 h-4"/>, label: 'Converted', color: 'text-emerald-700', ring: 'ring-emerald-500', bg: 'bg-emerald-50' },
 };
 
-const ORDERED_STATUSES: EnquiryStatus[] = ['ENQUIRY_ACTIVE', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'];
+const ORDERED_STATUSES: EnquiryStatus[] = ['ENQUIRY_NODE_ACTIVE', 'ENQUIRY_NODE_VERIFIED', 'ENQUIRY_NODE_IN_PROGRESS', 'CONVERTED'];
 
 const TimelineEntry: React.FC<{ item: TimelineItem }> = ({ item }) => {
     if (item.item_type === 'MESSAGE') {
