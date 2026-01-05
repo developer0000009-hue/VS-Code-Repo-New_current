@@ -73,13 +73,14 @@ export default function ShareCodesTab() {
         setError(null);
 
         try {
-            // Use correct RPC function based on permit type
-            const rpcFunction = permitType === 'Enquiry' ? 'generate_enquiry_share_code' : 'generate_admission_share_code';
-            const rpcParams = permitType === 'Enquiry'
-                ? { p_admission_id: selectedAdmissionId, p_purpose: 'Institutional Handshake' }
-                : { p_admission_id: selectedAdmissionId, p_purpose: 'Institutional Handshake', p_code_type: permitType };
+            // Always use generate_admission_share_code with code_type parameter
+            const rpcParams = {
+                p_admission_id: selectedAdmissionId,
+                p_purpose: 'Institutional Handshake',
+                p_code_type: permitType
+            };
 
-            const { data, error: rpcError } = await supabase.rpc(rpcFunction, rpcParams);
+            const { data, error: rpcError } = await supabase.rpc('generate_admission_share_code', rpcParams);
 
             if (rpcError) throw rpcError;
 

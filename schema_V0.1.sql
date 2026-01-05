@@ -1196,6 +1196,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_code text;
+    v_enquiry_id bigint;
 BEGIN
     -- Validate input parameters
     IF p_admission_id IS NULL THEN
@@ -1209,12 +1210,30 @@ BEGIN
 
     v_code := upper(substring(md5(random()::text), 1, 12));
 
-    -- Fix: Use the provided code_type parameter to properly set Enquiry vs Admission codes
-    INSERT INTO public.share_codes (code, admission_id, purpose, code_type, expires_at)
-    VALUES (v_code, p_admission_id, p_purpose, p_code_type, now() + interval '1 day');
+    IF p_code_type = 'Enquiry' THEN
+        -- For Enquiry permits, create enquiry record first
+        INSERT INTO public.enquiries (admission_id, applicant_name, grade, parent_name, parent_email, parent_phone, status)
+        SELECT id, applicant_name, grade, parent_name, parent_email, parent_phone, 'New'
+        FROM public.admissions WHERE id = p_admission_id
+        ON CONFLICT (admission_id) DO NOTHING
+        RETURNING id INTO v_enquiry_id;
 
-    -- For Admission permits, update admission status to indicate document request phase
-    UPDATE public.admissions SET status = 'Pending Review' WHERE id = p_admission_id;
+        -- If enquiry already exists, get its ID
+        IF v_enquiry_id IS NULL THEN
+            SELECT id INTO v_enquiry_id FROM public.enquiries WHERE admission_id = p_admission_id;
+        END IF;
+
+        -- Insert share code for Enquiry
+        INSERT INTO public.share_codes (code, admission_id, enquiry_id, purpose, code_type, expires_at)
+        VALUES (v_code, NULL, v_enquiry_id, p_purpose, 'Enquiry', now() + interval '1 day');
+    ELSE
+        -- For Admission permits
+        INSERT INTO public.share_codes (code, admission_id, purpose, code_type, expires_at)
+        VALUES (v_code, p_admission_id, p_purpose, p_code_type, now() + interval '1 day');
+
+        -- Update admission status to indicate document request phase
+        UPDATE public.admissions SET status = 'Pending Review' WHERE id = p_admission_id;
+    END IF;
 
     RETURN v_code;
 END;
