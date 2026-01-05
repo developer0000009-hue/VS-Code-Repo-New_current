@@ -264,9 +264,16 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                             </thead>
                             <tbody className="divide-y divide-white/5 relative z-10">
                                 {processedEnquiries.map((enq, idx) => (
-                                    <tr 
-                                        key={enq.id} 
-                                        onClick={() => setViewingEnquiry(enq)} 
+                                    <tr
+                                        key={enq.id}
+                                        onClick={() => {
+                                            // Validate enquiry data before opening modal
+                                            if (!enq.id || !enq.applicant_name) {
+                                                console.error('Invalid enquiry data:', enq);
+                                                return;
+                                            }
+                                            setViewingEnquiry(enq);
+                                        }}
                                         style={{ animationDelay: `${idx * 40}ms` }}
                                         className="group hover:bg-white/[0.015] transition-all duration-500 cursor-pointer relative overflow-hidden animate-in fade-in slide-in-from-bottom-2"
                                     >

@@ -37,17 +37,20 @@ const ORDERED_STATUSES: EnquiryStatus[] = ['ENQUIRY_ACTIVE', 'ENQUIRY_VERIFIED',
 const TimelineEntry: React.FC<{ item: TimelineItem }> = ({ item }) => {
     if (item.item_type === 'MESSAGE') {
         const isParent = !item.is_admin;
+        const message = item.details?.message || '[Message content unavailable]';
+        const createdByName = item.created_by_name || 'Unknown';
+
         return (
              <div className={`flex items-end gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 w-full ${isParent ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex items-end gap-5 max-w-[85%] sm:max-w-[75%] ${isParent ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className={`w-11 h-11 rounded-[1.1rem] flex items-center justify-center font-black text-sm shadow-2xl text-white flex-shrink-0 border border-white/5 ${isParent ? 'bg-indigo-600' : 'bg-[#252833]'}`}>
-                        {item.created_by_name.charAt(0)}
+                        {createdByName.charAt(0)}
                     </div>
                     <div className={`p-6 md:p-8 rounded-[2.5rem] shadow-2xl ring-1 ring-white/5 overflow-hidden relative ${isParent ? 'bg-[#1a1d23] rounded-br-none' : 'bg-[#221f30] rounded-bl-none text-white/90'}`}>
                          <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
-                         <p className="text-[15px] md:text-[17px] leading-relaxed relative z-10 whitespace-pre-wrap font-medium">{item.details.message}</p>
+                         <p className="text-[15px] md:text-[17px] leading-relaxed relative z-10 whitespace-pre-wrap font-medium">{message}</p>
                          <div className={`flex items-center gap-3 mt-6 relative z-10 opacity-30 ${isParent ? 'justify-end' : 'justify-start'}`}>
-                            <span className="text-[9px] font-black uppercase tracking-widest">{item.created_by_name}</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest">{createdByName}</span>
                             <span className="w-1 h-1 rounded-full bg-white"></span>
                             <span className="text-[9px] font-mono">{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                          </div>
@@ -56,13 +59,13 @@ const TimelineEntry: React.FC<{ item: TimelineItem }> = ({ item }) => {
             </div>
         );
     }
-    
+
     return (
         <div className="flex justify-center my-10 animate-in fade-in zoom-in-95 duration-1000">
             <div className="flex items-center gap-4 px-6 py-2.5 rounded-full bg-white/[0.02] border border-white/5 shadow-inner backdrop-blur-sm">
                 <div className="w-1 h-1 rounded-full bg-primary/40 animate-pulse"></div>
                 <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20">
-                    {item.item_type.replace(/_/g, ' ')} / {new Date(item.created_at).toLocaleTimeString()}
+                    {item.item_type?.replace(/_/g, ' ') || 'Unknown Event'} / {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <div className="w-1 h-1 rounded-full bg-primary/40 animate-pulse"></div>
             </div>
@@ -74,9 +77,22 @@ interface EnquiryDetailsModalProps {
     enquiry: Enquiry;
     onClose: () => void;
     onUpdate: () => void;
-    currentBranchId?: string | null; 
+    currentBranchId?: string | null;
     onNavigate?: (component: string) => void;
 }
+
+const validateEnquiry = (enquiry: Enquiry): { isValid: boolean; error?: string } => {
+    if (!enquiry) {
+        return { isValid: false, error: 'Enquiry data is missing' };
+    }
+    if (!enquiry.id) {
+        return { isValid: false, error: 'Enquiry ID is required' };
+    }
+    if (!enquiry.applicant_name) {
+        return { isValid: false, error: 'Applicant name is required' };
+    }
+    return { isValid: true };
+};
 
 const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onClose, onUpdate, onNavigate }) => {
     const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -88,7 +104,19 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState({ timeline: true, saving: false, converting: false, ai: false });
     const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const commsEndRef = useRef<HTMLDivElement>(null);
+
+    // Validate enquiry data on mount
+    useEffect(() => {
+        const validation = validateEnquiry(enquiry);
+        if (!validation.isValid) {
+            setError(validation.error || 'Invalid enquiry data');
+            setLoading(prev => ({ ...prev, timeline: false }));
+            return;
+        }
+        setError(null);
+    }, [enquiry]);
 
     const fetchTimeline = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(prev => ({ ...prev, timeline: true }));
@@ -114,7 +142,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
     }, [timeline]);
 
     const handleAIGenerateSummary = async () => {
-        const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
+        const apiKey = (import.meta as any).env?.VITE_GOOGLE_AI_API_KEY;
         if (!apiKey) {
             console.error("Google AI API key not configured");
             setAiSummary("AI summary unavailable - API key not configured.");
@@ -126,17 +154,22 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
             const ai = new GoogleGenAI({ apiKey });
             const conversationText = timeline
                 .filter(t => t.item_type === 'MESSAGE')
-                .map(t => `${t.is_admin ? 'Admin' : 'Parent'}: ${t.details.message}`)
+                .map(t => `${t.is_admin ? 'Admin' : 'Parent'}: ${t.details?.message || '[Message not available]'}`)
                 .join('\n');
 
-            const prompt = `Summarize the following school admission enquiry conversation for ${enquiry.applicant_name} (Grade ${enquiry.grade}). Provide a concise analysis of the parent's primary concerns and the current status of the handshake. Tone: Executive and Brief.\n\nConversation:\n${conversationText}`;
+            if (!conversationText.trim()) {
+                setAiSummary("No conversation data available to summarize.");
+                return;
+            }
+
+            const prompt = `Summarize the following school admission enquiry conversation for ${enquiry.applicant_name || 'Student'} (Grade ${enquiry.grade || 'Unknown'}). Provide a concise analysis of the parent's primary concerns and the current status of the handshake. Tone: Executive and Brief.\n\nConversation:\n${conversationText}`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: prompt
             });
 
-            setAiSummary(response.text || "Summary unavailable.");
+            setAiSummary(response?.text || "Summary unavailable.");
         } catch (err) {
             console.error("AI Context Failure:", err);
             setAiSummary("AI summary failed - please try again.");
@@ -229,7 +262,26 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
 
                     <div className="flex-1 flex flex-col bg-transparent relative z-10">
                         <div className="flex-grow overflow-y-auto p-10 md:p-20 space-y-16 custom-scrollbar flex flex-col scroll-smooth">
-                            {loading.timeline && timeline.length === 0 ? (
+                            {error ? (
+                                <div className="m-auto flex flex-col items-center gap-6 text-center">
+                                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center border border-red-500/30">
+                                        <XIcon className="w-8 h-8 text-red-400" />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h3 className="text-2xl font-serif font-black text-white uppercase tracking-tight">System Error</h3>
+                                        <p className="text-white/60 max-w-md font-serif italic">{error}</p>
+                                        <button
+                                            onClick={() => {
+                                                setError(null);
+                                                fetchTimeline();
+                                            }}
+                                            className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-xl text-sm font-bold uppercase tracking-wide transition-all border border-white/10"
+                                        >
+                                            Retry Loading
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : loading.timeline && timeline.length === 0 ? (
                                 <div className="m-auto flex flex-col items-center gap-6">
                                     <Spinner size="lg" className="text-primary" />
                                     <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/20 animate-pulse">Recalling Conversation Ledger</p>
