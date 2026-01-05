@@ -257,7 +257,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
 
     const fetchTimeline = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.rpc('get_enquiry_timeline', { p_node_id: primaryId });
+        const { data } = await supabase.rpc('get_enquiry_timeline', { p_enquiry_id: primaryId });
         if (data) setTimeline(data);
         setLoading(false);
     }, [primaryId]);
@@ -278,7 +278,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
         e.preventDefault();
         if (!newMessage.trim() || sending) return;
         setSending(true);
-        const { error } = await supabase.rpc('send_enquiry_message', { p_node_id: primaryId, p_message: newMessage });
+        const { error } = await supabase.rpc('send_enquiry_message', { p_enquiry_id: primaryId, p_message: newMessage });
         if (!error) {
             setNewMessage('');
             await fetchTimeline();

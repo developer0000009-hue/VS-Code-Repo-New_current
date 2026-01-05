@@ -93,11 +93,11 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
     const fetchTimeline = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(prev => ({ ...prev, timeline: true }));
         try {
-            const { data, error } = await supabase.rpc('get_enquiry_timeline', { p_node_id: enquiry.id });
+            const { data, error } = await supabase.rpc('get_enquiry_timeline', { p_enquiry_id: enquiry.id });
             if (error) throw error;
             setTimeline(data || []);
-        } catch (e) {
-            console.error("Timeline Sync Error:", e);
+        } catch (err) {
+            console.error("Timeline Sync Error:", err);
         } finally {
             if (!isSilent) setLoading(prev => ({ ...prev, timeline: false }));
         }
@@ -178,9 +178,9 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
         if (!msg) return;
         
         try {
-            const { error } = await supabase.rpc('send_enquiry_message', { 
-                p_node_id: enquiry.id, 
-                p_message: msg 
+            const { error } = await supabase.rpc('send_enquiry_message', {
+                p_enquiry_id: enquiry.id,
+                p_message: msg
             });
             if (error) throw error;
             setNewMessage('');
