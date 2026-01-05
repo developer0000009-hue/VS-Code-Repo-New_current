@@ -1181,10 +1181,10 @@ BEGIN
         SELECT id INTO v_enquiry_id FROM public.enquiries WHERE admission_id = p_admission_id;
     END IF;
 
-    -- Generate and store the code linked to enquiry (also set admission_id for consistency)
+    -- Generate and store the code linked to enquiry (admission_id must be NULL for Enquiry codes per constraint)
     v_code := upper(substring(md5(random()::text), 1, 12));
     INSERT INTO public.share_codes (code, admission_id, enquiry_id, purpose, code_type, expires_at)
-    VALUES (v_code, p_admission_id, v_enquiry_id, p_purpose, 'Enquiry', now() + interval '1 day');
+    VALUES (v_code, NULL, v_enquiry_id, p_purpose, 'Enquiry', now() + interval '1 day');
 
     RETURN v_code;
 END;
