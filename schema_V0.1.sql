@@ -1,9 +1,16 @@
 
 -- ===============================================================================================
 --  CANONICAL MASTER SCHEMA - SCHOOL MANAGEMENT SYSTEM
---  Version: 5.0.0
---  Description: Full Schema with RBAC, Multi-Tenancy, and Self-Healing Auth
+--  Version: 6.0.0 (Enhanced Enquiry System)
+--  Description: Full Schema with RBAC, Multi-Tenancy, Self-Healing Auth, and Advanced Enquiry Management
 --  Instructions: Run this entire script in the Supabase SQL Editor.
+--
+--  ENHANCED FEATURES (v6.0.0):
+--  • Complete Enquiry Management System with Admin Portal
+--  • Parent-Admin Communication Flow via Enquiry Messages
+--  • Enquiry-to-Admission Promotion Workflow
+--  • Real-time Notifications and Status Updates
+--  • Secure Enquiry-scoped Messaging with RLS
 -- ===============================================================================================
 
 -- -----------------------------------------------------------------------------------------------
