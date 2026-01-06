@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase, formatError } from '../services/supabase';
 import { Enquiry, EnquiryStatus } from '../types';
 import Spinner from './common/Spinner';
-import EnquiryDetailsModal from './EnquiryDetailsModal';
 import { SearchIcon } from './icons/SearchIcon';
 import { KeyIcon } from './icons/KeyIcon';
 import { MailIcon } from './icons/MailIcon';
@@ -63,10 +63,10 @@ const StatBox: React.FC<{ title: string; value: number; icon: React.ReactNode; c
 );
 
 const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
+    const navigate = useNavigate();
     const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [viewingEnquiry, setViewingEnquiry] = useState<Enquiry | null>(null);
     
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('');
@@ -275,12 +275,12 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                                     <tr
                                         key={enq.id}
                                         onClick={() => {
-                                            // Validate enquiry data before opening modal
+                                            // Validate enquiry data before navigating
                                             if (!enq.id || !enq.applicant_name) {
                                                 console.error('Invalid enquiry data:', enq);
                                                 return;
                                             }
-                                            setViewingEnquiry(enq);
+                                            navigate(`/enquiry-node/${enq.id}`);
                                         }}
                                         style={{ animationDelay: `${idx * 40}ms` }}
                                         className="group hover:bg-white/[0.015] transition-all duration-500 cursor-pointer relative overflow-hidden animate-in fade-in slide-in-from-bottom-2"
@@ -336,17 +336,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                 )}
             </div>
 
-            {viewingEnquiry && (
-                <EnquiryDetailsModal 
-                    enquiry={viewingEnquiry} 
-                    currentBranchId={branchId}
-                    onClose={() => setViewingEnquiry(null)} 
-                    onUpdate={() => {
-                        fetchEnquiries(true);
-                    }}
-                    onNavigate={onNavigate}
-                />
-            )}
+
         </div>
     );
 };
