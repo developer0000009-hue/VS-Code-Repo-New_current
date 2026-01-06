@@ -18,6 +18,18 @@ import { UsersIcon } from './icons/UsersIcon';
 import { PhoneIcon } from './icons/PhoneIcon';
 import { SearchIcon } from './icons/SearchIcon';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
+import { UserIcon } from './icons/UserIcon';
+import { MailIcon } from './icons/MailIcon';
+import { AcademicCapIcon } from './icons/AcademicCapIcon';
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
+import { CalendarIcon } from './icons/CalendarIcon';
+import { EyeIcon } from './icons/EyeIcon';
+import { EditIcon } from './icons/EditIcon';
+import { ArchiveIcon } from './icons/ArchiveIcon';
+import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
+import { CheckIcon } from './icons/CheckIcon';
+import { PlusIcon } from './icons/PlusIcon';
+import { ArrowRightIcon } from './icons/ArrowRightIcon';
 
 
 
@@ -319,177 +331,338 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
         );
     }
 
+    // Helper function to get status color
+    const getStatusColor = (status: string) => {
+        const colors = {
+            'New': 'bg-blue-500',
+            'ENQUIRY_ACTIVE': 'bg-blue-500',
+            'ENQUIRY_VERIFIED': 'bg-emerald-500',
+            'VERIFIED': 'bg-emerald-500',
+            'ENQUIRY_IN_PROGRESS': 'bg-amber-500',
+            'IN_REVIEW': 'bg-amber-500',
+            'CONVERTED': 'bg-green-600',
+            'Completed': 'bg-green-600'
+        };
+        return colors[status as keyof typeof colors] || 'bg-gray-500';
+    };
+
+    // Helper function to get priority color
+    const getPriorityColor = () => {
+        const daysSinceCreated = Math.floor((new Date().getTime() - new Date(enquiry.received_at).getTime()) / (1000 * 3600 * 24));
+        if (daysSinceCreated > 7) return 'bg-red-500';
+        if (daysSinceCreated > 3) return 'bg-amber-500';
+        return 'bg-green-500';
+    };
+
+    // Calculate some stats
+    const daysActive = Math.floor((new Date().getTime() - new Date(enquiry.received_at).getTime()) / (1000 * 3600 * 24));
+    const messageCount = timeline.filter(t => t.item_type === 'MESSAGE').length;
+
     return (
-        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-1000 pb-32">
-            {/* Header */}
-            <div className="flex items-center gap-4">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all border border-white/5"
-                >
-                    <ChevronLeftIcon className="w-6 h-6" />
-                </button>
-                <div className="flex items-center gap-10">
-                    <div className="relative group shrink-0">
-                        <div className="absolute inset-0 bg-indigo-500/20 blur-2xl opacity-40 group-hover:opacity-100 transition-opacity duration-1000"></div>
-                        <div className="w-20 h-20 bg-indigo-600 rounded-[2.2rem] text-white flex items-center justify-center shadow-2xl border border-white/10 relative z-10 transform group-hover:rotate-6 transition-transform duration-700">
-                            <ClipboardListIcon className="w-10 h-10" />
+        <div className="min-h-screen bg-[#0a0a0c] text-white">
+            {/* Hero Header - Full Width */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900/20 via-purple-900/10 to-black border-b border-white/5">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`, backgroundSize: '20px 20px' }}></div>
+
+                {/* Navigation */}
+                <div className="relative z-10 px-8 py-6 border-b border-white/5 bg-black/20 backdrop-blur-sm">
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/10 hover:border-white/20 group"
+                        >
+                            <ChevronLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                            <span className="text-sm font-medium">Back to Enquiries</span>
+                        </button>
+
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 text-xs font-mono text-white/60">
+                                <span>Last updated</span>
+                                <span className="text-white/40">
+                                    {new Date(enquiry.updated_at).toLocaleDateString(undefined, {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}
+                                </span>
+                            </div>
+                            <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all">
+                                <SettingsIcon className="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
-                    <div>
-                        <div className="flex flex-wrap items-center gap-6 mb-3">
-                            <h2 className="text-4xl md:text-6xl font-serif font-black text-white tracking-tighter uppercase leading-none drop-shadow-2xl">{enquiry.applicant_name}</h2>
-                            <span className="px-4 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] shadow-inner backdrop-blur-md">Node 0x{enquiry.id.toString().substring(0,6).toUpperCase()}</span>
+                </div>
+
+                {/* Hero Content */}
+                <div className="relative z-10 px-8 py-12">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-8">
+                                {/* Student Avatar */}
+                                <div className="relative">
+                                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white shadow-2xl border-4 border-white/10">
+                                        {enquiry.applicant_name.charAt(0)}
+                                    </div>
+                                    <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-4 border-[#0a0a0c] flex items-center justify-center">
+                                        <CheckIcon className="w-4 h-4 text-white" />
+                                    </div>
+                                </div>
+
+                                {/* Student Info */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <h1 className="text-5xl font-black text-white tracking-tight leading-none mb-2">
+                                            {enquiry.applicant_name}
+                                        </h1>
+                                        <div className="flex items-center gap-4">
+                                            <span className="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm font-bold border border-indigo-500/20">
+                                                Grade {enquiry.grade}
+                                            </span>
+                                            <span className="text-white/60 text-sm">
+                                                Enquiry #{enquiry.id.toString().substring(0, 8).toUpperCase()}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Status Pills */}
+                                    <div className="flex items-center gap-3">
+                                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${getStatusColor(enquiry.status)} text-white shadow-lg`}>
+                                            {STATUS_CONFIG[enquiry.status]?.icon}
+                                            {STATUS_CONFIG[enquiry.status]?.label || enquiry.status}
+                                        </div>
+
+                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${getPriorityColor()} text-white`}>
+                                            <AlertTriangleIcon className="w-3 h-3" />
+                                            {daysActive > 7 ? 'High Priority' : daysActive > 3 ? 'Medium Priority' : 'Normal Priority'}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20">
+                                            <ClockIcon className="w-3 h-3" />
+                                            {daysActive} days active
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Quick Stats */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="text-center p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <div className="text-2xl font-black text-white">{messageCount}</div>
+                                    <div className="text-xs font-medium text-white/60 uppercase tracking-wider">Messages</div>
+                                </div>
+                                <div className="text-center p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <div className="text-2xl font-black text-emerald-400">
+                                        {enquiry.status === 'CONVERTED' ? '100%' : enquiry.status === 'ENQUIRY_VERIFIED' ? '75%' : enquiry.status === 'ENQUIRY_IN_PROGRESS' ? '50%' : '25%'}
+                                    </div>
+                                    <div className="text-xs font-medium text-white/60 uppercase tracking-wider">Progress</div>
+                                </div>
+                            </div>
                         </div>
-                        <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] flex items-center gap-3">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                            Domain Sync Active • Grade {enquiry.grade} Context
-                        </p>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-grow flex-col lg:flex-row overflow-hidden relative">
-                <div className="absolute inset-0 opacity-[0.02] pointer-events-none z-0" style={{ backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.2) 1px, transparent 0)`, backgroundSize: '40px 40px' }}></div>
-
-                <div className="flex-1 flex flex-col bg-transparent relative z-10">
-                    <div className="flex-grow overflow-y-auto p-10 md:p-20 space-y-16 custom-scrollbar flex flex-col scroll-smooth">
-                        {loading.timeline && timeline.length === 0 ? (
-                            <div className="m-auto flex flex-col items-center gap-6">
-                                <Spinner size="lg" className="text-primary" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/20 animate-pulse">Recalling Conversation Ledger</p>
-                            </div>
-                        ) : (
-                            <>
-                                {timeline.length === 0 && (
-                                    <div className="m-auto flex flex-col items-center text-center opacity-10 space-y-10">
-                                        <CommunicationIcon className="w-48 h-48" />
-                                        <p className="text-4xl font-serif italic text-white max-w-lg leading-relaxed">No encrypted messages exchanged on this channel.</p>
-                                    </div>
-                                )}
-                                <div className="space-y-16">
-                                    {timeline.map((item, idx) => <TimelineEntry key={idx} item={item} />)}
-                                    <div ref={commsEndRef} className="h-4" />
-                                </div>
-                            </>
-                        )}
+            {/* 3-Column Layout */}
+            <div className="flex h-[calc(100vh-280px)] bg-[#0a0a0c]">
+                {/* Left Column - Timeline & Status Flow */}
+                <div className="w-80 bg-[#0f1115]/50 backdrop-blur-xl border-r border-white/5 flex flex-col">
+                    {/* Timeline Header */}
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-lg font-bold text-white mb-2">Activity Timeline</h2>
+                        <p className="text-sm text-white/60">Real-time enquiry progress</p>
                     </div>
 
-                    <div className="p-10 md:p-14 border-t border-white/5 bg-[#0a0a0c]/98 backdrop-blur-3xl">
-                        <form onSubmit={handleSendMessage} className="flex gap-8 items-end max-w-5xl mx-auto group">
-                            <div className="flex-grow relative">
-                                <textarea
-                                    value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                    placeholder="TYPE PAYLOAD TO PARENT NODE..."
-                                    className="w-full p-8 md:p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/10 text-white placeholder:text-white/5 outline-none resize-none font-serif text-xl md:text-2xl shadow-inner focus:bg-white/[0.04] focus:border-primary/40 transition-all duration-500 custom-scrollbar"
-                                    rows={1}
-                                    onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
-                                />
-                                <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity duration-700 pointer-events-none">
-                                    <span className="text-[9px] font-black text-primary/40 uppercase tracking-[0.4em]">Secure Uplink Terminal</span>
-                                </div>
+                    {/* Timeline Content */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        {/* Status Progress */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Progress Status</h3>
+                            <div className="space-y-3">
+                                {[
+                                    { step: 'Enquiry Created', status: 'completed', date: enquiry.received_at },
+                                    { step: 'Documents Requested', status: enquiry.status !== 'New' ? 'completed' : 'pending' },
+                                    { step: 'Verification', status: ['ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(enquiry.status) ? 'completed' : 'pending' },
+                                    { step: 'Review', status: ['ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(enquiry.status) ? 'completed' : 'pending' },
+                                    { step: 'Converted', status: enquiry.status === 'CONVERTED' ? 'completed' : 'pending' }
+                                ].map((item, index) => (
+                                    <div key={index} className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                                            item.status === 'completed'
+                                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                                : item.status === 'current'
+                                                ? 'border-indigo-500 text-indigo-400'
+                                                : 'border-white/20 text-white/40'
+                                        }`}>
+                                            {item.status === 'completed' ? (
+                                                <CheckIcon className="w-4 h-4" />
+                                            ) : (
+                                                <div className="w-2 h-2 rounded-full bg-current"></div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className={`text-sm font-medium ${item.status === 'completed' ? 'text-white' : 'text-white/60'}`}>
+                                                {item.step}
+                                            </div>
+                                            {item.date && (
+                                                <div className="text-xs text-white/40">
+                                                    {new Date(item.date).toLocaleDateString()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            <button
-                                type="submit"
-                                disabled={!newMessage.trim()}
-                                className="w-24 h-24 md:w-32 md:h-32 bg-primary text-white rounded-[3rem] md:rounded-[4rem] flex items-center justify-center shadow-[0_32px_64px_-12px_rgba(var(--primary),0.5)] transform active:scale-90 transition-all duration-500 disabled:opacity-5 disabled:grayscale"
-                            >
-                                <LocalSendIcon className="w-10 h-10 md:w-14 md:h-14" />
-                            </button>
-                        </form>
+                        </div>
+
+                        {/* Timeline Feed */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Recent Activity</h3>
+                            <div className="space-y-4">
+                                {timeline.slice(0, 10).map((item, idx) => (
+                                    <div key={idx} className="flex gap-3 p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                                            {item.item_type === 'MESSAGE' ? (
+                                                <CommunicationIcon className="w-4 h-4 text-indigo-400" />
+                                            ) : (
+                                                <SettingsIcon className="w-4 h-4 text-indigo-400" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-white truncate">
+                                                {item.item_type === 'MESSAGE' ? 'Message sent' : 'Status updated'}
+                                            </div>
+                                            <div className="text-xs text-white/60">
+                                                {new Date(item.created_at).toLocaleString(undefined, {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div className="w-full lg:w-[480px] bg-[#0c0d12]/90 backdrop-blur-3xl border-l border-white/10 p-12 md:p-16 space-y-16 overflow-y-auto custom-scrollbar relative z-20">
-                    <section className="space-y-10">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Communication Actions</h3>
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] animate-pulse"></div>
-                        </div>
-                        <div className="space-y-4">
-                            <button
-                                onClick={() => {
-                                    const msgArea = document.querySelector('textarea[placeholder="TYPE PAYLOAD TO PARENT NODE..."]') as HTMLTextAreaElement;
-                                    if (msgArea) msgArea.focus();
-                                }}
-                                className="w-full flex items-center justify-center gap-5 p-6 rounded-[2rem] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition-all duration-700 group/btn"
-                            >
-                                <CommunicationIcon className="w-6 h-6 group-hover/btn:scale-110 transition-transform" />
-                                <span className="text-sm font-black uppercase tracking-[0.2em]">Message Parent</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    const msgArea = document.querySelector('textarea[placeholder="TYPE PAYLOAD TO PARENT NODE..."]') as HTMLTextAreaElement;
-                                    if (msgArea) {
-                                        setNewMessage("Please provide the following documents to complete your application:\n\n• Birth Certificate\n• Address Proof\n• Previous School Records\n• Medical Certificate (if applicable)\n\nYou can upload these documents directly through your Parent Portal.");
-                                        msgArea.focus();
-                                    }
-                                }}
-                                className="w-full flex items-center justify-center gap-5 p-6 rounded-[2rem] bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/40 transition-all duration-700 group/btn"
-                            >
-                                <ClipboardListIcon className="w-6 h-6 group-hover/btn:scale-110 transition-transform" />
-                                <span className="text-sm font-black uppercase tracking-[0.2em]">Request Documents</span>
-                            </button>
-                        </div>
-                    </section>
-
-                    <section className="space-y-10">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Lifecycle Management</h3>
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] animate-pulse"></div>
-                        </div>
-                        <div className="space-y-4">
-                            {ORDERED_STATUSES.map(s => {
-                                const config = STATUS_CONFIG[s] || { icon: <div className="w-4 h-4 bg-gray-500 rounded" />, label: s.replace(/_/g, ' ') };
-                                return (
-                                    <button
-                                        key={s}
-                                        onClick={() => handleSaveStatus(s)}
-                                        disabled={loading.saving || enquiry.status === 'CONVERTED'}
-                                        className={`w-full flex items-center justify-between p-6 rounded-[2rem] border transition-all duration-700 group/btn relative overflow-hidden ${enquiry.status === s ? 'bg-primary/10 border-primary text-white shadow-2xl' : 'bg-black/20 border-white/5 text-white/30 hover:bg-white/5 hover:border-white/20'}`}
-                                    >
-                                        <div className="flex items-center gap-5 relative z-10">
-                                            <div className={`p-3 rounded-xl transition-all duration-700 ${enquiry.status === s ? 'bg-primary text-white shadow-lg rotate-3' : 'bg-white/5 text-white/20 group-hover/btn:scale-110'}`}>
-                                                {config.icon}
-                                            </div>
-                                            <span className={`text-sm font-black uppercase tracking-[0.2em] transition-colors duration-700 ${enquiry.status === s ? 'text-primary' : 'group-hover/btn:text-white'}`}>
-                                                {config.label}
-                                            </span>
-                                        </div>
-                                        {enquiry.status === s && <CheckCircleIcon className="w-5 h-5 text-primary animate-in zoom-in duration-500 relative z-10" />}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </section>
-
-                    <section className="space-y-10">
-                         <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Identity Intel</h3>
-
-                        <div className="space-y-5">
-                                <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
-                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Parent Contact</span>
-                                    <p className="text-base text-white/80 font-medium font-serif italic">{enquiry.parent_email || 'Not provided'}</p>
-                                    {enquiry.parent_phone && <p className="text-sm text-white/60 font-medium mt-1">{enquiry.parent_phone}</p>}
+                {/* Center Column - Core Details */}
+                <div className="flex-1 flex flex-col bg-[#0a0a0c]">
+                    {/* Information Cards */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                        {/* Student Information Card */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
+                                        <UserIcon className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Student Information</h3>
                                 </div>
-                                <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
-                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Institutional Grade</span>
-                                    <p className="text-base text-white/80 font-black font-serif italic tracking-wider">GRADE {enquiry.grade}</p>
+                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                    <EditIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Full Name</label>
+                                    <p className="text-white font-medium">{enquiry.applicant_name}</p>
                                 </div>
-                                <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
-                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Parent Name</span>
-                                    <p className="text-base text-white/80 font-medium font-serif italic">{enquiry.parent_name || 'Not provided'}</p>
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Grade Level</label>
+                                    <p className="text-white font-medium">Grade {enquiry.grade}</p>
                                 </div>
-                                <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
-                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Enquiry Source</span>
-                                    <p className="text-base text-white/80 font-medium font-serif italic">
-                                        {enquiry.admission_id ? 'Parent Portal / Verification' : 'Direct Enquiry'}
+                                <div className="col-span-2">
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Date of Birth</label>
+                                    <p className="text-white font-medium">Not specified</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Parent/Guardian Information Card */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                                        <UsersIcon className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Parent/Guardian Details</h3>
+                                </div>
+                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                    <EditIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Full Name</label>
+                                    <p className="text-white font-medium">{enquiry.parent_name || 'Not provided'}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Relationship</label>
+                                    <p className="text-white font-medium">Parent</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Email Address</label>
+                                    <p className="text-white font-medium">{enquiry.parent_email || 'Not provided'}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Phone Number</label>
+                                    <p className="text-white font-medium">{enquiry.parent_phone || 'Not provided'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Academic Interest Card */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+                                        <AcademicCapIcon className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Academic Interest</h3>
+                                </div>
+                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                    <EditIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Target Grade</label>
+                                    <p className="text-white font-medium">Grade {enquiry.grade}</p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Admission Timeline</label>
+                                    <p className="text-white font-medium">Immediate (Current Session)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Enquiry Source Card */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                                        <DocumentTextIcon className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Enquiry Source</h3>
+                                </div>
+                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                    <EyeIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Source Type</label>
+                                    <p className="text-white font-medium">
+                                        {enquiry.admission_id ? 'Parent Portal Registration' : 'Direct School Enquiry'}
                                     </p>
                                 </div>
-                                <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
-                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Created Date</span>
-                                    <p className="text-base text-white/80 font-medium font-serif italic">
+                                <div>
+                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Created Date</label>
+                                    <p className="text-white font-medium">
                                         {new Date(enquiry.received_at).toLocaleDateString(undefined, {
                                             year: 'numeric',
                                             month: 'long',
@@ -500,23 +673,157 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                                     </p>
                                 </div>
                             </div>
-                    </section>
+                        </div>
+                    </div>
 
-                    {enquiry.status !== 'CONVERTED' && (
-                        <section className="pt-10 border-t border-white/5 space-y-8">
+                    {/* Communication Input - Bottom */}
+                    <div className="border-t border-white/10 p-6 bg-[#0f1115]/50 backdrop-blur-xl">
+                        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
+                            <div className="flex gap-4 items-end">
+                                <div className="flex-1 relative">
+                                    <textarea
+                                        value={newMessage}
+                                        onChange={(e) => setNewMessage(e.target.value)}
+                                        placeholder="Send a message to the parent..."
+                                        className="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 outline-none resize-none focus:bg-white/10 focus:border-indigo-500/50 transition-all duration-300"
+                                        rows={3}
+                                        onKeyDown={(e) => {
+                                            if(e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendMessage(e as any);
+                                            }
+                                        }}
+                                    />
+                                    <div className="absolute right-3 bottom-3 text-xs text-white/40">
+                                        Press Enter to send
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={!newMessage.trim() || loading.saving}
+                                    className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    {loading.saving ? <Spinner size="sm" /> : <ArrowRightIcon className="w-4 h-4" />}
+                                    Send
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                {/* Right Column - Actions & Intelligence */}
+                <div className="w-80 bg-[#0f1115]/50 backdrop-blur-xl border-l border-white/5 flex flex-col">
+                    {/* Actions Header */}
+                    <div className="p-6 border-b border-white/10">
+                        <h2 className="text-lg font-bold text-white mb-2">Actions & Intelligence</h2>
+                        <p className="text-sm text-white/60">Contextual operations</p>
+                    </div>
+
+                    {/* Actions Content */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        {/* Primary Actions */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Primary Actions</h3>
+
+                            {/* Convert to Admission - HIGHEST PRIORITY */}
+                            {enquiry.status !== 'CONVERTED' && (
+                                <button
+                                    onClick={handleConvert}
+                                    disabled={loading.converting || enquiry.status === 'ENQUIRY_ACTIVE'}
+                                    className={`w-full p-4 rounded-xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-3 ${
+                                        enquiry.status !== 'ENQUIRY_ACTIVE'
+                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                                            : 'bg-white/10 text-white/40 cursor-not-allowed'
+                                    }`}
+                                >
+                                    {loading.converting ? <Spinner size="sm" /> : <GraduationCapIcon className="w-5 h-5" />}
+                                    Convert to Admission
+                                </button>
+                            )}
+
+                            {/* Status Management */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-white/60 uppercase tracking-wider">Update Status</label>
+                                <select
+                                    value={enquiry.status}
+                                    onChange={(e) => handleSaveStatus(e.target.value as EnquiryStatus)}
+                                    disabled={loading.saving}
+                                    className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white outline-none focus:border-indigo-500/50 transition-all"
+                                >
+                                    {ORDERED_STATUSES.map(status => (
+                                        <option key={status} value={status}>
+                                            {STATUS_CONFIG[status]?.label || status}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Communication Actions */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Communication</h3>
+
                             <button
-                                onClick={handleConvert}
-                                disabled={loading.converting || enquiry.status === 'ENQUIRY_ACTIVE'}
-                                className={`w-full py-7 md:py-8 rounded-[2.8rem] flex items-center justify-center gap-6 font-black text-xs uppercase tracking-[0.5em] transition-all duration-700 shadow-2xl active:scale-95 ${enquiry.status !== 'ENQUIRY_ACTIVE' ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-500/20' : 'bg-white/5 text-white/5 cursor-not-allowed border border-white/5 grayscale'}`}
+                                onClick={() => {
+                                    setNewMessage("Thank you for your interest in our school. We have received your enquiry and will get back to you shortly.");
+                                }}
+                                className="w-full p-3 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 hover:text-indigo-300 transition-all duration-300 text-left"
                             >
-                                {loading.converting ? <Spinner size="sm" className="text-white"/> : <><GraduationCapIcon className="w-7 h-7 opacity-60" /> PROMOTE TO ADMISSION</>}
+                                <div className="font-medium text-sm">Send Welcome Message</div>
+                                <div className="text-xs opacity-70">Automated response</div>
                             </button>
-                            {enquiry.status === 'ENQUIRY_ACTIVE' && <p className="text-[9px] text-amber-500/60 font-black uppercase tracking-[0.2em] text-center leading-relaxed">Identity verification protocol required <br/> prior to Promotion.</p>}
-                        </section>
-                    )}
 
-                    <div className="mt-auto opacity-5 hover:opacity-100 transition-opacity duration-1000">
-                        <p className="text-[8px] font-mono text-white break-all text-center">HASH: {btoa(enquiry.id.toString()).substring(0, 32)}</p>
+                            <button
+                                onClick={() => {
+                                    setNewMessage("Please provide the following documents to complete your application:\n\n• Birth Certificate\n• Address Proof\n• Previous School Records\n• Medical Certificate (if applicable)\n\nYou can upload these documents directly through your Parent Portal.");
+                                }}
+                                className="w-full p-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-300 text-left"
+                            >
+                                <div className="font-medium text-sm">Request Documents</div>
+                                <div className="text-xs opacity-70">Document checklist</div>
+                            </button>
+                        </div>
+
+                        {/* Intelligence Panel */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Intelligence</h3>
+
+                            <div className="space-y-3">
+                                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Response Time</div>
+                                    <div className="text-lg font-black text-white">
+                                        {messageCount > 0 ? '< 24h' : 'Pending'}
+                                    </div>
+                                </div>
+
+                                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Engagement Score</div>
+                                    <div className="text-lg font-black text-emerald-400">
+                                        {Math.min(95, 60 + (messageCount * 10))}%
+                                    </div>
+                                </div>
+
+                                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Priority Level</div>
+                                    <div className={`text-sm font-bold ${
+                                        daysActive > 7 ? 'text-red-400' :
+                                        daysActive > 3 ? 'text-amber-400' : 'text-green-400'
+                                    }`}>
+                                        {daysActive > 7 ? 'High' : daysActive > 3 ? 'Medium' : 'Normal'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Archive/Delete Actions */}
+                        <div className="space-y-4 border-t border-white/10 pt-6">
+                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Administrative</h3>
+
+                            <button className="w-full p-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-all duration-300 flex items-center justify-center gap-2">
+                                <ArchiveIcon className="w-4 h-4" />
+                                <span className="font-medium text-sm">Archive Enquiry</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
