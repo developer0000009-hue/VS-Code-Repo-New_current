@@ -292,9 +292,131 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
 
     if (loading.enquiry) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <Spinner size="lg" className="text-primary" />
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">Loading Enquiry Details</p>
+            <div className="min-h-screen bg-[#0a0a0c] text-white">
+                {/* Skeleton Hero Header */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-slate-900/30 via-slate-800/20 to-slate-900/40 border-b border-slate-700/50">
+                    <div className="relative z-10 px-8 py-6 border-b border-slate-700/50 bg-slate-900/20 backdrop-blur-sm">
+                        <div className="flex items-center justify-between">
+                            <div className="w-32 h-10 bg-slate-700/50 rounded-xl animate-pulse"></div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-24 h-4 bg-slate-700/30 rounded animate-pulse"></div>
+                                <div className="w-8 h-8 bg-slate-700/50 rounded-lg animate-pulse"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="relative z-10 px-8 py-12">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-8">
+                                    <div className="w-24 h-24 bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl animate-pulse"></div>
+                                    <div className="space-y-4 flex-1">
+                                        <div className="w-64 h-12 bg-slate-700/50 rounded-lg animate-pulse"></div>
+                                        <div className="flex gap-4">
+                                            <div className="w-20 h-6 bg-slate-700/30 rounded-full animate-pulse"></div>
+                                            <div className="w-24 h-6 bg-slate-700/30 rounded-full animate-pulse"></div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <div className="w-24 h-8 bg-slate-700/50 rounded-full animate-pulse"></div>
+                                            <div className="w-28 h-8 bg-slate-700/30 rounded-full animate-pulse"></div>
+                                            <div className="w-32 h-8 bg-slate-700/30 rounded-full animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="w-20 h-20 bg-slate-700/30 rounded-xl animate-pulse"></div>
+                                    <div className="w-20 h-20 bg-slate-700/30 rounded-xl animate-pulse"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Skeleton 3-Column Layout */}
+                <div className="flex h-[calc(100vh-280px)] bg-[#0a0a0c]">
+                    {/* Left Column Skeleton */}
+                    <div className="w-80 bg-slate-900/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col">
+                        <div className="p-6 border-b border-slate-700/50">
+                            <div className="w-32 h-6 bg-slate-700/50 rounded animate-pulse mb-2"></div>
+                            <div className="w-40 h-4 bg-slate-700/30 rounded animate-pulse"></div>
+                        </div>
+                        <div className="flex-1 p-6 space-y-6">
+                            <div className="space-y-4">
+                                <div className="w-24 h-4 bg-slate-700/50 rounded animate-pulse"></div>
+                                <div className="space-y-3">
+                                    {[...Array(5)].map((_, i) => (
+                                        <div key={i} className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-slate-700/50 rounded-full animate-pulse"></div>
+                                            <div className="flex-1 space-y-2">
+                                                <div className="w-24 h-3 bg-slate-700/30 rounded animate-pulse"></div>
+                                                <div className="w-16 h-2 bg-slate-700/20 rounded animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Center Column Skeleton */}
+                    <div className="flex-1 flex flex-col bg-[#0a0a0c]">
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="bg-slate-800/30 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 animate-pulse">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-slate-700/50 rounded-lg"></div>
+                                            <div className="w-32 h-5 bg-slate-700/50 rounded"></div>
+                                        </div>
+                                        <div className="w-8 h-8 bg-slate-700/30 rounded-lg"></div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <div className="w-16 h-3 bg-slate-700/30 rounded"></div>
+                                            <div className="w-24 h-4 bg-slate-700/50 rounded"></div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="w-20 h-3 bg-slate-700/30 rounded"></div>
+                                            <div className="w-20 h-4 bg-slate-700/50 rounded"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="border-t border-slate-700/50 p-6 bg-slate-900/50 backdrop-blur-xl">
+                            <div className="max-w-4xl mx-auto">
+                                <div className="flex gap-4 items-end">
+                                    <div className="flex-1 h-24 bg-slate-700/30 rounded-xl animate-pulse"></div>
+                                    <div className="w-20 h-12 bg-slate-700/50 rounded-xl animate-pulse"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column Skeleton */}
+                    <div className="w-80 bg-slate-900/50 backdrop-blur-xl border-l border-slate-700/50 flex flex-col">
+                        <div className="p-6 border-b border-slate-700/50">
+                            <div className="w-40 h-6 bg-slate-700/50 rounded animate-pulse mb-2"></div>
+                            <div className="w-32 h-4 bg-slate-700/30 rounded animate-pulse"></div>
+                        </div>
+                        <div className="flex-1 p-6 space-y-6">
+                            <div className="space-y-4">
+                                <div className="w-24 h-4 bg-slate-700/50 rounded animate-pulse"></div>
+                                <div className="w-full h-12 bg-slate-700/50 rounded-xl animate-pulse"></div>
+                                <div className="space-y-2">
+                                    <div className="w-20 h-3 bg-slate-700/30 rounded animate-pulse"></div>
+                                    <div className="w-full h-10 bg-slate-700/30 rounded-lg animate-pulse"></div>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="w-24 h-4 bg-slate-700/50 rounded animate-pulse"></div>
+                                <div className="space-y-3">
+                                    <div className="w-full h-12 bg-slate-700/30 rounded-lg animate-pulse"></div>
+                                    <div className="w-full h-12 bg-slate-700/30 rounded-lg animate-pulse"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -359,27 +481,29 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
     const messageCount = timeline.filter(t => t.item_type === 'MESSAGE').length;
 
     return (
-        <div className="min-h-screen bg-[#0a0a0c] text-white">
-            {/* Hero Header - Full Width */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900/20 via-purple-900/10 to-black border-b border-white/5">
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`, backgroundSize: '20px 20px' }}></div>
+        <div className="min-h-screen bg-slate-950 text-slate-50 font-['Inter','system-ui','-apple-system','sans-serif'] antialiased">
+            {/* Premium Hero Header */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-900/40 via-slate-800/30 to-slate-900/50 border-b border-slate-700/30">
+                {/* Subtle animated background */}
+                <div className="absolute inset-0 opacity-[0.03]">
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-purple-500/5 animate-pulse"></div>
+                </div>
 
                 {/* Navigation */}
-                <div className="relative z-10 px-8 py-6 border-b border-white/5 bg-black/20 backdrop-blur-sm">
+                <div className="relative z-10 px-8 py-6 border-b border-slate-700/30 bg-slate-900/20 backdrop-blur-xl">
                     <div className="flex items-center justify-between">
                         <button
                             onClick={() => navigate(-1)}
-                            className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/10 hover:border-white/20 group"
+                            className="group flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-slate-800/40 hover:bg-slate-700/50 text-slate-300 hover:text-white transition-all duration-500 border border-slate-600/30 hover:border-slate-500/40 hover:shadow-lg hover:shadow-indigo-500/10"
                         >
-                            <ChevronLeftIcon className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                            <span className="text-sm font-medium">Back to Enquiries</span>
+                            <ChevronLeftIcon className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-300" />
+                            <span className="text-sm font-semibold tracking-wide">Back to Enquiries</span>
                         </button>
 
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2 text-xs font-mono text-white/60">
-                                <span>Last updated</span>
-                                <span className="text-white/40">
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+                                <span className="font-medium">Updated</span>
+                                <span className="text-slate-500">
                                     {new Date(enquiry.updated_at).toLocaleDateString(undefined, {
                                         month: 'short',
                                         day: 'numeric',
@@ -388,7 +512,7 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                                     })}
                                 </span>
                             </div>
-                            <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all">
+                            <button className="p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-all duration-300 border border-slate-600/30 hover:border-slate-500/40 hover:shadow-lg hover:shadow-slate-500/10">
                                 <SettingsIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -396,67 +520,69 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                 </div>
 
                 {/* Hero Content */}
-                <div className="relative z-10 px-8 py-12">
+                <div className="relative z-10 px-8 py-16">
                     <div className="max-w-7xl mx-auto">
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-8">
-                                {/* Student Avatar */}
-                                <div className="relative">
-                                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white shadow-2xl border-4 border-white/10">
+                        <div className="flex items-start justify-between gap-12">
+                            <div className="flex items-start gap-10">
+                                {/* Premium Student Avatar */}
+                                <div className="relative group">
+                                    <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-4xl font-black text-white shadow-2xl shadow-indigo-500/20 border border-white/10 transition-all duration-500 group-hover:shadow-indigo-500/30 group-hover:scale-105">
                                         {enquiry.applicant_name.charAt(0)}
                                     </div>
-                                    <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 border-4 border-[#0a0a0c] flex items-center justify-center">
-                                        <CheckIcon className="w-4 h-4 text-white" />
+                                    <div className="absolute -bottom-3 -right-3 w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 border-4 border-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                        <CheckIcon className="w-5 h-5 text-white" />
                                     </div>
+                                    {/* Ambient glow */}
+                                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"></div>
                                 </div>
 
                                 {/* Student Info */}
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <div>
-                                        <h1 className="text-5xl font-black text-white tracking-tight leading-none mb-2">
+                                        <h1 className="text-6xl font-black text-white tracking-tight leading-none mb-3">
                                             {enquiry.applicant_name}
                                         </h1>
-                                        <div className="flex items-center gap-4">
-                                            <span className="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm font-bold border border-indigo-500/20">
+                                        <div className="flex items-center gap-6">
+                                            <span className="px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-indigo-300 text-sm font-bold border border-indigo-500/20 backdrop-blur-sm">
                                                 Grade {enquiry.grade}
                                             </span>
-                                            <span className="text-white/60 text-sm">
+                                            <span className="text-slate-400 text-sm font-medium tracking-wide">
                                                 Enquiry #{enquiry.id.toString().substring(0, 8).toUpperCase()}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Status Pills */}
-                                    <div className="flex items-center gap-3">
-                                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${getStatusColor(enquiry.status)} text-white shadow-lg`}>
+                                    {/* Premium Status Pills */}
+                                    <div className="flex items-center gap-4">
+                                        <div className={`flex items-center gap-3 px-5 py-2.5 rounded-2xl text-sm font-bold ${getStatusColor(enquiry.status)} text-white shadow-xl shadow-current/20 backdrop-blur-sm border border-white/10 transition-all duration-300 hover:scale-105 hover:shadow-2xl`}>
                                             {STATUS_CONFIG[enquiry.status]?.icon}
-                                            {STATUS_CONFIG[enquiry.status]?.label || enquiry.status}
+                                            <span className="tracking-wide">{STATUS_CONFIG[enquiry.status]?.label || enquiry.status}</span>
                                         </div>
 
-                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${getPriorityColor()} text-white`}>
-                                            <AlertTriangleIcon className="w-3 h-3" />
-                                            {daysActive > 7 ? 'High Priority' : daysActive > 3 ? 'Medium Priority' : 'Normal Priority'}
+                                        <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold ${getPriorityColor()} text-white shadow-lg shadow-current/15 backdrop-blur-sm border border-white/10 transition-all duration-300 hover:scale-105`}>
+                                            <AlertTriangleIcon className="w-4 h-4" />
+                                            <span>{daysActive > 7 ? 'High Priority' : daysActive > 3 ? 'Medium Priority' : 'Normal Priority'}</span>
                                         </div>
 
-                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white border border-white/20">
-                                            <ClockIcon className="w-3 h-3" />
-                                            {daysActive} days active
+                                        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold bg-slate-800/60 text-slate-200 border border-slate-600/30 backdrop-blur-sm shadow-lg transition-all duration-300 hover:scale-105 hover:bg-slate-700/60">
+                                            <ClockIcon className="w-4 h-4" />
+                                            <span>{daysActive} days active</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Quick Stats */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="text-center p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <div className="text-2xl font-black text-white">{messageCount}</div>
-                                    <div className="text-xs font-medium text-white/60 uppercase tracking-wider">Messages</div>
+                            {/* Premium Quick Stats */}
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="group text-center p-6 rounded-3xl bg-gradient-to-br from-slate-800/40 to-slate-900/60 backdrop-blur-xl border border-slate-700/50 hover:border-slate-600/60 transition-all duration-500 hover:shadow-xl hover:shadow-slate-500/10 hover:-translate-y-1">
+                                    <div className="text-3xl font-black text-white mb-1 group-hover:text-indigo-300 transition-colors duration-300">{messageCount}</div>
+                                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-[0.15em]">Messages</div>
                                 </div>
-                                <div className="text-center p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <div className="text-2xl font-black text-emerald-400">
+                                <div className="group text-center p-6 rounded-3xl bg-gradient-to-br from-slate-800/40 to-slate-900/60 backdrop-blur-xl border border-slate-700/50 hover:border-emerald-500/30 transition-all duration-500 hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1">
+                                    <div className="text-3xl font-black text-emerald-400 mb-1 group-hover:text-emerald-300 transition-colors duration-300">
                                         {enquiry.status === 'CONVERTED' ? '100%' : enquiry.status === 'ENQUIRY_VERIFIED' ? '75%' : enquiry.status === 'ENQUIRY_IN_PROGRESS' ? '50%' : '25%'}
                                     </div>
-                                    <div className="text-xs font-medium text-white/60 uppercase tracking-wider">Progress</div>
+                                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-[0.15em]">Progress</div>
                                 </div>
                             </div>
                         </div>
@@ -464,76 +590,74 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                 </div>
             </div>
 
-            {/* 3-Column Layout */}
-            <div className="flex h-[calc(100vh-280px)] bg-[#0a0a0c]">
-                {/* Left Column - Timeline & Status Flow */}
-                <div className="w-80 bg-[#0f1115]/50 backdrop-blur-xl border-r border-white/5 flex flex-col">
+            {/* Premium 3-Zone Layout */}
+            <div className="flex h-[calc(100vh-320px)] bg-slate-950">
+                {/* Left: Intelligence Timeline */}
+                <div className="w-96 bg-gradient-to-b from-slate-900/60 to-slate-950/80 backdrop-blur-2xl border-r border-slate-700/30 flex flex-col shadow-2xl">
                     {/* Timeline Header */}
-                    <div className="p-6 border-b border-white/10">
-                        <h2 className="text-lg font-bold text-white mb-2">Activity Timeline</h2>
-                        <p className="text-sm text-white/60">Real-time enquiry progress</p>
+                    <div className="p-8 border-b border-slate-700/30">
+                        <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Activity Timeline</h2>
+                        <p className="text-sm text-slate-400 font-medium">Real-time enquiry progress</p>
                     </div>
 
                     {/* Timeline Content */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                        {/* Status Progress */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Progress Status</h3>
-                            <div className="space-y-3">
+                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                        {/* Elegant Progress Status */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-[0.2em] letter-spacing-1">Progress Status</h3>
+                            <div className="space-y-4">
                                 {[
-                                    { step: 'Enquiry Created', status: 'completed', date: enquiry.received_at },
-                                    { step: 'Documents Requested', status: enquiry.status !== 'New' ? 'completed' : 'pending' },
-                                    { step: 'Verification', status: ['ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(enquiry.status) ? 'completed' : 'pending' },
-                                    { step: 'Review', status: ['ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(enquiry.status) ? 'completed' : 'pending' },
-                                    { step: 'Converted', status: enquiry.status === 'CONVERTED' ? 'completed' : 'pending' }
+                                    { step: 'Enquiry Created', status: 'completed', date: enquiry.received_at, phase: 'Created' },
+                                    { step: 'Documents Requested', status: enquiry.status !== 'New' ? 'completed' : 'pending', phase: 'Docs' },
+                                    { step: 'Verification', status: ['ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(enquiry.status) ? 'completed' : 'pending', phase: 'Verify' },
+                                    { step: 'Review', status: ['ENQUIRY_IN_PROGRESS', 'CONVERTED'].includes(enquiry.status) ? 'completed' : 'pending', phase: 'Review' },
+                                    { step: 'Converted', status: enquiry.status === 'CONVERTED' ? 'completed' : 'pending', phase: 'Convert' }
                                 ].map((item, index) => (
-                                    <div key={index} className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                                    <div key={index} className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-800/30 border border-slate-700/30 hover:bg-slate-700/40 hover:border-slate-600/40 transition-all duration-300 hover:shadow-lg hover:shadow-slate-500/5">
+                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all duration-300 ${
                                             item.status === 'completed'
-                                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                                ? 'bg-gradient-to-br from-emerald-500 to-teal-500 border-emerald-500/50 text-white shadow-lg shadow-emerald-500/20'
                                                 : item.status === 'current'
-                                                ? 'border-indigo-500 text-indigo-400'
-                                                : 'border-white/20 text-white/40'
-                                        }`}>
+                                                ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10'
+                                                : 'border-slate-600 text-slate-500 bg-slate-800/50'
+                                        } group-hover:scale-110`}>
                                             {item.status === 'completed' ? (
-                                                <CheckIcon className="w-4 h-4" />
+                                                <CheckIcon className="w-5 h-5" />
                                             ) : (
-                                                <div className="w-2 h-2 rounded-full bg-current"></div>
+                                                <div className="w-2.5 h-2.5 rounded-full bg-current animate-pulse"></div>
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <div className={`text-sm font-medium ${item.status === 'completed' ? 'text-white' : 'text-white/60'}`}>
+                                            <div className={`text-sm font-semibold tracking-wide ${item.status === 'completed' ? 'text-white' : 'text-slate-400'}`}>
                                                 {item.step}
                                             </div>
-                                            {item.date && (
-                                                <div className="text-xs text-white/40">
-                                                    {new Date(item.date).toLocaleDateString()}
-                                                </div>
-                                            )}
+                                            <div className="text-xs text-slate-500 font-medium">
+                                                {item.phase} • {item.date ? new Date(item.date).toLocaleDateString() : 'Pending'}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Timeline Feed */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Recent Activity</h3>
+                        {/* Recent Activity Feed */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-[0.2em] letter-spacing-1">Recent Activity</h3>
                             <div className="space-y-4">
-                                {timeline.slice(0, 10).map((item, idx) => (
-                                    <div key={idx} className="flex gap-3 p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                                {timeline.slice(0, 8).map((item, idx) => (
+                                    <div key={idx} className="group flex gap-4 p-4 rounded-2xl bg-slate-800/20 border border-slate-700/30 hover:bg-slate-700/30 hover:border-slate-600/40 transition-all duration-300 hover:shadow-lg hover:shadow-slate-500/5 hover:-translate-y-0.5">
+                                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0 border border-slate-600/30 group-hover:border-indigo-500/30 transition-colors duration-300">
                                             {item.item_type === 'MESSAGE' ? (
-                                                <CommunicationIcon className="w-4 h-4 text-indigo-400" />
+                                                <CommunicationIcon className="w-5 h-5 text-indigo-400" />
                                             ) : (
-                                                <SettingsIcon className="w-4 h-4 text-indigo-400" />
+                                                <SettingsIcon className="w-5 h-5 text-indigo-400" />
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-medium text-white truncate">
-                                                {item.item_type === 'MESSAGE' ? 'Message sent' : 'Status updated'}
+                                            <div className="text-sm font-semibold text-white truncate group-hover:text-indigo-300 transition-colors duration-300">
+                                                {item.item_type === 'MESSAGE' ? 'Message exchanged' : 'Status updated'}
                                             </div>
-                                            <div className="text-xs text-white/60">
+                                            <div className="text-xs text-slate-400 font-medium">
                                                 {new Date(item.created_at).toLocaleString(undefined, {
                                                     month: 'short',
                                                     day: 'numeric',
@@ -549,120 +673,120 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                     </div>
                 </div>
 
-                {/* Center Column - Core Details */}
-                <div className="flex-1 flex flex-col bg-[#0a0a0c]">
-                    {/* Information Cards */}
-                    <div className="flex-1 overflow-y-auto p-8 space-y-6">
-                        {/* Student Information Card */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
-                                        <UserIcon className="w-5 h-5" />
+                {/* Center: Enquiry Intelligence */}
+                <div className="flex-1 flex flex-col bg-slate-950">
+                    {/* Premium Information Cards */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                        {/* Student Identity Card */}
+                        <div className="group bg-gradient-to-br from-slate-800/40 via-slate-900/60 to-slate-800/40 backdrop-blur-2xl border border-slate-700/50 rounded-3xl p-8 hover:border-slate-600/60 hover:shadow-2xl hover:shadow-indigo-500/5 transition-all duration-500 hover:-translate-y-1">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/20">
+                                        <UserIcon className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-white">Student Information</h3>
+                                    <h3 className="text-xl font-bold text-white tracking-tight">Student Identity</h3>
                                 </div>
-                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                <button className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 text-slate-400 hover:text-white transition-all duration-300 border border-slate-600/30 hover:border-slate-500/40 opacity-0 group-hover:opacity-100">
                                     <EditIcon className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Full Name</label>
-                                    <p className="text-white font-medium">{enquiry.applicant_name}</p>
+                            <div className="grid grid-cols-2 gap-8">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Full Name</label>
+                                    <p className="text-white font-semibold text-lg tracking-wide">{enquiry.applicant_name}</p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Grade Level</label>
-                                    <p className="text-white font-medium">Grade {enquiry.grade}</p>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Grade Level</label>
+                                    <p className="text-white font-semibold text-lg tracking-wide">Grade {enquiry.grade}</p>
                                 </div>
-                                <div className="col-span-2">
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Date of Birth</label>
-                                    <p className="text-white font-medium">Not specified</p>
+                                <div className="col-span-2 space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Date of Birth</label>
+                                    <p className="text-slate-300 font-medium text-lg tracking-wide">Not specified</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Parent/Guardian Information Card */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
-                                        <UsersIcon className="w-5 h-5" />
+                        {/* Parent Intelligence Card */}
+                        <div className="group bg-gradient-to-br from-slate-800/40 via-slate-900/60 to-slate-800/40 backdrop-blur-2xl border border-slate-700/50 rounded-3xl p-8 hover:border-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/5 transition-all duration-500 hover:-translate-y-1">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-300 border border-emerald-500/20">
+                                        <UsersIcon className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-white">Parent/Guardian Details</h3>
+                                    <h3 className="text-xl font-bold text-white tracking-tight">Parent Intelligence</h3>
                                 </div>
-                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                <button className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 text-slate-400 hover:text-white transition-all duration-300 border border-slate-600/30 hover:border-slate-500/40 opacity-0 group-hover:opacity-100">
                                     <EditIcon className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Full Name</label>
-                                    <p className="text-white font-medium">{enquiry.parent_name || 'Not provided'}</p>
+                            <div className="grid grid-cols-2 gap-8">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Full Name</label>
+                                    <p className="text-white font-semibold text-lg tracking-wide">{enquiry.parent_name || 'Not provided'}</p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Relationship</label>
-                                    <p className="text-white font-medium">Parent</p>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Relationship</label>
+                                    <p className="text-white font-semibold text-lg tracking-wide">Parent</p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Email Address</label>
-                                    <p className="text-white font-medium">{enquiry.parent_email || 'Not provided'}</p>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Email Address</label>
+                                    <p className="text-slate-300 font-medium text-lg tracking-wide">{enquiry.parent_email || 'Not provided'}</p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Phone Number</label>
-                                    <p className="text-white font-medium">{enquiry.parent_phone || 'Not provided'}</p>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Phone Number</label>
+                                    <p className="text-slate-300 font-medium text-lg tracking-wide">{enquiry.parent_phone || 'Not provided'}</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Academic Interest Card */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
-                                        <AcademicCapIcon className="w-5 h-5" />
+                        {/* Academic Intent Card */}
+                        <div className="group bg-gradient-to-br from-slate-800/40 via-slate-900/60 to-slate-800/40 backdrop-blur-2xl border border-slate-700/50 rounded-3xl p-8 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/5 transition-all duration-500 hover:-translate-y-1">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/20">
+                                        <AcademicCapIcon className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-white">Academic Interest</h3>
+                                    <h3 className="text-xl font-bold text-white tracking-tight">Academic Intent</h3>
                                 </div>
-                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                <button className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 text-slate-400 hover:text-white transition-all duration-300 border border-slate-600/30 hover:border-slate-500/40 opacity-0 group-hover:opacity-100">
                                     <EditIcon className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Target Grade</label>
-                                    <p className="text-white font-medium">Grade {enquiry.grade}</p>
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Target Grade</label>
+                                    <p className="text-white font-semibold text-xl tracking-wide">Grade {enquiry.grade}</p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Admission Timeline</label>
-                                    <p className="text-white font-medium">Immediate (Current Session)</p>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Admission Timeline</label>
+                                    <p className="text-slate-300 font-medium text-lg tracking-wide">Immediate (Current Session)</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Enquiry Source Card */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 group">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
-                                        <DocumentTextIcon className="w-5 h-5" />
+                        <div className="group bg-gradient-to-br from-slate-800/40 via-slate-900/60 to-slate-800/40 backdrop-blur-2xl border border-slate-700/50 rounded-3xl p-8 hover:border-amber-500/30 hover:shadow-2xl hover:shadow-amber-500/5 transition-all duration-500 hover:-translate-y-1">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/20">
+                                        <DocumentTextIcon className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-white">Enquiry Source</h3>
+                                    <h3 className="text-xl font-bold text-white tracking-tight">Enquiry Source</h3>
                                 </div>
-                                <button className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                                <button className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 text-slate-400 hover:text-white transition-all duration-300 border border-slate-600/30 hover:border-slate-500/40 opacity-0 group-hover:opacity-100">
                                     <EyeIcon className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Source Type</label>
-                                    <p className="text-white font-medium">
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Source Type</label>
+                                    <p className="text-white font-semibold text-lg tracking-wide">
                                         {enquiry.admission_id ? 'Parent Portal Registration' : 'Direct School Enquiry'}
                                     </p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1 block">Created Date</label>
-                                    <p className="text-white font-medium">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1">Created Date</label>
+                                    <p className="text-slate-300 font-medium text-lg tracking-wide">
                                         {new Date(enquiry.received_at).toLocaleDateString(undefined, {
                                             year: 'numeric',
                                             month: 'long',
@@ -676,16 +800,16 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                         </div>
                     </div>
 
-                    {/* Communication Input - Bottom */}
-                    <div className="border-t border-white/10 p-6 bg-[#0f1115]/50 backdrop-blur-xl">
-                        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
-                            <div className="flex gap-4 items-end">
-                                <div className="flex-1 relative">
+                    {/* Premium Communication Input */}
+                    <div className="border-t border-slate-700/50 p-8 bg-gradient-to-r from-slate-900/60 to-slate-950/80 backdrop-blur-2xl">
+                        <form onSubmit={handleSendMessage} className="max-w-5xl mx-auto">
+                            <div className="flex gap-6 items-end">
+                                <div className="flex-1 relative group">
                                     <textarea
                                         value={newMessage}
                                         onChange={(e) => setNewMessage(e.target.value)}
                                         placeholder="Send a message to the parent..."
-                                        className="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 outline-none resize-none focus:bg-white/10 focus:border-indigo-500/50 transition-all duration-300"
+                                        className="w-full p-6 rounded-3xl bg-gradient-to-br from-slate-800/60 to-slate-900/80 border border-slate-600/40 text-white placeholder:text-slate-400 outline-none resize-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all duration-500 text-lg leading-relaxed font-medium backdrop-blur-xl hover:bg-slate-700/60 focus:bg-slate-700/60"
                                         rows={3}
                                         onKeyDown={(e) => {
                                             if(e.key === 'Enter' && !e.shiftKey) {
@@ -694,64 +818,64 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                                             }
                                         }}
                                     />
-                                    <div className="absolute right-3 bottom-3 text-xs text-white/40">
+                                    <div className="absolute right-4 bottom-4 text-xs text-slate-400 font-medium tracking-wide">
                                         Press Enter to send
                                     </div>
                                 </div>
                                 <button
                                     type="submit"
                                     disabled={!newMessage.trim() || loading.saving}
-                                    className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-8 py-4 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 shadow-xl shadow-indigo-500/20 hover:shadow-2xl hover:shadow-indigo-500/30 hover:scale-105 border border-indigo-500/20"
                                 >
-                                    {loading.saving ? <Spinner size="sm" /> : <ArrowRightIcon className="w-4 h-4" />}
-                                    Send
+                                    {loading.saving ? <Spinner size="sm" /> : <ArrowRightIcon className="w-5 h-5" />}
+                                    <span className="tracking-wide">Send</span>
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                {/* Right Column - Actions & Intelligence */}
-                <div className="w-80 bg-[#0f1115]/50 backdrop-blur-xl border-l border-white/5 flex flex-col">
+                {/* Right: Actions & Intelligence Panel */}
+                <div className="w-96 bg-gradient-to-b from-slate-900/60 to-slate-950/80 backdrop-blur-2xl border-l border-slate-700/30 flex flex-col shadow-2xl">
                     {/* Actions Header */}
-                    <div className="p-6 border-b border-white/10">
-                        <h2 className="text-lg font-bold text-white mb-2">Actions & Intelligence</h2>
-                        <p className="text-sm text-white/60">Contextual operations</p>
+                    <div className="p-8 border-b border-slate-700/30">
+                        <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Actions & Intelligence</h2>
+                        <p className="text-sm text-slate-400 font-medium">Contextual operations</p>
                     </div>
 
                     {/* Actions Content */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
                         {/* Primary Actions */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Primary Actions</h3>
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-[0.2em] letter-spacing-1">Primary Actions</h3>
 
                             {/* Convert to Admission - HIGHEST PRIORITY */}
                             {enquiry.status !== 'CONVERTED' && (
                                 <button
                                     onClick={handleConvert}
                                     disabled={loading.converting || enquiry.status === 'ENQUIRY_ACTIVE'}
-                                    className={`w-full p-4 rounded-xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-3 ${
+                                    className={`group w-full p-6 rounded-3xl font-bold text-base transition-all duration-500 flex items-center justify-center gap-4 border ${
                                         enquiry.status !== 'ENQUIRY_ACTIVE'
-                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                                            : 'bg-white/10 text-white/40 cursor-not-allowed'
+                                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-2xl shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-105 border-emerald-500/20'
+                                            : 'bg-slate-800/60 text-slate-500 cursor-not-allowed border-slate-600/30'
                                     }`}
                                 >
-                                    {loading.converting ? <Spinner size="sm" /> : <GraduationCapIcon className="w-5 h-5" />}
-                                    Convert to Admission
+                                    {loading.converting ? <Spinner size="sm" /> : <GraduationCapIcon className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />}
+                                    <span className="tracking-wide">Convert to Admission</span>
                                 </button>
                             )}
 
                             {/* Status Management */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-white/60 uppercase tracking-wider">Update Status</label>
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-slate-300 uppercase tracking-[0.15em] letter-spacing-1">Update Status</label>
                                 <select
                                     value={enquiry.status}
                                     onChange={(e) => handleSaveStatus(e.target.value as EnquiryStatus)}
                                     disabled={loading.saving}
-                                    className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white outline-none focus:border-indigo-500/50 transition-all"
+                                    className="w-full p-4 rounded-2xl bg-gradient-to-br from-slate-800/60 to-slate-900/80 border border-slate-600/40 text-white outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all duration-300 font-medium backdrop-blur-xl hover:bg-slate-700/60"
                                 >
                                     {ORDERED_STATUSES.map(status => (
-                                        <option key={status} value={status}>
+                                        <option key={status} value={status} className="bg-slate-900 text-white">
                                             {STATUS_CONFIG[status]?.label || status}
                                         </option>
                                     ))}
@@ -760,68 +884,68 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                         </div>
 
                         {/* Communication Actions */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Communication</h3>
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-[0.2em] letter-spacing-1">Communication</h3>
 
                             <button
                                 onClick={() => {
                                     setNewMessage("Thank you for your interest in our school. We have received your enquiry and will get back to you shortly.");
                                 }}
-                                className="w-full p-3 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 hover:text-indigo-300 transition-all duration-300 text-left"
+                                className="group w-full p-4 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 text-indigo-300 hover:text-indigo-200 transition-all duration-300 text-left border border-indigo-500/20 hover:border-indigo-500/30 backdrop-blur-sm hover:shadow-lg hover:shadow-indigo-500/10"
                             >
-                                <div className="font-medium text-sm">Send Welcome Message</div>
-                                <div className="text-xs opacity-70">Automated response</div>
+                                <div className="font-semibold text-base mb-1">Send Welcome Message</div>
+                                <div className="text-xs opacity-70 font-medium">Automated response</div>
                             </button>
 
                             <button
                                 onClick={() => {
                                     setNewMessage("Please provide the following documents to complete your application:\n\n• Birth Certificate\n• Address Proof\n• Previous School Records\n• Medical Certificate (if applicable)\n\nYou can upload these documents directly through your Parent Portal.");
                                 }}
-                                className="w-full p-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 hover:text-amber-300 transition-all duration-300 text-left"
+                                className="group w-full p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-300 hover:text-amber-200 transition-all duration-300 text-left border border-amber-500/20 hover:border-amber-500/30 backdrop-blur-sm hover:shadow-lg hover:shadow-amber-500/10"
                             >
-                                <div className="font-medium text-sm">Request Documents</div>
-                                <div className="text-xs opacity-70">Document checklist</div>
+                                <div className="font-semibold text-base mb-1">Request Documents</div>
+                                <div className="text-xs opacity-70 font-medium">Document checklist</div>
                             </button>
                         </div>
 
                         {/* Intelligence Panel */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Intelligence</h3>
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-[0.2em] letter-spacing-1">Intelligence</h3>
 
-                            <div className="space-y-3">
-                                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                    <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Response Time</div>
-                                    <div className="text-lg font-black text-white">
+                            <div className="space-y-4">
+                                <div className="group p-5 rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/60 backdrop-blur-xl border border-slate-700/50 hover:border-slate-600/60 transition-all duration-300 hover:shadow-lg hover:shadow-slate-500/5">
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1 mb-2">Response Time</div>
+                                    <div className="text-2xl font-black text-white group-hover:text-indigo-300 transition-colors duration-300">
                                         {messageCount > 0 ? '< 24h' : 'Pending'}
                                     </div>
                                 </div>
 
-                                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                    <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Engagement Score</div>
-                                    <div className="text-lg font-black text-emerald-400">
+                                <div className="group p-5 rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/60 backdrop-blur-xl border border-slate-700/50 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1 mb-2">Engagement Score</div>
+                                    <div className="text-2xl font-black text-emerald-400 group-hover:text-emerald-300 transition-colors duration-300">
                                         {Math.min(95, 60 + (messageCount * 10))}%
                                     </div>
                                 </div>
 
-                                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                    <div className="text-xs font-bold text-white/60 uppercase tracking-wider mb-1">Priority Level</div>
-                                    <div className={`text-sm font-bold ${
-                                        daysActive > 7 ? 'text-red-400' :
-                                        daysActive > 3 ? 'text-amber-400' : 'text-green-400'
-                                    }`}>
+                                <div className="group p-5 rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/60 backdrop-blur-xl border border-slate-700/50 hover:border-amber-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5">
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] letter-spacing-1 mb-2">Priority Level</div>
+                                    <div className={`text-lg font-bold ${
+                                        daysActive > 7 ? 'text-red-400 group-hover:text-red-300' :
+                                        daysActive > 3 ? 'text-amber-400 group-hover:text-amber-300' : 'text-green-400 group-hover:text-green-300'
+                                    } transition-colors duration-300`}>
                                         {daysActive > 7 ? 'High' : daysActive > 3 ? 'Medium' : 'Normal'}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Archive/Delete Actions */}
-                        <div className="space-y-4 border-t border-white/10 pt-6">
-                            <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider">Administrative</h3>
+                        {/* Administrative Actions */}
+                        <div className="space-y-6 border-t border-slate-700/50 pt-8">
+                            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-[0.2em] letter-spacing-1">Administrative</h3>
 
-                            <button className="w-full p-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-all duration-300 flex items-center justify-center gap-2">
-                                <ArchiveIcon className="w-4 h-4" />
-                                <span className="font-medium text-sm">Archive Enquiry</span>
+                            <button className="group w-full p-4 rounded-2xl bg-gradient-to-br from-red-500/10 to-red-600/10 hover:from-red-500/20 hover:to-red-600/20 text-red-400 hover:text-red-300 transition-all duration-300 flex items-center justify-center gap-3 border border-red-500/20 hover:border-red-500/30 backdrop-blur-sm hover:shadow-lg hover:shadow-red-500/10">
+                                <ArchiveIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+                                <span className="font-semibold text-base tracking-wide">Archive Enquiry</span>
                             </button>
                         </div>
                     </div>
