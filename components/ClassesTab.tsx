@@ -23,7 +23,6 @@ import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
 import BulkClassOperationsModal from './classes/BulkClassOperationsModal';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { GridIcon } from './icons/GridIcon';
-import { GoogleGenAI } from '@google/genai';
 import CreateClassWizard from './classes/CreateClassWizard';
 import ClassWorkspace from './classes/ClassWorkspace';
 
@@ -142,47 +141,8 @@ const ClassroomAIModal: React.FC<{ classes: ExtendedClass[]; onClose: () => void
         setAiResponse(null);
         
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            
-            let prompt = "";
-            let dataContext = "";
-
-            if (activeTab === 'distribution') {
-                const classData = classes.map(c => ({ name: c.name, grade: c.grade_level, count: c.student_count, capacity: c.capacity || 30 }));
-                dataContext = JSON.stringify(classData);
-                prompt = `
-                    Analyze the following class enrollment data: ${dataContext}.
-                    Identify any classes that are overfilled (count > capacity) or significantly underfilled.
-                    Suggest specific student moves to balance the distribution within the same grade levels.
-                    Format the response as a list of actionable suggestions (e.g., "Move 3 students from Grade 10-A to 10-B").
-                    Keep it concise and professional.
-                `;
-            } else if (activeTab === 'staffing') {
-                const unassigned = classes.filter(c => !c.class_teacher_id).map(c => c.name);
-                const teacherList = teachers.map(t => t.display_name).slice(0, 10);
-                prompt = `
-                    The following classes have no assigned teacher: ${unassigned.join(', ')}.
-                    Here is a list of available faculty: ${teacherList.join(', ')}.
-                    Suggest optimal assignments based on typical school structures.
-                    Provide a rationale for each suggestion.
-                `;
-            } else {
-                const totalStudents = classes.slice(0, 100).reduce((acc, c) => acc + (c.student_count || 0), 0);
-                const totalCapacity = classes.slice(0, 100).reduce((acc, c) => acc + (c.capacity || 30), 0);
-                prompt = `
-                    School Data: Total Students: ${totalStudents}, Total Capacity: ${totalCapacity}, Class Count: ${classes.length}.
-                    Analyze the capacity utilization. Are we approaching limits? 
-                    Predict potential issues for the next academic year if enrollment grows by 10%.
-                    Provide 3 strategic recommendations for space management.
-                `;
-            }
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt
-            });
-            
-            setAiResponse(response.text || "No response generated.");
+            // AI functionality disabled - package not available
+            throw new Error("AI functionality is currently unavailable");
 
         } catch (err: any) {
             setAiResponse("AI Analysis Unavailable: " + formatError(err));

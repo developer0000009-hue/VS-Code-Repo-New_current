@@ -1,6 +1,5 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { BookIcon } from './icons/BookIcon';
 import { PlusIcon } from './icons/PlusIcon';
 import { SearchIcon } from './icons/SearchIcon';
@@ -141,21 +140,9 @@ const CreateEditHomeworkModal: React.FC<{
     const handleNext = () => setStep(p => Math.min(p + 1, steps.length - 1));
     const handleBack = () => setStep(p => Math.max(p - 1, 0));
 
-    // AI Generation Logic
+    // AI Generation Logic - Disabled
     const handleAISuggest = async () => {
-        if (!formData.title) return alert("Please enter a title first.");
-        setAiGenerating(true);
-        try {
-            if (!process.env.API_KEY) throw new Error("AI Key missing");
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const prompt = `Create a homework description for "${formData.title}". Include 3 questions.`;
-            const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-            if (response.text) setFormData(prev => ({ ...prev, description: response.text || '' }));
-        } catch (err: any) {
-            alert(`AI Suggestion Failed: ${err.message}`);
-        } finally {
-            setAiGenerating(false);
-        }
+        alert("AI suggestions are currently unavailable. Please write the description manually.");
     };
 
     const handleSubmit = async () => {

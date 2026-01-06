@@ -163,15 +163,21 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button 
-                        onClick={() => fetchEnquiries()} 
+                    <button
+                        onClick={() => fetchEnquiries()}
                         disabled={loading}
                         className="p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] text-white/40 hover:text-white transition-all border border-white/5 group active:scale-95 shadow-2xl"
                     >
                         <RefreshIcon className={`w-6 h-6 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-700'}`}/>
                     </button>
+                    <button
+                        onClick={() => navigate('/enquiry-entry')}
+                        className="px-8 py-5 bg-emerald-600 text-white font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-2xl shadow-emerald-500/20 hover:bg-emerald-500 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1 active:scale-95 ring-4 ring-emerald-500/10"
+                    >
+                        <UsersIcon className="w-5 h-5" /> New Enquiry
+                    </button>
                     {onNavigate && (
-                        <button 
+                        <button
                             onClick={() => onNavigate('Code Verification')}
                             className="px-8 py-5 bg-primary text-white font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-2xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1 active:scale-95 ring-4 ring-primary/10"
                         >

@@ -19,15 +19,7 @@ import { PhoneIcon } from './icons/PhoneIcon';
 import { SearchIcon } from './icons/SearchIcon';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
 
-// Type declaration for dynamic import
-declare module '@google/genai' {
-    export class GoogleGenAI {
-        constructor(options: { apiKey: string });
-        get models(): {
-            generateContent(options: { model: string; contents: string }): Promise<{ text: string }>;
-        };
-    }
-}
+
 
 const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -103,8 +95,7 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
         applicant_name: '',
     });
     const [newMessage, setNewMessage] = useState('');
-    const [loading, setLoading] = useState({ enquiry: true, timeline: false, saving: false, converting: false, ai: false });
-    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [loading, setLoading] = useState({ enquiry: true, timeline: false, saving: false, converting: false });
     const [error, setError] = useState<string | null>(null);
     const commsEndRef = useRef<HTMLDivElement>(null);
 
@@ -130,7 +121,14 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
 
     const fetchEnquiry = useCallback(async () => {
         if (!enquiry_id) {
-            setError('Invalid enquiry ID');
+            setError('Invalid enquiry ID provided');
+            setLoading(prev => ({ ...prev, enquiry: false }));
+            return;
+        }
+
+        const parsedId = parseInt(enquiry_id);
+        if (isNaN(parsedId) || parsedId <= 0) {
+            setError('Invalid enquiry ID format');
             setLoading(prev => ({ ...prev, enquiry: false }));
             return;
         }
@@ -141,15 +139,31 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
             const { data, error: fetchError } = await supabase
                 .from('enquiries')
                 .select('*')
-                .eq('id', parseInt(enquiry_id))
+                .eq('id', parsedId)
                 .single();
 
-            if (fetchError) throw fetchError;
-            if (!data) throw new Error('Enquiry not found');
+            if (fetchError) {
+                // Handle specific RLS or permission errors
+                if (fetchError.code === 'PGRST116') {
+                    setError('Enquiry not found or access denied. You may not have permission to view this enquiry.');
+                } else if (fetchError.message?.includes('permission denied') || fetchError.message?.includes('RLS')) {
+                    setError('Access denied. You do not have permission to view this enquiry.');
+                } else {
+                    throw fetchError;
+                }
+                setEnquiry(null);
+                return;
+            }
+
+            if (!data) {
+                setError('Enquiry not found in the system');
+                setEnquiry(null);
+                return;
+            }
 
             const validation = validateEnquiry(data as Enquiry);
             if (!validation.isValid) {
-                setError(validation.error || 'Invalid enquiry data');
+                setError(validation.error || 'Enquiry data is incomplete or invalid');
                 setEnquiry(null);
                 return;
             }
@@ -162,7 +176,12 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
             });
         } catch (err: any) {
             console.error("Enquiry Fetch Error:", err);
-            setError(formatError(err));
+            const formattedError = formatError(err);
+            if (formattedError.includes('Synchronization Idle') || formattedError.includes('Institutional system exception')) {
+                setError('Unable to load enquiry. Please check your connection and try again.');
+            } else {
+                setError(formattedError);
+            }
         } finally {
             setLoading(prev => ({ ...prev, enquiry: false }));
         }
@@ -201,47 +220,7 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
         }
     }, [timeline]);
 
-    const handleAIGenerateSummary = async () => {
-        const apiKey = (import.meta as any).env?.VITE_GOOGLE_AI_API_KEY;
-        if (!apiKey) {
-            console.error("Google AI API key not configured");
-            setAiSummary("AI summary unavailable - API key not configured.");
-            return;
-        }
 
-        setLoading(prev => ({ ...prev, ai: true }));
-        try {
-            // Dynamic import to avoid static import errors if package not installed
-            const { GoogleGenAI } = await import('@google/genai').catch(() => {
-                throw new Error("Google AI package not available");
-            });
-
-            const ai = new GoogleGenAI({ apiKey });
-            const conversationText = timeline
-                .filter(t => t.item_type === 'MESSAGE')
-                .map(t => `${t.is_admin ? 'Admin' : 'Parent'}: ${t.details?.message || '[Message not available]'}`)
-                .join('\n');
-
-            if (!conversationText.trim()) {
-                setAiSummary("No conversation data available to summarize.");
-                return;
-            }
-
-            const prompt = `Summarize the following school admission enquiry conversation for ${enquiry?.applicant_name || 'Student'} (Grade ${enquiry?.grade || 'Unknown'}). Provide a concise analysis of the parent's primary concerns and the current status of the handshake. Tone: Executive and Brief.\n\nConversation:\n${conversationText}`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt
-            });
-
-            setAiSummary(response?.text || "Summary unavailable.");
-        } catch (err: any) {
-            console.error("AI Context Failure:", err);
-            setAiSummary("AI summary unavailable - " + (err.message || "package not installed or API error"));
-        } finally {
-            setLoading(prev => ({ ...prev, ai: false }));
-        }
-    };
 
     const handleSaveStatus = async (newStatus: EnquiryStatus) => {
         if (!enquiry) return;
@@ -486,28 +465,8 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                     </section>
 
                     <section className="space-y-10">
-                         <div className="flex items-center justify-between">
-                            <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Identity Intel</h3>
-                            <button
-                                onClick={handleAIGenerateSummary}
-                                disabled={loading.ai}
-                                className="p-3 rounded-2xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-all active:scale-90"
-                                title="AI Summarize Conversation"
-                            >
-                                {loading.ai ? <Spinner size="sm" /> : <SparklesIcon className="w-5 h-5" />}
-                            </button>
-                         </div>
+                         <h3 className="text-[11px] font-black uppercase text-white/30 tracking-[0.5em]">Identity Intel</h3>
 
-                         {aiSummary ? (
-                            <div className="bg-primary/5 border border-primary/20 p-8 rounded-[2.5rem] relative group overflow-hidden animate-in fade-in slide-in-from-right-8 duration-1000">
-                                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:opacity-40 transition-opacity"></div>
-                                 <p className="text-[9px] font-black uppercase tracking-[0.4em] text-primary mb-4 flex items-center gap-2">
-                                     <SparklesIcon className="w-3.5 h-3.5" /> AI Synthesis
-                                 </p>
-                                 <p className="text-sm font-serif italic text-white/70 leading-loose">"{aiSummary}"</p>
-                                 <button onClick={() => setAiSummary(null)} className="mt-6 text-[9px] font-black uppercase tracking-[0.2em] text-white/20 hover:text-white transition-colors">Clear Insight</button>
-                            </div>
-                         ) : (
                         <div className="space-y-5">
                                 <div className="flex flex-col gap-2 p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner">
                                     <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Parent Contact</span>
@@ -541,7 +500,6 @@ const EnquiryDetailsPage: React.FC<EnquiryDetailsPageProps> = ({ onNavigate }) =
                                     </p>
                                 </div>
                             </div>
-                         )}
                     </section>
 
                     {enquiry.status !== 'CONVERTED' && (

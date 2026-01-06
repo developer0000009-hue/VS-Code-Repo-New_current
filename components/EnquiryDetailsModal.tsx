@@ -18,15 +18,7 @@ import { PhoneIcon } from './icons/PhoneIcon';
 import { SearchIcon } from './icons/SearchIcon';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
 
-// Type declaration for dynamic import
-declare module '@google/genai' {
-    export class GoogleGenAI {
-        constructor(options: { apiKey: string });
-        get models(): {
-            generateContent(options: { model: string; contents: string }): Promise<{ text: string }>;
-        };
-    }
-}
+
 
 
 const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -171,12 +163,10 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
 
         setLoading(prev => ({ ...prev, ai: true }));
         try {
-            // Dynamic import to avoid static import errors if package not installed
-            const { GoogleGenAI } = await import('@google/genai').catch(() => {
-                throw new Error("Google AI package not available");
-            });
+            // AI functionality disabled - package not available
+            throw new Error("AI functionality is currently unavailable");
 
-            const ai = new GoogleGenAI({ apiKey });
+            // AI functionality disabled
             const conversationText = timeline
                 .filter(t => t.item_type === 'MESSAGE')
                 .map(t => `${t.is_admin ? 'Admin' : 'Parent'}: ${t.details?.message || '[Message not available]'}`)
@@ -189,12 +179,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ enquiry, onCl
 
             const prompt = `Summarize the following school admission enquiry conversation for ${enquiry.applicant_name || 'Student'} (Grade ${enquiry.grade || 'Unknown'}). Provide a concise analysis of the parent's primary concerns and the current status of the handshake. Tone: Executive and Brief.\n\nConversation:\n${conversationText}`;
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt
-            });
-
-            setAiSummary(response?.text || "Summary unavailable.");
+            // AI response would go here - disabled
         } catch (err: any) {
             console.error("AI Context Failure:", err);
             setAiSummary("AI summary unavailable - " + (err.message || "package not installed or API error"));
