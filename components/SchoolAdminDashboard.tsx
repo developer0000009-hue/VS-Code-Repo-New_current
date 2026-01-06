@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
 import { UserProfile, Role, SchoolAdminProfileData, SchoolBranch, BuiltInRoles } from '../types';
 import Navbar from './admin/Navbar';
 import Sidebar from './admin/Sidebar';
@@ -26,7 +25,6 @@ import AnalyticsTab from './AnalyticsTab';
 import TeachersManagementTab from './TeachersManagementTab';
 import ClassesTab from './ClassesTab';
 import { getAdminMenu } from './admin/AdminMenuConfig';
-import EnquiryDetailsPage from './EnquiryDetailsPage';
 import { XIcon } from './icons/XIcon';
 
 interface SchoolAdminDashboardProps {
@@ -213,46 +211,39 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
     };
 
     return (
-        <Routes>
-            <Route path="/enquiry-node/:enquiry_id" element={
-                <EnquiryDetailsPage onNavigate={setActiveComponent} />
-            } />
-            <Route path="/" element={
-                <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
-                    <Sidebar
-                        activeComponent={activeComponent}
-                        setActiveComponent={setActiveComponent}
-                        isCollapsed={isSidebarCollapsed}
-                        setCollapsed={setIsSidebarCollapsed}
-                        isBranchAdmin={isBranchAdmin}
-                        isHeadOfficeAdmin={isHeadOfficeAdmin}
-                        menuGroups={menuGroups}
-                    />
+        <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
+            <Sidebar
+                activeComponent={activeComponent}
+                setActiveComponent={setActiveComponent}
+                isCollapsed={isSidebarCollapsed}
+                setCollapsed={setIsSidebarCollapsed}
+                isBranchAdmin={isBranchAdmin}
+                isHeadOfficeAdmin={isHeadOfficeAdmin}
+                menuGroups={menuGroups}
+            />
 
-                    <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out h-screen overflow-hidden ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-[280px]'}`}>
-                        <Navbar
-                            activeComponent={activeComponent}
-                            setActiveComponent={setActiveComponent}
-                            isBranchAdmin={isBranchAdmin}
-                            isHeadOfficeAdmin={isHeadOfficeAdmin}
-                            profile={profile}
-                            onSelectRole={onSelectRole}
-                            onSignOut={onSignOut}
-                            branches={branches}
-                            currentBranchId={currentBranchId}
-                            onSwitchBranch={onSwitchBranch}
-                            menuGroups={menuGroups}
-                        />
+            <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out h-screen overflow-hidden ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-[280px]'}`}>
+                <Navbar
+                    activeComponent={activeComponent}
+                    setActiveComponent={setActiveComponent}
+                    isBranchAdmin={isBranchAdmin}
+                    isHeadOfficeAdmin={isHeadOfficeAdmin}
+                    profile={profile}
+                    onSelectRole={onSelectRole}
+                    onSignOut={onSignOut}
+                    branches={branches}
+                    currentBranchId={currentBranchId}
+                    onSwitchBranch={onSwitchBranch}
+                    menuGroups={menuGroups}
+                />
 
-                        <main className="flex-grow w-full max-w-[1800px] mx-auto p-4 sm:p-6 lg:p-8 custom-scrollbar overflow-y-auto">
-                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                {renderContent()}
-                            </div>
-                        </main>
+                <main className="flex-grow w-full max-w-[1800px] mx-auto p-4 sm:p-6 lg:p-8 custom-scrollbar overflow-y-auto">
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        {renderContent()}
                     </div>
-                </div>
-            } />
-        </Routes>
+                </main>
+            </div>
+        </div>
     );
 };
 

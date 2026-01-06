@@ -5,6 +5,7 @@ import { supabase, STORAGE_KEY, formatError } from './services/supabase';
 import { UserProfile, BuiltInRoles, Role } from './types';
 import AuthPage from './components/AuthPage';
 import SchoolAdminDashboard from './components/SchoolAdminDashboard';
+import EnquiryDetailsPage from './components/EnquiryDetailsPage';
 import ParentDashboard from './ParentDashboard';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
@@ -171,8 +172,35 @@ const App: React.FC = () => {
         }
     };
 
+    const renderEnquiryDetails = () => {
+        // Only allow admin roles to access enquiry details
+        const isAdminRole = [
+            BuiltInRoles.SCHOOL_ADMINISTRATION,
+            BuiltInRoles.BRANCH_ADMIN,
+            BuiltInRoles.PRINCIPAL,
+            BuiltInRoles.HR_MANAGER,
+            BuiltInRoles.ACADEMIC_COORDINATOR,
+            BuiltInRoles.ACCOUNTANT
+        ].includes(profile.role as any);
+
+        if (!isAdminRole) {
+            return <NotFound redirectTo="/" />;
+        }
+
+        return (
+            <EnquiryDetailsPage
+                onNavigate={(component: string) => {
+                    // Navigate back to dashboard and set active component
+                    navigate('/', { replace: true });
+                    // The dashboard will handle setting the active component
+                }}
+            />
+        );
+    };
+
     return (
         <Routes>
+            <Route path="/enquiry-node/:enquiry_id" element={renderEnquiryDetails()} />
             <Route path="/" element={renderDashboard()} />
             <Route path="*" element={<NotFound redirectTo="/" />} />
         </Routes>
