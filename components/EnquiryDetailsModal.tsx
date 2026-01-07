@@ -144,15 +144,15 @@ const EditableField: React.FC<{
     };
 
     return (
-        <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">{label}</label>
+        <div className="space-y-3">
+            <label className="text-sm font-semibold text-gray-300" style={{fontFamily: 'Inter, sans-serif'}}>{label}</label>
             {isEditing ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <input
                         type="text"
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="flex-1 px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 text-sm text-white placeholder-gray-400 transition-all duration-200"
                         autoFocus
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') handleSave();
@@ -161,27 +161,30 @@ const EditableField: React.FC<{
                     />
                     <button
                         onClick={handleSave}
-                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        className="p-3 text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all duration-200"
+                        style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                     >
                         <CheckIcon className="w-4 h-4" />
                     </button>
                     <button
                         onClick={handleCancel}
-                        className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                        className="p-3 text-gray-400 hover:bg-gray-600/50 rounded-xl transition-all duration-200"
+                        style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                     >
                         <XIcon className="w-4 h-4" />
                     </button>
                 </div>
             ) : (
                 <div
-                    className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors border-2 ${
-                        missing ? 'border-amber-200 bg-amber-50' : 'border-transparent'
+                    className={`flex items-center justify-between p-4 bg-gray-700/50 rounded-xl cursor-pointer hover:bg-gray-600/30 transition-all duration-200 border-2 ${
+                        missing ? 'border-amber-500/30 bg-amber-500/5' : 'border-gray-600'
                     }`}
                     onClick={() => setIsEditing(true)}
+                    style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'}}
                 >
-                    <span className={`text-sm ${!value ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+                    <span className={`text-sm ${!value ? 'text-gray-400 italic' : 'text-white font-medium'}`}>
                         {value || 'Not provided'}
-                        {required && !value && <span className="text-red-500 ml-1">*</span>}
+                        {required && !value && <span className="text-red-400 ml-2">*</span>}
                     </span>
                     <EditIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -195,11 +198,11 @@ const SummaryChip: React.FC<{
     value: string;
     icon?: React.ReactNode;
     color?: string;
-}> = ({ label, value, icon, color = 'text-gray-600' }) => (
-    <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+}> = ({ label, value, icon, color = 'text-gray-300' }) => (
+    <div className="flex items-center gap-3 px-4 py-3 bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-600/30" style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}>
         {icon && <div className="text-gray-400">{icon}</div>}
         <div>
-            <div className="text-xs text-gray-500 font-medium">{label}</div>
+            <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</div>
             <div className={`text-sm font-semibold ${color}`}>{value}</div>
         </div>
     </div>
@@ -211,37 +214,37 @@ const TimelineStep: React.FC<{
     isCurrent: boolean;
     isLast: boolean;
 }> = ({ step, isCompleted, isCurrent, isLast }) => (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-4">
         <div className="flex flex-col items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' :
-                isCurrent ? 'bg-blue-500 border-blue-500 text-white' :
-                'bg-white border-gray-300 text-gray-400'
-            }`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' :
+                isCurrent ? 'bg-gradient-to-r from-purple-500 to-purple-600 border-purple-500 text-white shadow-lg' :
+                'bg-gray-700 border-gray-600 text-gray-400'
+            }`} style={{boxShadow: isCompleted || isCurrent ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'}}>
                 {isCompleted ? (
-                    <CheckIcon className="w-4 h-4" />
+                    <CheckIcon className="w-5 h-5" />
                 ) : (
-                    <span className="text-xs font-semibold">
+                    <span className="text-sm font-bold">
                         {isCurrent ? '●' : '○'}
                     </span>
                 )}
             </div>
             {!isLast && (
-                <div className={`w-0.5 h-12 mt-2 ${
-                    isCompleted ? 'bg-emerald-500' : 'bg-gray-300'
+                <div className={`w-0.5 h-16 mt-3 rounded-full ${
+                    isCompleted ? 'bg-emerald-500' : 'bg-gray-600'
                 }`} />
             )}
         </div>
-        <div className="pb-6">
-            <div className={`text-sm font-medium ${
-                isCompleted ? 'text-emerald-700' :
-                isCurrent ? 'text-blue-700' :
-                'text-gray-500'
-            }`}>
+        <div className="pb-8">
+            <div className={`text-base font-semibold ${
+                isCompleted ? 'text-emerald-400' :
+                isCurrent ? 'text-purple-300' :
+                'text-gray-400'
+            }`} style={{fontFamily: 'Inter, sans-serif'}}>
                 {step.label}
             </div>
             {isCurrent && (
-                <div className="text-xs text-gray-600 mt-1">Current step</div>
+                <div className="text-sm text-purple-400 mt-2 font-medium">Current step</div>
             )}
         </div>
     </div>
@@ -253,24 +256,24 @@ const MessageBubble: React.FC<{
     timestamp: string;
     sender: string;
 }> = ({ message, isAdmin, timestamp, sender }) => (
-    <div className={`flex gap-3 ${isAdmin ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`flex gap-4 ${isAdmin ? 'justify-end' : 'justify-start'} mb-6`}>
         {!isAdmin && (
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-semibold text-gray-600 flex-shrink-0">
+            <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
                 {sender.charAt(0)}
             </div>
         )}
-        <div className={`max-w-[70%] ${isAdmin ? 'order-first' : ''}`}>
-            <div className={`p-3 rounded-lg ${
-                isAdmin ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'
-            }`}>
+        <div className={`max-w-[75%] ${isAdmin ? 'order-first' : ''}`}>
+            <div className={`p-4 rounded-2xl shadow-lg ${
+                isAdmin ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gray-800/70 backdrop-blur-sm border border-gray-600 text-gray-100'
+            }`} style={{boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
                 <p className="text-sm leading-relaxed">{message}</p>
             </div>
-            <div className={`text-xs text-gray-500 mt-1 ${isAdmin ? 'text-right' : 'text-left'}`}>
+            <div className={`text-xs text-gray-500 mt-2 ${isAdmin ? 'text-right' : 'text-left'}`}>
                 {sender} • {timestamp}
             </div>
         </div>
         {isAdmin && (
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
                 {sender.charAt(0)}
             </div>
         )}
@@ -470,77 +473,83 @@ Admissions Team`;
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-lg w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden border border-gray-700" style={{boxShadow: '0 8px 32px rgba(0,0,0,0.3)'}}>
 
                 {/* Success/Error Messages */}
                 {(successMessage || error) && (
-                    <div className={`px-6 py-3 text-sm font-medium ${
-                        successMessage ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                        'bg-red-50 text-red-800 border-red-200'
-                    } border-b`}>
+                    <div className={`px-8 py-4 text-sm font-medium border-b ${
+                        successMessage ? 'bg-emerald-50/10 text-emerald-300 border-emerald-700/30' :
+                        'bg-red-50/10 text-red-300 border-red-700/30'
+                    }`}>
                         {successMessage || error}
                     </div>
                 )}
 
                 {/* Header */}
-                <div className="bg-white border-b border-gray-200 px-6 py-4">
+                <div className="bg-gradient-to-r from-slate-900 to-gray-900 border-b border-gray-700 px-8 py-6">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
                             <button
                                 onClick={onClose}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-3 hover:bg-gray-800 rounded-xl transition-all duration-200"
+                                style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                             >
-                                <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
+                                <ChevronLeftIcon className="w-5 h-5 text-gray-300" />
                             </button>
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg font-semibold text-gray-700">
+                                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-lg font-bold text-white shadow-lg">
                                     {formData.applicant_name.charAt(0)}
                                 </div>
                                 <div>
-                                    <h1 className="text-xl font-bold text-gray-900">{formData.applicant_name}</h1>
-                                    <p className="text-sm text-gray-600">Grade {enquiry.grade} • Enquiry #{enquiry.id.toString().slice(-6)}</p>
+                                    <h1 className="text-2xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>{formData.applicant_name}</h1>
+                                    <p className="text-sm text-gray-300" style={{fontFamily: 'Inter, sans-serif'}}>Grade {enquiry.grade} • Enquiry #{enquiry.id.toString().slice(-6)}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-6">
-                            {/* Status */}
-                            <div className={`px-3 py-1 rounded-lg text-sm font-semibold border ${currentStatus.bg} ${currentStatus.color}`}>
+                        <div className="flex items-center gap-8">
+                            {/* Status Badge */}
+                            <div className={`px-4 py-2 rounded-xl text-sm font-semibold border backdrop-blur-sm ${
+                                enquiry.status === 'CONVERTED' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' :
+                                enquiry.status === 'ENQUIRY_VERIFIED' || enquiry.status === 'VERIFIED' ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' :
+                                'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            }`}>
                                 {currentStatus.label}
                             </div>
 
-                            {/* Progress */}
-                            <div className="flex items-center gap-3 min-w-[120px]">
-                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            {/* Progress Bar */}
+                            <div className="flex items-center gap-3 min-w-[140px]">
+                                <div className="flex-1 h-3 bg-gray-700 rounded-full overflow-hidden" style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)'}}>
                                     <div
-                                        className="h-full bg-blue-500 transition-all duration-300"
-                                        style={{ width: `${currentStatus.progress}%` }}
+                                        className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500 rounded-full"
+                                        style={{ width: `${currentStatus.progress}%`, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
                                     />
                                 </div>
-                                <span className="text-sm font-medium text-gray-600 min-w-[35px]">
+                                <span className="text-sm font-semibold text-gray-300 min-w-[40px]" style={{fontFamily: 'Inter, sans-serif'}}>
                                     {currentStatus.progress}%
                                 </span>
                             </div>
 
                             <button
                                 onClick={onClose}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-3 hover:bg-gray-800 rounded-xl transition-all duration-200"
+                                style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                             >
-                                <XIcon className="w-5 h-5 text-gray-600" />
+                                <XIcon className="w-5 h-5 text-gray-300" />
                             </button>
                         </div>
                     </div>
                 </div>
 
                 {/* At-a-Glance Summary */}
-                <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
-                    <div className="flex items-center gap-4">
+                <div className="bg-gray-800/50 border-b border-gray-700 px-8 py-6">
+                    <div className="flex items-center gap-6">
                         <SummaryChip
                             label="Priority"
                             value={priorityLevel}
                             icon={<AlertTriangleIcon className="w-4 h-4" />}
-                            color={priorityColor}
+                            color={priorityLevel === 'High' ? 'text-red-400' : priorityLevel === 'Medium' ? 'text-amber-400' : 'text-green-400'}
                         />
                         <SummaryChip
                             label="Days Active"
@@ -563,11 +572,11 @@ Admissions Team`;
                 {/* Main Content */}
                 <div className="flex-1 flex overflow-hidden">
                     {/* Sidebar */}
-                    <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+                    <div className="w-80 bg-gray-800/70 backdrop-blur-sm border-r border-gray-700 flex flex-col">
                         {/* Timeline */}
-                        <div className="flex-1 p-6">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-6">Progress Timeline</h2>
-                            <div className="space-y-1">
+                        <div className="flex-1 p-8">
+                            <h2 className="text-xl font-bold text-white mb-8" style={{fontFamily: 'Inter, sans-serif'}}>Progress Timeline</h2>
+                            <div className="space-y-2">
                                 {PROGRESS_STEPS.map((step, index) => {
                                     const isCompleted = index < Math.floor(currentStatus.progress / 20);
                                     const isCurrent = index === Math.floor(currentStatus.progress / 20);
@@ -586,16 +595,16 @@ Admissions Team`;
                         </div>
 
                         {/* Next Action */}
-                        <div className="p-6 border-t border-gray-200">
-                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Next Action</h3>
-                            <p className="text-sm text-gray-600">{currentStatus.nextAction}</p>
+                        <div className="p-8 border-t border-gray-700">
+                            <h3 className="text-base font-semibold text-white mb-4">Next Action</h3>
+                            <p className="text-sm text-gray-300 leading-relaxed">{currentStatus.nextAction}</p>
                         </div>
                     </div>
 
                     {/* Main Content Area */}
                     <div className="flex-1 flex flex-col">
                         {/* Tab Navigation */}
-                        <div className="bg-white border-b border-gray-200">
+                        <div className="bg-gray-800/70 backdrop-blur-sm border-b border-gray-700">
                             <div className="flex">
                                 {[
                                     { id: 'overview', label: 'Details' },
@@ -605,11 +614,12 @@ Admissions Team`;
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id as any)}
-                                        className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                                        className={`px-8 py-4 text-sm font-semibold border-b-2 transition-all duration-200 ${
                                             activeTab === tab.id
-                                                ? 'border-blue-500 text-blue-600'
-                                                : 'border-transparent text-gray-600 hover:text-gray-900'
+                                                ? 'border-purple-500 text-purple-300 bg-purple-500/10'
+                                                : 'border-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
                                         }`}
+                                        style={{fontFamily: 'Inter, sans-serif'}}
                                     >
                                         {tab.label}
                                     </button>
@@ -618,16 +628,18 @@ Admissions Team`;
                         </div>
 
                         {/* Tab Content */}
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="flex-1 overflow-y-auto bg-gray-900">
                             {activeTab === 'overview' ? (
-                                <div className="p-6 space-y-6">
+                                <div className="p-8 space-y-8">
                                     {/* Student Details */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <AcademicCapIcon className="w-5 h-5 text-gray-600" />
-                                            <h3 className="text-lg font-semibold text-gray-900">Student Information</h3>
+                                    <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-8" style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}>
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/30">
+                                                <AcademicCapIcon className="w-6 h-6 text-purple-300" />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>Student Information</h3>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-2 gap-8">
                                             <EditableField
                                                 label="Full Name"
                                                 value={formData.applicant_name}
@@ -635,22 +647,24 @@ Admissions Team`;
                                                 required
                                                 missing={!formData.applicant_name}
                                             />
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-gray-700">Grade Level</label>
-                                                <div className="p-3 bg-gray-50 rounded-lg border-2 border-transparent">
-                                                    <span className="text-sm text-gray-900 font-medium">Grade {enquiry.grade}</span>
+                                            <div className="space-y-3">
+                                                <label className="text-sm font-semibold text-gray-300" style={{fontFamily: 'Inter, sans-serif'}}>Grade Level</label>
+                                                <div className="p-4 bg-gray-700/50 rounded-xl border-2 border-gray-600" style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'}}>
+                                                    <span className="text-sm text-white font-semibold">Grade {enquiry.grade}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Parent/Guardian Details */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <UsersIcon className="w-5 h-5 text-gray-600" />
-                                            <h3 className="text-lg font-semibold text-gray-900">Parent/Guardian Information</h3>
+                                    <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-8" style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}>
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/30">
+                                                <UsersIcon className="w-6 h-6 text-green-300" />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>Parent/Guardian Information</h3>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-2 gap-8">
                                             <EditableField
                                                 label="Full Name"
                                                 value={formData.parent_name}
@@ -670,21 +684,22 @@ Admissions Team`;
                                                 onSave={(value) => handleSaveField('parent_phone', value)}
                                                 missing={!formData.parent_phone}
                                             />
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-gray-700">Relationship</label>
-                                                <div className="p-3 bg-gray-50 rounded-lg border-2 border-transparent">
-                                                    <span className="text-sm text-gray-900 font-medium">Parent</span>
+                                            <div className="space-y-3">
+                                                <label className="text-sm font-semibold text-gray-300" style={{fontFamily: 'Inter, sans-serif'}}>Relationship</label>
+                                                <div className="p-4 bg-gray-700/50 rounded-xl border-2 border-gray-600" style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'}}>
+                                                    <span className="text-sm text-white font-semibold">Parent</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Quick Actions */}
-                                        <div className="mt-6 pt-6 border-t border-gray-200">
-                                            <div className="flex gap-3">
+                                        <div className="mt-8 pt-8 border-t border-gray-700">
+                                            <div className="flex gap-4">
                                                 <button
                                                     onClick={() => window.open(`mailto:${formData.parent_email}`, '_blank')}
                                                     disabled={!formData.parent_email}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                                                    className="flex items-center gap-3 px-6 py-3 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-xl hover:bg-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-sm font-semibold"
+                                                    style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                                                 >
                                                     <MailIcon className="w-4 h-4" />
                                                     Email
@@ -692,14 +707,16 @@ Admissions Team`;
                                                 <button
                                                     onClick={() => window.open(`tel:${formData.parent_phone}`, '_blank')}
                                                     disabled={!formData.parent_phone}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                                                    className="flex items-center gap-3 px-6 py-3 bg-green-500/10 border border-green-500/30 text-green-300 rounded-xl hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-sm font-semibold"
+                                                    style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                                                 >
                                                     <PhoneIcon className="w-4 h-4" />
                                                     Call
                                                 </button>
                                                 <button
                                                     onClick={() => handleQuickAction('welcome')}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-sm font-medium"
+                                                    className="flex items-center gap-3 px-6 py-3 bg-purple-500/10 border border-purple-500/30 text-purple-300 rounded-xl hover:bg-purple-500/20 transition-all duration-200 text-sm font-semibold"
+                                                    style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                                                 >
                                                     <CommunicationIcon className="w-4 h-4" />
                                                     Message
@@ -709,24 +726,26 @@ Admissions Team`;
                                     </div>
 
                                     {/* Enquiry Source */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <DocumentTextIcon className="w-5 h-5 text-gray-600" />
-                                            <h3 className="text-lg font-semibold text-gray-900">Enquiry Source</h3>
+                                    <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 p-8" style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}>
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30">
+                                                <DocumentTextIcon className="w-6 h-6 text-amber-300" />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>Enquiry Source</h3>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-gray-700">Source Type</label>
-                                                <div className="p-3 bg-gray-50 rounded-lg border-2 border-transparent">
-                                                    <span className="text-sm text-gray-900 font-medium">
+                                        <div className="grid grid-cols-2 gap-8">
+                                            <div className="space-y-3">
+                                                <label className="text-sm font-semibold text-gray-300" style={{fontFamily: 'Inter, sans-serif'}}>Source Type</label>
+                                                <div className="p-4 bg-gray-700/50 rounded-xl border-2 border-gray-600" style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'}}>
+                                                    <span className="text-sm text-white font-semibold">
                                                         {enquiry.admission_id ? 'Parent Portal Registration' : 'Direct School Enquiry'}
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-gray-700">Created Date</label>
-                                                <div className="p-3 bg-gray-50 rounded-lg border-2 border-transparent">
-                                                    <span className="text-sm text-gray-900 font-medium">
+                                            <div className="space-y-3">
+                                                <label className="text-sm font-semibold text-gray-300" style={{fontFamily: 'Inter, sans-serif'}}>Created Date</label>
+                                                <div className="p-4 bg-gray-700/50 rounded-xl border-2 border-gray-600" style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'}}>
+                                                    <span className="text-sm text-white font-semibold">
                                                         {new Date(enquiry.received_at || enquiry.updated_at).toLocaleDateString()}
                                                     </span>
                                                 </div>
@@ -735,45 +754,45 @@ Admissions Team`;
                                     </div>
                                 </div>
                             ) : activeTab === 'timeline' ? (
-                                <div className="p-6">
-                                    <h2 className="text-lg font-semibold text-gray-900 mb-6">Activity Timeline</h2>
+                                <div className="p-8">
+                                    <h2 className="text-2xl font-bold text-white mb-8" style={{fontFamily: 'Inter, sans-serif'}}>Activity Timeline</h2>
                                     {loading.timeline ? (
-                                        <div className="space-y-4">
+                                        <div className="space-y-6">
                                             {[...Array(5)].map((_, i) => (
-                                                <div key={i} className="flex gap-4">
-                                                    <SkeletonLoader className="w-8 h-8 rounded-full" />
-                                                    <div className="space-y-2 flex-1">
-                                                        <SkeletonLoader className="h-4 w-32" />
-                                                        <SkeletonLoader className="h-3 w-48" />
+                                                <div key={i} className="flex gap-6">
+                                                    <SkeletonLoader className="w-10 h-10 rounded-full" />
+                                                    <div className="space-y-3 flex-1">
+                                                        <SkeletonLoader className="h-5 w-40" />
+                                                        <SkeletonLoader className="h-4 w-64" />
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : timeline.length === 0 ? (
-                                        <div className="text-center py-12">
-                                            <ClockIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                                            <h3 className="text-lg font-medium text-gray-900 mb-2">No activity yet</h3>
-                                            <p className="text-gray-600">Timeline events will appear here</p>
+                                        <div className="text-center py-16">
+                                            <ClockIcon className="w-16 h-16 text-gray-400 mx-auto mb-6" />
+                                            <h3 className="text-xl font-semibold text-gray-300 mb-3">No activity yet</h3>
+                                            <p className="text-gray-500">Timeline events will appear here</p>
                                         </div>
                                     ) : (
-                                        <div className="space-y-6">
+                                        <div className="space-y-8">
                                             {timeline.map((item, idx) => (
-                                                <div key={idx} className="flex gap-4">
-                                                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <div key={idx} className="flex gap-6">
+                                                    <div className="w-12 h-12 bg-gray-700/50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-600" style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}>
                                                         {item.item_type === 'MESSAGE' ? (
-                                                            <CommunicationIcon className="w-4 h-4 text-gray-600" />
+                                                            <CommunicationIcon className="w-5 h-5 text-purple-300" />
                                                         ) : (
-                                                            <CheckCircleIcon className="w-4 h-4 text-gray-600" />
+                                                            <CheckCircleIcon className="w-5 h-5 text-green-300" />
                                                         )}
                                                     </div>
                                                     <div className="flex-1">
-                                                        <div className="text-sm font-medium text-gray-900">
+                                                        <div className="text-base font-semibold text-white">
                                                             {item.item_type === 'MESSAGE' ? 'Message sent' : 'Status updated'}
                                                         </div>
-                                                        <div className="text-sm text-gray-600 mt-1">
+                                                        <div className="text-sm text-gray-300 mt-2 leading-relaxed">
                                                             {item.details?.message || item.item_type?.replace(/_/g, ' ')}
                                                         </div>
-                                                        <div className="text-xs text-gray-500 mt-2">
+                                                        <div className="text-xs text-gray-500 mt-3 font-medium">
                                                             {new Date(item.created_at).toLocaleString()} • {item.created_by_name}
                                                         </div>
                                                     </div>
@@ -786,26 +805,26 @@ Admissions Team`;
                                 /* Communication Tab */
                                 <div className="flex flex-col h-full">
                                     {/* Messages */}
-                                    <div className="flex-1 overflow-y-auto p-6">
+                                    <div className="flex-1 overflow-y-auto p-8">
                                         {loading.timeline ? (
-                                            <div className="space-y-4">
+                                            <div className="space-y-6">
                                                 {[...Array(3)].map((_, i) => (
-                                                    <div key={i} className="flex gap-4">
-                                                        <SkeletonLoader className="w-8 h-8 rounded-full" />
-                                                        <div className="space-y-2 flex-1">
-                                                            <SkeletonLoader className="h-16 w-full rounded-lg" />
+                                                    <div key={i} className="flex gap-6">
+                                                        <SkeletonLoader className="w-10 h-10 rounded-full" />
+                                                        <div className="space-y-3 flex-1">
+                                                            <SkeletonLoader className="h-20 w-full rounded-xl" />
                                                         </div>
                                                     </div>
                                                 ))}
                                             </div>
                                         ) : timeline.filter(t => t.item_type === 'MESSAGE').length === 0 ? (
                                             <div className="flex flex-col items-center justify-center h-full text-center">
-                                                <CommunicationIcon className="w-16 h-16 text-gray-300 mb-4" />
-                                                <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                                                <p className="text-gray-600">Start the conversation with the parent</p>
+                                                <CommunicationIcon className="w-20 h-20 text-gray-400 mb-6" />
+                                                <h3 className="text-xl font-semibold text-gray-300 mb-3">No messages yet</h3>
+                                                <p className="text-gray-500">Start the conversation with the parent</p>
                                             </div>
                                         ) : (
-                                            <div className="space-y-2">
+                                            <div className="space-y-4">
                                                 {timeline
                                                     .filter(t => t.item_type === 'MESSAGE')
                                                     .map((item, idx) => (
@@ -826,21 +845,22 @@ Admissions Team`;
                                     </div>
 
                                     {/* Message Input */}
-                                    <div className="border-t border-gray-200 bg-white p-6">
-                                        <form onSubmit={handleSendMessage} className="flex gap-4">
+                                    <div className="border-t border-gray-700 bg-gray-800/70 backdrop-blur-sm p-8">
+                                        <form onSubmit={handleSendMessage} className="flex gap-6">
                                             <div className="flex-1">
                                                 <textarea
                                                     value={newMessage}
                                                     onChange={(e) => setNewMessage(e.target.value)}
                                                     placeholder="Type your message..."
-                                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
-                                                    rows={3}
+                                                    className="w-full p-4 bg-gray-700/50 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none text-sm text-white placeholder-gray-400 transition-all duration-200"
+                                                    rows={4}
                                                 />
                                             </div>
                                             <button
                                                 type="submit"
                                                 disabled={!newMessage.trim() || loading.sending}
-                                                className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+                                                className="px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-3 font-semibold text-sm shadow-lg"
+                                                style={{boxShadow: '0 2px 8px rgba(0,0,0,0.2)'}}
                                             >
                                                 {loading.sending ? <Spinner size="sm" /> : <LocalSendIcon className="w-4 h-4" />}
                                                 Send
@@ -854,30 +874,33 @@ Admissions Team`;
                 </div>
 
                 {/* Action Bar */}
-                <div className="bg-gray-50 border-t border-gray-200 px-6 py-4">
+                <div className="bg-gray-800/70 backdrop-blur-sm border-t border-gray-700 px-8 py-6">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
                             <select
                                 value={enquiry.status}
                                 onChange={(e) => handleStatusChange(e.target.value as EnquiryStatus)}
                                 disabled={loading.saving}
-                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                className="px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-sm focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 text-white transition-all duration-200"
+                                style={{boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'}}
                             >
                                 {Object.entries(STATUS_CONFIG).map(([key, config]) => (
                                     <option key={key} value={key}>{config.label}</option>
                                 ))}
                             </select>
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-4">
                                 <button
                                     onClick={() => handleQuickAction('welcome')}
-                                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                                    className="px-6 py-3 bg-gray-700/50 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-600/50 hover:border-gray-500 transition-all duration-200 text-sm font-semibold"
+                                    style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                                 >
                                     Send Welcome
                                 </button>
                                 <button
                                     onClick={() => handleQuickAction('documents')}
-                                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                                    className="px-6 py-3 bg-gray-700/50 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-600/50 hover:border-gray-500 transition-all duration-200 text-sm font-semibold"
+                                    style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
                                 >
                                     Request Documents
                                 </button>
@@ -888,20 +911,21 @@ Admissions Team`;
                             <button
                                 onClick={handleConvert}
                                 disabled={loading.converting || !currentStatus.canConvert}
-                                className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${
+                                className={`px-8 py-4 rounded-xl font-bold text-sm transition-all duration-200 ${
                                     currentStatus.canConvert
-                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow-md'
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl'
+                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                                 }`}
+                                style={{boxShadow: currentStatus.canConvert ? '0 4px 16px rgba(0,0,0,0.2)' : 'none'}}
                             >
                                 {loading.converting ? (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                         <Spinner size="sm" />
                                         Converting...
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2">
-                                        <GraduationCapIcon className="w-4 h-4" />
+                                    <div className="flex items-center gap-3">
+                                        <GraduationCapIcon className="w-5 h-5" />
                                         Convert to Admission
                                     </div>
                                 )}
