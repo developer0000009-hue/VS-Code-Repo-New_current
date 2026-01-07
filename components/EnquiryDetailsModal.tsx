@@ -28,87 +28,49 @@ const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
+const EncryptionIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+    </svg>
+);
+
+// Status configuration with enterprise-grade styling
 const STATUS_CONFIG: Record<string, {
     label: string;
     color: string;
     bg: string;
-    progress: number;
-    nextAction: string;
-    canConvert: boolean;
+    description: string;
+    canPromote: boolean;
 }> = {
-    'New': {
-        label: 'New Enquiry',
-        color: 'text-blue-700',
-        bg: 'bg-blue-50 border-blue-200',
-        progress: 10,
-        nextAction: 'Contact parent and verify details',
-        canConvert: false
-    },
     'ENQUIRY_ACTIVE': {
         label: 'Active',
-        color: 'text-blue-700',
-        bg: 'bg-blue-50 border-blue-200',
-        progress: 25,
-        nextAction: 'Verify parent contact information',
-        canConvert: false
+        color: 'text-blue-400',
+        bg: 'bg-blue-500/10 border border-blue-500/20',
+        description: 'Initial contact established',
+        canPromote: false
     },
     'ENQUIRY_VERIFIED': {
         label: 'Verified',
-        color: 'text-emerald-700',
-        bg: 'bg-emerald-50 border-emerald-200',
-        progress: 60,
-        nextAction: 'Request required documents',
-        canConvert: true
-    },
-    'VERIFIED': {
-        label: 'Verified',
-        color: 'text-emerald-700',
-        bg: 'bg-emerald-50 border-emerald-200',
-        progress: 60,
-        nextAction: 'Request required documents',
-        canConvert: true
+        color: 'text-emerald-400',
+        bg: 'bg-emerald-500/10 border border-emerald-500/20',
+        description: 'Parent details confirmed',
+        canPromote: true
     },
     'ENQUIRY_IN_PROGRESS': {
         label: 'In Progress',
-        color: 'text-amber-700',
-        bg: 'bg-amber-50 border-amber-200',
-        progress: 80,
-        nextAction: 'Review submitted documents',
-        canConvert: true
-    },
-    'IN_REVIEW': {
-        label: 'In Review',
-        color: 'text-amber-700',
-        bg: 'bg-amber-50 border-amber-200',
-        progress: 80,
-        nextAction: 'Review submitted documents',
-        canConvert: true
+        color: 'text-amber-400',
+        bg: 'bg-amber-500/10 border border-amber-500/20',
+        description: 'Document review in progress',
+        canPromote: true
     },
     'CONVERTED': {
         label: 'Converted',
-        color: 'text-emerald-700',
-        bg: 'bg-emerald-50 border-emerald-200',
-        progress: 100,
-        nextAction: 'Admission process complete',
-        canConvert: false
-    },
-    'Completed': {
-        label: 'Completed',
-        color: 'text-emerald-700',
-        bg: 'bg-emerald-50 border-emerald-200',
-        progress: 100,
-        nextAction: 'Admission process complete',
-        canConvert: false
-    },
+        color: 'text-gray-400',
+        bg: 'bg-gray-500/10 border border-gray-500/20',
+        description: 'Promoted to admission',
+        canPromote: false
+    }
 };
-
-const PROGRESS_STEPS = [
-    { label: 'Enquiry Created', status: 'completed' },
-    { label: 'Contact Verified', status: 'pending' },
-    { label: 'Documents Requested', status: 'pending' },
-    { label: 'Review Complete', status: 'pending' },
-    { label: 'Ready for Admission', status: 'pending' }
-];
 
 interface EnquiryDetailsModalProps {
     enquiry: Enquiry;
@@ -117,41 +79,6 @@ interface EnquiryDetailsModalProps {
     currentBranchId?: string | null;
     onNavigate?: (component: string) => void;
 }
-
-// Helper Components
-const SkeletonLoader: React.FC<{ className?: string }> = ({ className = "h-4 w-32" }) => (
-    <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
-);
-
-const MessageBubble: React.FC<{
-    message: string;
-    isAdmin: boolean;
-    timestamp: string;
-    sender: string;
-}> = ({ message, isAdmin, timestamp, sender }) => (
-    <div className={`flex gap-4 ${isAdmin ? 'justify-end' : 'justify-start'} mb-6`}>
-        {!isAdmin && (
-            <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
-                {sender.charAt(0)}
-            </div>
-        )}
-        <div className={`max-w-[75%] ${isAdmin ? 'order-first' : ''}`}>
-            <div className={`p-4 rounded-2xl shadow-lg ${
-                isAdmin ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gray-800/70 backdrop-blur-sm border border-gray-600 text-gray-100'
-            }`} style={{boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
-                <p className="text-sm leading-relaxed">{message}</p>
-            </div>
-            <div className={`text-xs text-gray-500 mt-2 ${isAdmin ? 'text-right' : 'text-left'}`}>
-                {sender} • {timestamp}
-            </div>
-        </div>
-        {isAdmin && (
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
-                {sender.charAt(0)}
-            </div>
-        )}
-    </div>
-);
 
 const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
     enquiry,
@@ -163,21 +90,17 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState({
         timeline: true,
-        promoting: false,
-        sending: false
+        statusUpdate: false,
+        sending: false,
+        promoting: false
     });
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showPromotionConfirm, setShowPromotionConfirm] = useState(false);
     const commsEndRef = useRef<HTMLDivElement>(null);
 
-    // Calculate derived data
-    const daysActive = Math.floor((new Date().getTime() - new Date(enquiry.received_at || enquiry.updated_at).getTime()) / (1000 * 3600 * 24));
-    const priorityLevel = daysActive > 7 ? 'High' : daysActive > 3 ? 'Medium' : 'Low';
-    const priorityColor = priorityLevel === 'High' ? 'text-red-600' :
-                         priorityLevel === 'Medium' ? 'text-amber-600' : 'text-green-600';
-    const currentStatus = STATUS_CONFIG[enquiry.status] || STATUS_CONFIG['New'];
-    const lastActivity = timeline.length > 0 ? timeline[0].created_at : enquiry.updated_at;
+    // Current status info
+    const currentStatus = STATUS_CONFIG[enquiry.status] || STATUS_CONFIG['ENQUIRY_ACTIVE'];
 
     const fetchTimeline = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(prev => ({ ...prev, timeline: true }));
@@ -211,7 +134,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
     }, [successMessage]);
 
     const handleStatusChange = async (newStatus: EnquiryStatus) => {
-        setLoading(prev => ({ ...prev, promoting: true }));
+        setLoading(prev => ({ ...prev, statusUpdate: true }));
         setError(null);
         try {
             const { error } = await supabase
@@ -227,12 +150,12 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
             console.error('Status update error:', err);
             setError(`Failed to update status: ${formatError(err)}`);
         } finally {
-            setLoading(prev => ({ ...prev, promoting: false }));
+            setLoading(prev => ({ ...prev, statusUpdate: false }));
         }
     };
 
     const handlePromoteToAdmission = async () => {
-        if (!['VERIFIED', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'IN_REVIEW'].includes(enquiry.status)) {
+        if (!currentStatus.canPromote) {
             setError('Cannot promote: enquiry must be verified first');
             return;
         }
@@ -285,26 +208,26 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden border border-gray-700" style={{boxShadow: '0 8px 32px rgba(0,0,0,0.3)'}}>
+            <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden border border-gray-700/50" style={{boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'}}>
 
                 {/* Success/Error Messages */}
                 {(successMessage || error) && (
-                    <div className={`px-8 py-4 text-sm font-medium border-b ${
-                        successMessage ? 'bg-emerald-50/10 text-emerald-300 border-emerald-700/30' :
-                        'bg-red-50/10 text-red-300 border-red-700/30'
+                    <div className={`px-8 py-4 text-sm font-medium border-b backdrop-blur-sm ${
+                        successMessage ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' :
+                        'bg-red-500/10 text-red-300 border-red-500/20'
                     }`}>
                         {successMessage || error}
                     </div>
                 )}
 
-                {/* Header */}
-                <div className="bg-gradient-to-r from-slate-900 to-gray-900 border-b border-gray-700 px-8 py-6">
+                {/* Header Section */}
+                <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b border-gray-700/50 px-8 py-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-6">
                             <button
                                 onClick={onClose}
-                                className="p-3 hover:bg-gray-800 rounded-xl transition-all duration-200"
-                                style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
+                                className="p-3 hover:bg-gray-800/80 rounded-xl transition-all duration-200 hover:scale-105"
+                                style={{boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}
                             >
                                 <ChevronLeftIcon className="w-5 h-5 text-gray-300" />
                             </button>
@@ -313,18 +236,18 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                                     {enquiry.applicant_name.charAt(0)}
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>{enquiry.applicant_name}</h1>
+                                    <h1 className="text-2xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
+                                        {enquiry.applicant_name}
+                                    </h1>
                                     <div className="flex items-center gap-3 mt-2">
-                                        {enquiry.status === 'VERIFIED' || enquiry.status === 'ENQUIRY_VERIFIED' ? (
-                                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-300 text-xs font-semibold rounded-full border border-emerald-500/30">
-                                                Verified
-                                            </span>
-                                        ) : null}
                                         <span className="px-3 py-1 bg-blue-500/10 text-blue-300 text-xs font-semibold rounded-full border border-blue-500/30">
                                             Grade {enquiry.grade}
                                         </span>
-                                        <span className="px-3 py-1 bg-purple-500/10 text-purple-300 text-xs font-semibold rounded-full border border-purple-500/30">
-                                            Enquiry Active
+                                        <span className="px-3 py-1 bg-gray-500/10 text-gray-400 text-xs font-mono rounded-full border border-gray-500/30">
+                                            #{enquiry.id.toString().slice(-6)}
+                                        </span>
+                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${currentStatus.bg} ${currentStatus.color}`}>
+                                            {currentStatus.label}
                                         </span>
                                     </div>
                                 </div>
@@ -333,8 +256,8 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
 
                         <button
                             onClick={onClose}
-                            className="p-3 hover:bg-gray-800 rounded-xl transition-all duration-200"
-                            style={{boxShadow: '0 1px 3px rgba(0,0,0,0.1)'}}
+                            className="p-3 hover:bg-gray-800/80 rounded-xl transition-all duration-200 hover:scale-105"
+                            style={{boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}
                         >
                             <XIcon className="w-5 h-5 text-gray-300" />
                         </button>
@@ -343,45 +266,78 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
 
                 {/* Two-Panel Layout */}
                 <div className="flex-1 flex overflow-hidden">
-                    {/* Left Panel - Enquiry Communication */}
+                    {/* Left Panel - Enquiry Communication Channel */}
                     <div className="flex-1 bg-gray-900 flex flex-col">
                         <div className="flex-1 overflow-y-auto">
                             <div className="p-8">
-                                <h2 className="text-xl font-bold text-white mb-8" style={{fontFamily: 'Inter, sans-serif'}}>Enquiry Communication</h2>
+                                <div className="flex items-center gap-3 mb-8">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                                        <CommunicationIcon className="w-4 h-4 text-white" />
+                                    </div>
+                                    <h2 className="text-xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
+                                        Enquiry Communication
+                                    </h2>
+                                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                                        <EncryptionIcon className="w-3 h-3 text-emerald-400" />
+                                        <span className="text-xs text-emerald-300 font-medium">Encrypted</span>
+                                    </div>
+                                </div>
 
                                 {/* Messages */}
                                 {loading.timeline ? (
                                     <div className="space-y-6">
                                         {[...Array(3)].map((_, i) => (
                                             <div key={i} className="flex gap-6">
-                                                <SkeletonLoader className="w-10 h-10 rounded-full" />
+                                                <div className="w-10 h-10 bg-gray-700 rounded-full animate-pulse" />
                                                 <div className="space-y-3 flex-1">
-                                                    <SkeletonLoader className="h-20 w-full rounded-xl" />
+                                                    <div className="h-20 bg-gray-700/50 rounded-xl animate-pulse" />
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : timeline.filter(t => t.item_type === 'MESSAGE').length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                                        <CommunicationIcon className="w-20 h-20 text-gray-400 mb-6" />
-                                        <h3 className="text-xl font-semibold text-gray-300 mb-3">No encrypted messages exchanged on this channel yet.</h3>
-                                        <p className="text-gray-500">Messages are enquiry-only and will appear here</p>
+                                        <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mb-6">
+                                            <CommunicationIcon className="w-8 h-8 text-gray-400" />
+                                        </div>
+                                        <h3 className="text-xl font-semibold text-gray-300 mb-3">No encrypted messages exchanged yet</h3>
+                                        <p className="text-gray-500 text-sm leading-relaxed max-w-md">
+                                            Messages are enquiry-stage only and will appear here once communication begins.
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
                                         {timeline
                                             .filter(t => t.item_type === 'MESSAGE')
                                             .map((item, idx) => (
-                                                <MessageBubble
-                                                    key={idx}
-                                                    message={item.details?.message || ''}
-                                                    isAdmin={!item.is_admin}
-                                                    timestamp={new Date(item.created_at).toLocaleTimeString([], {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                    sender={item.created_by_name || 'Unknown'}
-                                                />
+                                                <div key={idx} className={`flex gap-4 ${item.is_admin ? 'justify-end' : 'justify-start'} mb-6`}>
+                                                    {!item.is_admin && (
+                                                        <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
+                                                            {item.created_by_name?.charAt(0) || 'P'}
+                                                        </div>
+                                                    )}
+                                                    <div className={`max-w-[75%] ${item.is_admin ? 'order-first' : ''}`}>
+                                                        <div className={`p-4 rounded-2xl shadow-lg backdrop-blur-sm ${
+                                                            item.is_admin ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gray-800/70 border border-gray-600/50 text-gray-100'
+                                                        }`} style={{boxShadow: item.is_admin ? '0 4px 16px rgba(147,51,234,0.3)' : '0 2px 8px rgba(0,0,0,0.2)'}}>
+                                                            <p className="text-sm leading-relaxed">{item.details?.message || ''}</p>
+                                                        </div>
+                                                        <div className={`text-xs text-gray-500 mt-2 flex items-center gap-2 ${item.is_admin ? 'text-right justify-end' : 'text-left justify-start'}`}>
+                                                            <span>{item.created_by_name || 'Unknown'}</span>
+                                                            <span>•</span>
+                                                            <span>{new Date(item.created_at).toLocaleTimeString([], {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}</span>
+                                                            {!item.is_admin && <EncryptionIcon className="w-3 h-3 text-emerald-400" />}
+                                                        </div>
+                                                    </div>
+                                                    {item.is_admin && (
+                                                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
+                                                            {item.created_by_name?.charAt(0) || 'A'}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
                                         <div ref={commsEndRef} />
                                     </div>
@@ -389,11 +345,14 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Message Input - Disabled if Converted */}
-                        <div className="border-t border-gray-700 bg-gray-800/70 backdrop-blur-sm p-8">
+                        {/* Message Composer */}
+                        <div className="border-t border-gray-700/50 bg-gray-800/70 backdrop-blur-sm p-8">
                             {enquiry.status === 'CONVERTED' ? (
                                 <div className="text-center py-4">
-                                    <p className="text-gray-400 text-sm">Message input disabled - enquiry has been converted to admission</p>
+                                    <div className="flex items-center justify-center gap-3 text-gray-400">
+                                        <ShieldCheckIcon className="w-5 h-5" />
+                                        <p className="text-sm">Message input disabled - enquiry has been converted to admission</p>
+                                    </div>
                                 </div>
                             ) : (
                                 <form onSubmit={handleSendMessage} className="flex gap-6">
@@ -401,16 +360,16 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                                         <textarea
                                             value={newMessage}
                                             onChange={(e) => setNewMessage(e.target.value)}
-                                            placeholder="Type message to parent (Enquiry channel only)"
-                                            className="w-full p-4 bg-gray-700/50 border border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none text-sm text-white placeholder-gray-400 transition-all duration-200"
-                                            rows={4}
+                                            placeholder="Send a message to the parent (Enquiry channel)"
+                                            className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none text-sm text-white placeholder-gray-400 transition-all duration-200 backdrop-blur-sm"
+                                            rows={3}
                                         />
                                     </div>
                                     <button
                                         type="submit"
                                         disabled={!newMessage.trim() || loading.sending}
-                                        className="px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-3 font-semibold text-sm shadow-lg"
-                                        style={{boxShadow: '0 2px 8px rgba(0,0,0,0.2)'}}
+                                        className="px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-3 font-semibold text-sm shadow-lg hover:shadow-xl"
+                                        style={{boxShadow: '0 4px 16px rgba(147,51,234,0.3)'}}
                                     >
                                         {loading.sending ? <Spinner size="sm" /> : <LocalSendIcon className="w-4 h-4" />}
                                         Send
@@ -420,70 +379,87 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Right Panel - Enquiry Control Stack */}
-                    <div className="w-96 bg-gray-800/70 backdrop-blur-sm border-l border-gray-700 flex flex-col">
+                    {/* Right Panel - Enquiry Control & Intelligence */}
+                    <div className="w-96 bg-gray-800/70 backdrop-blur-sm border-l border-gray-700/50 flex flex-col">
                         {/* Lifecycle Management */}
-                        <div className="p-8 border-b border-gray-700">
-                            <h3 className="text-lg font-bold text-white mb-6" style={{fontFamily: 'Inter, sans-serif'}}>Lifecycle Management</h3>
+                        <div className="p-8 border-b border-gray-700/50">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                                    <ClipboardListIcon className="w-4 h-4 text-white" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
+                                    Lifecycle Management
+                                </h3>
+                            </div>
                             <div className="space-y-3">
                                 {[
-                                    { key: 'ENQUIRY_ACTIVE', label: 'Active' },
-                                    { key: 'ENQUIRY_VERIFIED', label: 'Verified' },
-                                    { key: 'ENQUIRY_IN_PROGRESS', label: 'In Progress' },
-                                    { key: 'CONVERTED', label: 'Converted', disabled: true }
+                                    { key: 'ENQUIRY_ACTIVE', label: 'Active', desc: 'Initial contact established' },
+                                    { key: 'ENQUIRY_VERIFIED', label: 'Verified', desc: 'Parent details confirmed' },
+                                    { key: 'ENQUIRY_IN_PROGRESS', label: 'In Progress', desc: 'Document review in progress' },
+                                    { key: 'CONVERTED', label: 'Converted', desc: 'Promoted to admission (system)', disabled: true }
                                 ].map((status) => (
-                                    <label key={status.key} className="flex items-center gap-4 cursor-pointer">
+                                    <label key={status.key} className="flex items-start gap-4 cursor-pointer group">
                                         <input
                                             type="radio"
                                             name="enquiryStatus"
                                             value={status.key}
                                             checked={enquiry.status === status.key}
                                             onChange={(e) => handleStatusChange(e.target.value as EnquiryStatus)}
-                                            disabled={status.disabled || loading.promoting}
-                                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 focus:ring-2"
+                                            disabled={status.disabled || loading.statusUpdate}
+                                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 focus:ring-2 mt-0.5"
                                         />
-                                        <span className={`text-sm font-medium ${
-                                            status.disabled ? 'text-gray-500' :
-                                            enquiry.status === status.key ? 'text-purple-300' : 'text-gray-300'
-                                        }`}>
-                                            {status.label}
-                                            {status.disabled && ' (System Only)'}
-                                        </span>
+                                        <div className="flex-1">
+                                            <span className={`text-sm font-medium transition-colors ${
+                                                status.disabled ? 'text-gray-500' :
+                                                enquiry.status === status.key ? 'text-purple-300' : 'text-gray-300 group-hover:text-gray-200'
+                                            }`}>
+                                                {status.label}
+                                                {status.disabled && ' (System Only)'}
+                                            </span>
+                                            <p className="text-xs text-gray-500 mt-1">{status.desc}</p>
+                                        </div>
                                     </label>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Identity Snapshot */}
-                        <div className="p-8 border-b border-gray-700">
-                            <h3 className="text-lg font-bold text-white mb-6" style={{fontFamily: 'Inter, sans-serif'}}>Identity Snapshot</h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center py-3 border-b border-gray-600/30">
-                                    <span className="text-sm text-gray-400">Parent Email</span>
-                                    <span className="text-sm text-white font-medium">{enquiry.parent_email || 'Not provided'}</span>
+                        {/* Enquiry Identity Snapshot */}
+                        <div className="p-8 border-b border-gray-700/50">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-8 h-8 bg-gradient-to-br from-slate-500 to-slate-600 rounded-lg flex items-center justify-center">
+                                    <UsersIcon className="w-4 h-4 text-white" />
                                 </div>
-                                <div className="flex justify-between items-center py-3 border-b border-gray-600/30">
+                                <h3 className="text-lg font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
+                                    Enquiry Identity
+                                </h3>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center py-3 px-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
+                                    <span className="text-sm text-gray-400">Parent Email</span>
+                                    <span className="text-sm text-white font-medium truncate ml-2">{enquiry.parent_email || 'Not provided'}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-3 px-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
                                     <span className="text-sm text-gray-400">Applied Grade</span>
                                     <span className="text-sm text-white font-medium">Grade {enquiry.grade}</span>
                                 </div>
-                                <div className="flex justify-between items-center py-3">
-                                    <span className="text-sm text-gray-400">Enquiry ID</span>
-                                    <span className="text-sm text-gray-500 font-mono">#{enquiry.id.toString().slice(-6)}</span>
+                                <div className="flex justify-between items-center py-3 px-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
+                                    <span className="text-sm text-gray-400">Enquiry Source</span>
+                                    <span className="text-sm text-gray-400">Web Form</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Promote to Admission CTA */}
+                        {/* Primary Action */}
                         <div className="p-8">
                             <button
                                 onClick={() => setShowPromotionConfirm(true)}
-                                disabled={!['VERIFIED', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'IN_REVIEW'].includes(enquiry.status) || loading.promoting}
+                                disabled={!currentStatus.canPromote || loading.promoting}
                                 className={`w-full px-6 py-4 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-3 ${
-                                    ['VERIFIED', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'IN_REVIEW'].includes(enquiry.status)
-                                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl'
+                                    currentStatus.canPromote
+                                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl hover:scale-[1.02]'
                                         : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                                 }`}
-                                style={{boxShadow: ['VERIFIED', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'IN_REVIEW'].includes(enquiry.status) ? '0 4px 16px rgba(0,0,0,0.2)' : 'none'}}
+                                style={currentStatus.canPromote ? {boxShadow: '0 8px 32px rgba(16,185,129,0.3)'} : {}}
                             >
                                 {loading.promoting ? (
                                     <>
@@ -497,7 +473,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                                     </>
                                 )}
                             </button>
-                            {!['VERIFIED', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'IN_REVIEW'].includes(enquiry.status) && (
+                            {!currentStatus.canPromote && enquiry.status !== 'CONVERTED' && (
                                 <p className="text-xs text-gray-500 mt-3 text-center">Must be verified to promote</p>
                             )}
                         </div>
@@ -507,20 +483,20 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                 {/* Promotion Confirmation Modal */}
                 {showPromotionConfirm && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                        <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-700" style={{boxShadow: '0 8px 32px rgba(0,0,0,0.3)'}}>
+                        <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-700/50" style={{boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'}}>
                             <div className="text-center">
-                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
                                     <GraduationCapIcon className="w-8 h-8 text-emerald-400" />
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-4">Promote to Admission</h3>
-                                <p className="text-gray-300 mb-8 leading-relaxed">
+                                <p className="text-gray-300 mb-8 leading-relaxed text-sm">
                                     This will convert the enquiry to an admission record, lock the enquiry, and redirect you to the Admission Vault.
                                     This action cannot be undone.
                                 </p>
                                 <div className="flex gap-4">
                                     <button
                                         onClick={() => setShowPromotionConfirm(false)}
-                                        className="flex-1 px-6 py-3 bg-gray-700/50 border border-gray-600 text-gray-300 rounded-xl hover:bg-gray-600/50 transition-all duration-200"
+                                        className="flex-1 px-6 py-3 bg-gray-700/50 border border-gray-600/50 text-gray-300 rounded-xl hover:bg-gray-600/50 transition-all duration-200"
                                     >
                                         Cancel
                                     </button>
