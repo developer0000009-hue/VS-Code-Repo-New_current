@@ -1,76 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { EnquiryService } from '../services/enquiry';
 import { Enquiry, TimelineItem, EnquiryStatus } from '../types';
-import Spinner from './common/Spinner';
+import EnquiryErrorBoundary from './common/EnquiryErrorBoundary';
+import EnquiryTimeline from './EnquiryTimeline';
+import EnquiryStatusManager from './EnquiryStatusManager';
+import EnquiryMessageComposer from './EnquiryMessageComposer';
+import EnquiryAISummary from './EnquiryAISummary';
 import { XIcon } from './icons/XIcon';
-import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { GraduationCapIcon } from './icons/GraduationCapIcon';
-import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
-import { ClockIcon } from './icons/ClockIcon';
-import { CommunicationIcon } from './icons/CommunicationIcon';
-import { UsersIcon } from './icons/UsersIcon';
-import { PhoneIcon } from './icons/PhoneIcon';
-import { MailIcon } from './icons/MailIcon';
-import { AcademicCapIcon } from './icons/AcademicCapIcon';
-import { DocumentTextIcon } from './icons/DocumentTextIcon';
-import { CalendarIcon } from './icons/CalendarIcon';
-import { EyeIcon } from './icons/EyeIcon';
-import { EditIcon } from './icons/EditIcon';
-import { CheckIcon } from './icons/CheckIcon';
-import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
-import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
-
-const LocalSendIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-    </svg>
-);
-
-const EncryptionIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
-    </svg>
-);
-
-// Status configuration with enterprise-grade styling
-const STATUS_CONFIG: Record<string, {
-    label: string;
-    color: string;
-    bg: string;
-    description: string;
-    canPromote: boolean;
-}> = {
-    'ENQUIRY_ACTIVE': {
-        label: 'Active',
-        color: 'text-blue-400',
-        bg: 'bg-blue-500/10 border border-blue-500/20',
-        description: 'Initial contact established',
-        canPromote: false
-    },
-    'ENQUIRY_VERIFIED': {
-        label: 'Verified',
-        color: 'text-emerald-400',
-        bg: 'bg-emerald-500/10 border border-emerald-500/20',
-        description: 'Parent details confirmed',
-        canPromote: true
-    },
-    'ENQUIRY_IN_PROGRESS': {
-        label: 'In Progress',
-        color: 'text-amber-400',
-        bg: 'bg-amber-500/10 border border-amber-500/20',
-        description: 'Document review in progress',
-        canPromote: true
-    },
-    'CONVERTED': {
-        label: 'Converted',
-        color: 'text-gray-400',
-        bg: 'bg-gray-500/10 border border-gray-500/20',
-        description: 'Promoted to admission',
-        canPromote: false
-    }
-};
+import { GoogleGenAI } from '@google/genai';
 
 interface EnquiryDetailsModalProps {
     enquiry: Enquiry;
@@ -87,30 +26,23 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
     onNavigate
 }) => {
     const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-    const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState({
         timeline: true,
-        statusUpdate: false,
-        sending: false,
-        promoting: false
+        saving: false,
+        converting: false,
+        ai: false
     });
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [showPromotionConfirm, setShowPromotionConfirm] = useState(false);
-    const commsEndRef = useRef<HTMLDivElement>(null);
-
-    // Current status info
-    const currentStatus = STATUS_CONFIG[enquiry.status] || STATUS_CONFIG['ENQUIRY_ACTIVE'];
 
     const fetchTimeline = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(prev => ({ ...prev, timeline: true }));
         try {
-            const { data, error } = await supabase.rpc('get_enquiry_timeline', { p_enquiry_id: enquiry.id });
+            const { data, error } = await supabase.rpc('get_enquiry_timeline', {
+                p_node_id: enquiry.id
+            });
             if (error) throw error;
             setTimeline(data || []);
-        } catch (err) {
-            console.error("Timeline fetch error:", err);
-            setError("Failed to load timeline. Please refresh the page.");
+        } catch (e) {
+            console.error("Timeline Sync Error:", e);
         } finally {
             if (!isSilent) setLoading(prev => ({ ...prev, timeline: false }));
         }
@@ -120,402 +52,179 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
         fetchTimeline();
     }, [fetchTimeline]);
 
-    useEffect(() => {
-        if (commsEndRef.current) {
-            commsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [timeline]);
-
-    useEffect(() => {
-        if (successMessage) {
-            const timer = setTimeout(() => setSuccessMessage(null), 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [successMessage]);
-
-    const handleStatusChange = async (newStatus: EnquiryStatus) => {
-        setLoading(prev => ({ ...prev, statusUpdate: true }));
-        setError(null);
+    const handleStatusChange = useCallback(async (newStatus: EnquiryStatus) => {
+        setLoading(prev => ({ ...prev, saving: true }));
         try {
             const { error } = await supabase
                 .from('enquiries')
-                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .update({
+                    status: newStatus,
+                    updated_at: new Date().toISOString()
+                })
                 .eq('id', enquiry.id);
 
             if (error) throw error;
-            setSuccessMessage('Status updated successfully');
             onUpdate();
             await fetchTimeline(true);
         } catch (err) {
-            console.error('Status update error:', err);
-            setError(`Failed to update status: ${formatError(err)}`);
+            console.error('Status update failed:', err);
+            throw new Error(formatError(err));
         } finally {
-            setLoading(prev => ({ ...prev, statusUpdate: false }));
+            setLoading(prev => ({ ...prev, saving: false }));
         }
-    };
+    }, [enquiry.id, onUpdate, fetchTimeline]);
 
-    const handlePromoteToAdmission = async () => {
-        if (!currentStatus.canPromote) {
-            setError('Cannot promote: enquiry must be verified first');
-            return;
-        }
-
-        setLoading(prev => ({ ...prev, promoting: true }));
-        setError(null);
+    const handleConvert = useCallback(async () => {
+        setLoading(prev => ({ ...prev, converting: true }));
         try {
             const result = await EnquiryService.convertToAdmission(enquiry.id);
             if (result.success) {
-                setSuccessMessage('Successfully promoted to admission');
                 onUpdate();
-                setTimeout(() => {
-                    onClose();
-                    onNavigate?.('Admissions');
-                }, 1500);
+                onClose();
+                onNavigate?.('Admissions');
             } else {
-                throw new Error(result.message || 'Promotion failed');
+                throw new Error(result.message || 'Conversion failed');
             }
         } catch (err: any) {
-            console.error('Promotion error:', err);
-            setError(`Promotion failed: ${err.message || 'Please try again'}`);
+            console.error('Conversion failed:', err);
+            throw new Error(err.message || 'Failed to convert enquiry to admission');
         } finally {
-            setLoading(prev => ({ ...prev, promoting: false }));
+            setLoading(prev => ({ ...prev, converting: false }));
         }
-    };
+    }, [enquiry.id, onUpdate, onClose, onNavigate]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const msg = newMessage.trim();
-        if (!msg) return;
-
-        setLoading(prev => ({ ...prev, sending: true }));
-        setError(null);
+    const handleSendMessage = useCallback(async (message: string) => {
         try {
             const { error } = await supabase.rpc('send_enquiry_message', {
-                p_enquiry_id: enquiry.id,
-                p_message: msg
+                p_node_id: enquiry.id,
+                p_message: message
             });
             if (error) throw error;
-            setNewMessage('');
-            setSuccessMessage('Message sent successfully');
             await fetchTimeline(true);
         } catch (err) {
-            console.error('Send message error:', err);
-            setError(`Failed to send message: ${formatError(err)}`);
-        } finally {
-            setLoading(prev => ({ ...prev, sending: false }));
+            console.error('Message send failed:', err);
+            throw new Error(formatError(err));
         }
-    };
+    }, [enquiry.id, fetchTimeline]);
+
+    const handleGenerateSummary = useCallback(async (): Promise<string> => {
+        setLoading(prev => ({ ...prev, ai: true }));
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_GOOGLE_AI_API_KEY });
+            const conversationText = timeline
+                .filter(t => t.item_type === 'MESSAGE')
+                .map(t => `${t.is_admin ? 'Admin' : 'Parent'}: ${t.details.message}`)
+                .join('\n');
+
+            const prompt = `Summarize the following school admission enquiry conversation for ${enquiry.applicant_name} (Grade ${enquiry.grade}). Provide a concise analysis of the parent's primary concerns and the current status of the handshake. Tone: Executive and Brief.\n\nConversation:\n${conversationText}`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-1.5-flash',
+                contents: prompt
+            });
+
+            return response.response?.text() || "Summary unavailable.";
+        } catch (err) {
+            console.error("AI Context Failure:", err);
+            throw new Error('Failed to generate AI summary');
+        } finally {
+            setLoading(prev => ({ ...prev, ai: false }));
+        }
+    }, [timeline, enquiry.applicant_name, enquiry.grade]);
+
+    const stringId = String(enquiry.id);
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden border border-gray-700/50" style={{boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'}}>
-
-                {/* Success/Error Messages */}
-                {(successMessage || error) && (
-                    <div className={`px-8 py-4 text-sm font-medium border-b backdrop-blur-sm ${
-                        successMessage ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' :
-                        'bg-red-500/10 text-red-300 border-red-500/20'
-                    }`}>
-                        {successMessage || error}
-                    </div>
-                )}
-
-                {/* Header Section */}
-                <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-b border-gray-700/50 px-8 py-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-6">
-                            <button
-                                onClick={onClose}
-                                className="p-3 hover:bg-gray-800/80 rounded-xl transition-all duration-200 hover:scale-105"
-                                style={{boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}
-                            >
-                                <ChevronLeftIcon className="w-5 h-5 text-gray-300" />
-                            </button>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-lg font-bold text-white shadow-lg">
-                                    {enquiry.applicant_name.charAt(0)}
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
-                                        {enquiry.applicant_name}
-                                    </h1>
-                                    <div className="flex items-center gap-3 mt-2">
-                                        <span className="px-3 py-1 bg-blue-500/10 text-blue-300 text-xs font-semibold rounded-full border border-blue-500/30">
-                                            Grade {enquiry.grade}
-                                        </span>
-                                        <span className="px-3 py-1 bg-gray-500/10 text-gray-400 text-xs font-mono rounded-full border border-gray-500/30">
-                                            #{enquiry.id.toString().slice(-6)}
-                                        </span>
-                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${currentStatus.bg} ${currentStatus.color}`}>
-                                            {currentStatus.label}
-                                        </span>
-                                    </div>
+        <EnquiryErrorBoundary>
+            <div
+                className="fixed inset-0 bg-black/95 backdrop-blur-3xl flex items-center justify-center z-[150] p-0 md:p-4 lg:p-6"
+                onClick={onClose}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="enquiry-modal-title"
+            >
+                <div
+                    className="bg-[#09090b] rounded-none md:rounded-[3rem] lg:rounded-[4.5rem] shadow-[0_64px_128px_-32px_rgba(0,0,0,1)] w-full max-w-[1700px] h-full md:h-[94vh] flex flex-col border-0 md:border md:border-white/5 overflow-hidden ring-0 md:ring-1 md:ring-white/10 animate-in zoom-in-95 duration-500"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <header className="px-6 md:px-10 lg:px-16 py-6 md:py-10 border-b border-white/5 bg-[#0f1115]/95 backdrop-blur-2xl flex flex-wrap justify-between items-center z-40 relative shadow-2xl shrink-0">
+                        <div className="flex items-center gap-4 md:gap-10 min-w-0">
+                            <div className="relative group shrink-0 hidden sm:block">
+                                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl opacity-40 group-hover:opacity-100 transition-opacity duration-1000"></div>
+                                <div className="w-12 h-12 md:w-20 md:h-20 bg-indigo-600 rounded-2xl md:rounded-[2.2rem] text-white flex items-center justify-center shadow-2xl border border-white/10 relative z-10 transform group-hover:rotate-6 transition-transform duration-700">
+                                    <ClipboardListIcon className="w-6 h-6 md:w-10 md:h-10" />
                                 </div>
                             </div>
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-3 md:gap-6 mb-1.5 md:mb-3">
+                                    <h2
+                                        id="enquiry-modal-title"
+                                        className="text-2xl md:text-4xl lg:text-6xl font-serif font-black text-white tracking-tighter uppercase leading-none truncate drop-shadow-2xl"
+                                    >
+                                        {enquiry.applicant_name}
+                                    </h2>
+                                    <span className="px-3 md:px-4 py-1 rounded-lg md:xl bg-white/5 border border-white/10 text-[8px] md:text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] shadow-inner backdrop-blur-md">
+                                        Node 0x{stringId.substring(0,6).toUpperCase()}
+                                    </span>
+                                </div>
+                                <p className="text-[9px] md:text-[11px] font-black text-white/20 uppercase tracking-[0.5em] flex items-center gap-2 md:gap-3">
+                                    <span className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                    <span className="truncate">Grade {enquiry.grade} Context Node</span>
+                                </p>
+                            </div>
                         </div>
-
                         <button
                             onClick={onClose}
-                            className="p-3 hover:bg-gray-800/80 rounded-xl transition-all duration-200 hover:scale-105"
-                            style={{boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}
+                            className="p-3 md:p-4 rounded-xl md:rounded-[1.5rem] bg-white/5 text-white/20 hover:text-white hover:bg-white/10 transition-all transform active:scale-90 border border-white/5 focus:outline-none focus:ring-2 focus:ring-white/20"
+                            aria-label="Close enquiry details"
                         >
-                            <XIcon className="w-5 h-5 text-gray-300" />
+                            <XIcon className="w-6 h-6 md:w-8 md:h-8" />
                         </button>
-                    </div>
-                </div>
+                    </header>
 
-                {/* Two-Panel Layout */}
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Left Panel - Enquiry Communication Channel */}
-                    <div className="flex-1 bg-gray-900 flex flex-col">
-                        <div className="flex-1 overflow-y-auto">
-                            <div className="p-8">
-                                <div className="flex items-center gap-3 mb-8">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                                        <CommunicationIcon className="w-4 h-4 text-white" />
-                                    </div>
-                                    <h2 className="text-xl font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
-                                        Enquiry Communication
-                                    </h2>
-                                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                                        <EncryptionIcon className="w-3 h-3 text-emerald-400" />
-                                        <span className="text-xs text-emerald-300 font-medium">Encrypted</span>
-                                    </div>
-                                </div>
+                    <div className="flex-grow flex flex-col lg:flex-row overflow-hidden relative">
+                        <div className="absolute inset-0 opacity-[0.02] pointer-events-none z-0" style={{ backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.2) 1px, transparent 0)`, backgroundSize: '40px 40px' }}></div>
 
-                                {/* Messages */}
-                                {loading.timeline ? (
-                                    <div className="space-y-6">
-                                        {[...Array(3)].map((_, i) => (
-                                            <div key={i} className="flex gap-6">
-                                                <div className="w-10 h-10 bg-gray-700 rounded-full animate-pulse" />
-                                                <div className="space-y-3 flex-1">
-                                                    <div className="h-20 bg-gray-700/50 rounded-xl animate-pulse" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : timeline.filter(t => t.item_type === 'MESSAGE').length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                                        <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mb-6">
-                                            <CommunicationIcon className="w-8 h-8 text-gray-400" />
-                                        </div>
-                                        <h3 className="text-xl font-semibold text-gray-300 mb-3">No encrypted messages exchanged yet</h3>
-                                        <p className="text-gray-500 text-sm leading-relaxed max-w-md">
-                                            Messages are enquiry-stage only and will appear here once communication begins.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {timeline
-                                            .filter(t => t.item_type === 'MESSAGE')
-                                            .map((item, idx) => (
-                                                <div key={idx} className={`flex gap-4 ${item.is_admin ? 'justify-end' : 'justify-start'} mb-6`}>
-                                                    {!item.is_admin && (
-                                                        <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
-                                                            {item.created_by_name?.charAt(0) || 'P'}
-                                                        </div>
-                                                    )}
-                                                    <div className={`max-w-[75%] ${item.is_admin ? 'order-first' : ''}`}>
-                                                        <div className={`p-4 rounded-2xl shadow-lg backdrop-blur-sm ${
-                                                            item.is_admin ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white' : 'bg-gray-800/70 border border-gray-600/50 text-gray-100'
-                                                        }`} style={{boxShadow: item.is_admin ? '0 4px 16px rgba(147,51,234,0.3)' : '0 2px 8px rgba(0,0,0,0.2)'}}>
-                                                            <p className="text-sm leading-relaxed">{item.details?.message || ''}</p>
-                                                        </div>
-                                                        <div className={`text-xs text-gray-500 mt-2 flex items-center gap-2 ${item.is_admin ? 'text-right justify-end' : 'text-left justify-start'}`}>
-                                                            <span>{item.created_by_name || 'Unknown'}</span>
-                                                            <span>•</span>
-                                                            <span>{new Date(item.created_at).toLocaleTimeString([], {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit'
-                                                            })}</span>
-                                                            {!item.is_admin && <EncryptionIcon className="w-3 h-3 text-emerald-400" />}
-                                                        </div>
-                                                    </div>
-                                                    {item.is_admin && (
-                                                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg">
-                                                            {item.created_by_name?.charAt(0) || 'A'}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        <div ref={commsEndRef} />
-                                    </div>
-                                )}
-                            </div>
+                        <div className="flex-1 flex flex-col bg-transparent relative z-10 overflow-hidden">
+                            <EnquiryTimeline
+                                timeline={timeline}
+                                loading={loading.timeline}
+                                onTimelineUpdate={() => fetchTimeline(true)}
+                            />
+
+                            <EnquiryMessageComposer
+                                onSendMessage={handleSendMessage}
+                                loading={loading.saving}
+                            />
                         </div>
 
-                        {/* Message Composer */}
-                        <div className="border-t border-gray-700/50 bg-gray-800/70 backdrop-blur-sm p-8">
-                            {enquiry.status === 'CONVERTED' ? (
-                                <div className="text-center py-4">
-                                    <div className="flex items-center justify-center gap-3 text-gray-400">
-                                        <ShieldCheckIcon className="w-5 h-5" />
-                                        <p className="text-sm">Message input disabled - enquiry has been converted to admission</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <form onSubmit={handleSendMessage} className="flex gap-6">
-                                    <div className="flex-1">
-                                        <textarea
-                                            value={newMessage}
-                                            onChange={(e) => setNewMessage(e.target.value)}
-                                            placeholder="Send a message to the parent (Enquiry channel)"
-                                            className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 resize-none text-sm text-white placeholder-gray-400 transition-all duration-200 backdrop-blur-sm"
-                                            rows={3}
-                                        />
-                                    </div>
-                                    <button
-                                        type="submit"
-                                        disabled={!newMessage.trim() || loading.sending}
-                                        className="px-6 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-3 font-semibold text-sm shadow-lg hover:shadow-xl"
-                                        style={{boxShadow: '0 4px 16px rgba(147,51,234,0.3)'}}
-                                    >
-                                        {loading.sending ? <Spinner size="sm" /> : <LocalSendIcon className="w-4 h-4" />}
-                                        Send
-                                    </button>
-                                </form>
-                            )}
-                        </div>
-                    </div>
+                        <div className="w-full lg:w-[420px] xl:w-[480px] bg-[#0c0d12]/90 backdrop-blur-3xl border-l border-white/10 p-8 md:p-12 lg:p-16 space-y-12 md:space-y-16 overflow-y-auto custom-scrollbar relative z-20 shrink-0 border-t lg:border-t-0 border-white/5">
+                            <EnquiryStatusManager
+                                currentStatus={enquiry.status}
+                                loading={loading.saving || loading.converting}
+                                onStatusChange={handleStatusChange}
+                                onConvert={handleConvert}
+                            />
 
-                    {/* Right Panel - Enquiry Control & Intelligence */}
-                    <div className="w-96 bg-gray-800/70 backdrop-blur-sm border-l border-gray-700/50 flex flex-col">
-                        {/* Lifecycle Management */}
-                        <div className="p-8 border-b border-gray-700/50">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                                    <ClipboardListIcon className="w-4 h-4 text-white" />
-                                </div>
-                                <h3 className="text-lg font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
-                                    Lifecycle Management
-                                </h3>
-                            </div>
-                            <div className="space-y-3">
-                                {[
-                                    { key: 'ENQUIRY_ACTIVE', label: 'Active', desc: 'Initial contact established' },
-                                    { key: 'ENQUIRY_VERIFIED', label: 'Verified', desc: 'Parent details confirmed' },
-                                    { key: 'ENQUIRY_IN_PROGRESS', label: 'In Progress', desc: 'Document review in progress' },
-                                    { key: 'CONVERTED', label: 'Converted', desc: 'Promoted to admission (system)', disabled: true }
-                                ].map((status) => (
-                                    <label key={status.key} className="flex items-start gap-4 cursor-pointer group">
-                                        <input
-                                            type="radio"
-                                            name="enquiryStatus"
-                                            value={status.key}
-                                            checked={enquiry.status === status.key}
-                                            onChange={(e) => handleStatusChange(e.target.value as EnquiryStatus)}
-                                            disabled={status.disabled || loading.statusUpdate}
-                                            className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 focus:ring-purple-500 focus:ring-2 mt-0.5"
-                                        />
-                                        <div className="flex-1">
-                                            <span className={`text-sm font-medium transition-colors ${
-                                                status.disabled ? 'text-gray-500' :
-                                                enquiry.status === status.key ? 'text-purple-300' : 'text-gray-300 group-hover:text-gray-200'
-                                            }`}>
-                                                {status.label}
-                                                {status.disabled && ' (System Only)'}
-                                            </span>
-                                            <p className="text-xs text-gray-500 mt-1">{status.desc}</p>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
+                            <EnquiryAISummary
+                                enquiryId={enquiry.id}
+                                grade={enquiry.grade}
+                                applicantName={enquiry.applicant_name}
+                                timeline={timeline}
+                                onGenerateSummary={handleGenerateSummary}
+                                loading={loading.ai}
+                            />
 
-                        {/* Enquiry Identity Snapshot */}
-                        <div className="p-8 border-b border-gray-700/50">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-8 h-8 bg-gradient-to-br from-slate-500 to-slate-600 rounded-lg flex items-center justify-center">
-                                    <UsersIcon className="w-4 h-4 text-white" />
-                                </div>
-                                <h3 className="text-lg font-bold text-white" style={{fontFamily: 'Inter, sans-serif'}}>
-                                    Enquiry Identity
-                                </h3>
-                            </div>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center py-3 px-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
-                                    <span className="text-sm text-gray-400">Parent Email</span>
-                                    <span className="text-sm text-white font-medium truncate ml-2">{enquiry.parent_email || 'Not provided'}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-3 px-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
-                                    <span className="text-sm text-gray-400">Applied Grade</span>
-                                    <span className="text-sm text-white font-medium">Grade {enquiry.grade}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-3 px-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
-                                    <span className="text-sm text-gray-400">Enquiry Source</span>
-                                    <span className="text-sm text-gray-400">Web Form</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Primary Action */}
-                        <div className="p-8">
-                            <button
-                                onClick={() => setShowPromotionConfirm(true)}
-                                disabled={!currentStatus.canPromote || loading.promoting}
-                                className={`w-full px-6 py-4 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-3 ${
-                                    currentStatus.canPromote
-                                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl hover:scale-[1.02]'
-                                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                }`}
-                                style={currentStatus.canPromote ? {boxShadow: '0 8px 32px rgba(16,185,129,0.3)'} : {}}
-                            >
-                                {loading.promoting ? (
-                                    <>
-                                        <Spinner size="sm" />
-                                        Promoting...
-                                    </>
-                                ) : (
-                                    <>
-                                        <GraduationCapIcon className="w-5 h-5" />
-                                        Promote to Admission
-                                    </>
-                                )}
-                            </button>
-                            {!currentStatus.canPromote && enquiry.status !== 'CONVERTED' && (
-                                <p className="text-xs text-gray-500 mt-3 text-center">Must be verified to promote</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Promotion Confirmation Modal */}
-                {showPromotionConfirm && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                        <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-700/50" style={{boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'}}>
-                            <div className="text-center">
-                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-                                    <GraduationCapIcon className="w-8 h-8 text-emerald-400" />
-                                </div>
-                                <h3 className="text-xl font-bold text-white mb-4">Promote to Admission</h3>
-                                <p className="text-gray-300 mb-8 leading-relaxed text-sm">
-                                    This will convert the enquiry to an admission record, lock the enquiry, and redirect you to the Admission Vault.
-                                    This action cannot be undone.
+                            <div className="mt-auto opacity-5 hover:opacity-100 transition-opacity duration-1000 hidden lg:block">
+                                <p className="text-[8px] font-mono text-white break-all text-center uppercase tracking-tighter">
+                                    Cipher Ledger: {btoa(stringId).substring(0, 32)}
                                 </p>
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={() => setShowPromotionConfirm(false)}
-                                        className="flex-1 px-6 py-3 bg-gray-700/50 border border-gray-600/50 text-gray-300 rounded-xl hover:bg-gray-600/50 transition-all duration-200"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowPromotionConfirm(false);
-                                            handlePromoteToAdmission();
-                                        }}
-                                        className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
-                                    >
-                                        Confirm Promotion
-                                    </button>
-                                </div>
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
-        </div>
+        </EnquiryErrorBoundary>
     );
 };
 
