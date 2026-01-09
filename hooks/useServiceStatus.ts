@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ServiceStatus, VerificationStatus } from '../types';
 import { verificationService, ServiceHealthStatus, QueuedVerification } from '../services/verificationService';
+import { EnquiryService } from '../services/enquiry';
 
 interface UseServiceStatusReturn {
     serviceStatus: ServiceStatus;
@@ -121,11 +122,20 @@ export function useServiceStatus(): UseServiceStatusReturn {
     // Independent enquiry database health check
     const checkEnquiryHealth = useCallback(async () => {
         try {
-            const healthStatus = await verificationService.checkEnquiryDatabaseHealth();
-            setEnquiryStatus(healthStatus.status);
-            setEnquiryLastChecked(healthStatus.lastChecked);
-            setEnquiryMessage(healthStatus.message);
-            setEnquiryHealthDetails(healthStatus.details);
+            const healthResult = await EnquiryService.checkEnquiryDatabaseHealth();
+            setEnquiryStatus(healthResult.status);
+            setEnquiryLastChecked(new Date());
+
+            // Set appropriate message based on status
+            let message = 'Enquiry database is accessible';
+            if (healthResult.status === 'offline') {
+                message = `Enquiry database unavailable: ${healthResult.details.errorDetails || 'Connection failed'}`;
+            } else if (healthResult.status === 'degraded') {
+                message = 'Enquiry database experiencing issues';
+            }
+
+            setEnquiryMessage(message);
+            setEnquiryHealthDetails(healthResult.details);
         } catch (err: any) {
             console.error('Failed to check enquiry health:', err);
             setEnquiryStatus('offline');

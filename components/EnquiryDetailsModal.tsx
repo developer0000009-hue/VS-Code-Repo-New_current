@@ -20,39 +20,60 @@ interface EnquiryDetailsModalProps {
     onNavigate?: (component: string) => void;
 }
 
-type Status = 'NEW' | 'VERIFIED' | 'IN_REVIEW' | 'CONVERTED';
+type Status = 'NEW' | 'CONTACTED' | 'VERIFIED' | 'APPROVED' | 'REJECTED' | 'CONVERTED' | 'IN_REVIEW';
 
-const STATUS_CONFIG: Record<Status, { 
-    color: string; 
-    bg: string; 
+const STATUS_CONFIG: Record<Status, {
+    color: string;
+    bg: string;
     text: string;
     icon: React.ReactNode;
     label: string;
 }> = {
-    'NEW': { 
-        color: 'border-gray-300 bg-gray-50', 
-        bg: 'bg-gray-400', 
+    'NEW': {
+        color: 'border-gray-300 bg-gray-50',
+        bg: 'bg-gray-400',
         text: 'text-gray-700',
         icon: <div className="w-2 h-2 rounded-full bg-gray-400" />,
         label: 'New Enquiry'
     },
-    'VERIFIED': { 
-        color: 'border-blue-300 bg-blue-50', 
-        bg: 'bg-blue-500', 
+    'CONTACTED': {
+        color: 'border-purple-300 bg-purple-50',
+        bg: 'bg-purple-500',
+        text: 'text-purple-700',
+        icon: <div className="w-2 h-2 rounded-full bg-purple-500" />,
+        label: 'Contacted'
+    },
+    'VERIFIED': {
+        color: 'border-blue-300 bg-blue-50',
+        bg: 'bg-blue-500',
         text: 'text-blue-700',
         icon: <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />,
         label: 'Verified'
     },
-    'IN_REVIEW': { 
-        color: 'border-orange-300 bg-orange-50', 
-        bg: 'bg-orange-500', 
+    'APPROVED': {
+        color: 'border-teal-300 bg-teal-50',
+        bg: 'bg-teal-500',
+        text: 'text-teal-700',
+        icon: <CheckCircleIcon className="w-4 h-4 text-teal-500" />,
+        label: 'Approved'
+    },
+    'REJECTED': {
+        color: 'border-red-300 bg-red-50',
+        bg: 'bg-red-500',
+        text: 'text-red-700',
+        icon: <XIcon className="w-4 h-4 text-red-500" />,
+        label: 'Rejected'
+    },
+    'IN_REVIEW': {
+        color: 'border-orange-300 bg-orange-50',
+        bg: 'bg-orange-500',
         text: 'text-orange-700',
         icon: <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />,
         label: 'In Review'
     },
-    'CONVERTED': { 
-        color: 'border-green-300 bg-green-50', 
-        bg: 'bg-green-500', 
+    'CONVERTED': {
+        color: 'border-green-300 bg-green-50',
+        bg: 'bg-green-500',
         text: 'text-green-700',
         icon: <CheckCircleIcon className="w-4 h-4 text-green-500" />,
         label: 'Converted to Admission'
@@ -69,12 +90,20 @@ const REJECTION_REASONS = [
     'Other'
 ];
 
-const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({ 
-    enquiry, 
-    onClose, 
-    onUpdate, 
-    onNavigate 
+const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
+    enquiry,
+    onClose,
+    onUpdate,
+    onNavigate
 }) => {
+    // Debug logging
+    console.log('EnquiryDetailsModal rendered with enquiry:', {
+        id: enquiry.id,
+        status: enquiry.status,
+        applicant_name: enquiry.applicant_name,
+        hasSource: !!(enquiry as any).source
+    });
+
     const [status, setStatus] = useState<Status>(enquiry.status as Status);
     const [followUpNote, setFollowUpNote] = useState('');
     const [rejectionReason, setRejectionReason] = useState('');
@@ -101,15 +130,29 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
 
             if (error) throw error;
 
-            // Transform the data to match TimelineItem interface
-            const transformedTimeline: TimelineItem[] = (data || []).map((item: any) => ({
-                id: item.id,
-                item_type: item.item_type,
-                is_admin: item.is_admin,
-                created_by_name: item.created_by_name,
-                created_at: item.created_at,
-                details: item.details
-            }));
+            // Transform the data to match TimelineItem interface with error handling
+            const transformedTimeline: TimelineItem[] = (data || []).map((item: any) => {
+                try {
+                    return {
+                        id: item.id || `item-${Date.now()}`,
+                        item_type: item.item_type || 'MESSAGE',
+                        is_admin: item.is_admin || false,
+                        created_by_name: item.created_by_name || 'System',
+                        created_at: item.created_at || new Date().toISOString(),
+                        details: item.details || { message: 'Status update' }
+                    };
+                } catch (mappingError) {
+                    console.warn('Error mapping timeline item:', mappingError);
+                    return {
+                        id: `fallback-${Date.now()}`,
+                        item_type: 'MESSAGE' as const,
+                        is_admin: false,
+                        created_by_name: 'System',
+                        created_at: new Date().toISOString(),
+                        details: { message: 'Timeline event' }
+                    };
+                }
+            });
 
             setTimeline(transformedTimeline);
         } catch (err) {
@@ -233,12 +276,12 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
 
     // Timeline items for visual progress
     const getTimelineProgress = () => {
-        const steps = ['NEW', 'VERIFIED', 'IN_REVIEW', 'CONVERTED'];
+        const steps: Status[] = ['NEW', 'CONTACTED', 'VERIFIED', 'APPROVED', 'IN_REVIEW', 'CONVERTED'];
         const currentIndex = steps.indexOf(status);
-        
+
         return steps.map((step, index) => ({
             step,
-            completed: index <= currentIndex,
+            completed: currentIndex >= 0 && index <= currentIndex,
             current: index === currentIndex
         }));
     };
@@ -264,10 +307,10 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                                 <span className="text-sm text-gray-500">{daysActive} days active</span>
                             </div>
                         </div>
-                        <div className={`px-3 py-1 rounded-full border text-sm font-medium flex items-center space-x-2 ${STATUS_CONFIG[status].color}`}>
-                            {STATUS_CONFIG[status].icon}
-                            <span className={STATUS_CONFIG[status].text}>
-                                {STATUS_CONFIG[status].label}
+                        <div className={`px-3 py-1 rounded-full border text-sm font-medium flex items-center space-x-2 ${STATUS_CONFIG[status]?.color || 'border-gray-300 bg-gray-50'}`}>
+                            {STATUS_CONFIG[status]?.icon || <div className="w-2 h-2 rounded-full bg-gray-400" />}
+                            <span className={STATUS_CONFIG[status]?.text || 'text-gray-700'}>
+                                {STATUS_CONFIG[status]?.label || status}
                             </span>
                         </div>
                     </div>
@@ -321,7 +364,7 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
                             <div className="text-center p-3 bg-gray-50 rounded-lg">
                                 <div className="text-xs text-gray-500 uppercase tracking-wide">Source</div>
                                 <div className="text-sm font-semibold mt-1 text-gray-900">
-                                    {enquiry.source || 'Website'}
+                                    {(enquiry as any).source || 'Website'}
                                 </div>
                             </div>
                         </div>

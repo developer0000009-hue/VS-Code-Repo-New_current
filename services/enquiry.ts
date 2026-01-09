@@ -57,6 +57,208 @@ export const EnquiryService = {
             }
         }
     },
+
+    /**
+     * Health-aware enquiry fetching with fallback to cache
+     * Checks database health first, then fetches or uses cache accordingly
+     */
+    async fetchEnquiriesWithHealthCheck(branchId?: string | null): Promise<{
+        success: boolean;
+        data?: EnquiryDetails[];
+        source: 'database' | 'cache' | 'failed';
+        healthStatus: 'online' | 'offline' | 'degraded';
+        errorType?: 'auth' | 'permission' | 'connection' | 'timeout' | 'unknown';
+        errorDetails?: string;
+        cacheAge?: number;
+    }> {
+        try {
+            // First check database health
+            const healthResult = await this.checkEnquiryDatabaseHealth();
+
+            if (healthResult.status === 'online') {
+                // Database is healthy, try to fetch fresh data
+                try {
+                    const fetchResult = await this.fetchEnquiriesFromDatabase(branchId);
+                    if (fetchResult.success) {
+                        // Cache successful data
+                        this.cache.set(fetchResult.data!, branchId);
+                        return {
+                            success: true,
+                            data: fetchResult.data,
+                            source: 'database',
+                            healthStatus: 'online'
+                        };
+                    }
+                } catch (fetchError) {
+                    console.warn('Failed to fetch from healthy database, falling back to cache:', fetchError);
+                }
+            }
+
+            // If we reach here, either database is offline/degraded or fetch failed
+            // Try to use cached data
+            const cached = this.cache.get(branchId);
+            if (cached) {
+                return {
+                    success: true,
+                    data: cached.data,
+                    source: 'cache',
+                    healthStatus: healthResult.status,
+                    errorType: healthResult.details?.errorType,
+                    errorDetails: healthResult.details?.errorDetails,
+                    cacheAge: Math.round(cached.age / 60000) // minutes
+                };
+            }
+
+            // No cached data available
+            return {
+                success: false,
+                source: 'failed',
+                healthStatus: healthResult.status,
+                errorType: healthResult.details?.errorType,
+                errorDetails: healthResult.details?.errorDetails || 'No cached data available and database is unreachable'
+            };
+
+        } catch (error: any) {
+            console.error('Health check failed:', error);
+            return {
+                success: false,
+                source: 'failed',
+                healthStatus: 'offline',
+                errorType: 'connection',
+                errorDetails: formatError(error)
+            };
+        }
+    },
+
+    /**
+     * Internal method to check enquiry database health
+     */
+    async checkEnquiryDatabaseHealth(): Promise<{
+        status: 'online' | 'offline' | 'degraded';
+        details: {
+            rpcAvailable: boolean;
+            tableQueryAvailable: boolean;
+            errorType?: 'auth' | 'permission' | 'connection' | 'timeout' | 'unknown';
+            errorDetails?: string;
+        }
+    }> {
+        let rpcAvailable = false;
+        let tableQueryAvailable = false;
+        let errorType: 'auth' | 'permission' | 'connection' | 'timeout' | 'unknown' = 'unknown';
+        let errorDetails = '';
+
+        try {
+            // Test RPC function availability
+            try {
+                const { data: rpcData, error: rpcError } = await supabase.rpc('get_enquiries_for_node', {
+                    p_branch_id: null
+                });
+
+                if (!rpcError) {
+                    rpcAvailable = true;
+                } else {
+                    if (rpcError.code === '42501') errorType = 'permission';
+                    else if (rpcError.code === '42703') errorType = 'auth';
+                    else if (rpcError.message?.includes('timeout')) errorType = 'timeout';
+                    else if (rpcError.message?.includes('connection')) errorType = 'connection';
+                    errorDetails = formatError(rpcError);
+                }
+            } catch (rpcException) {
+                errorType = 'connection';
+                errorDetails = 'RPC function unavailable';
+            }
+
+            // Test direct table query
+            try {
+                const { data: tableData, error: tableError } = await supabase
+                    .from('enquiries')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('conversion_state', 'NOT_CONVERTED')
+                    .eq('is_archived', false)
+                    .eq('is_deleted', false)
+                    .limit(1);
+
+                if (!tableError) {
+                    tableQueryAvailable = true;
+                } else {
+                    if (tableError.code === '42501') errorType = 'permission';
+                    else if (tableError.code === '42703') errorType = 'auth';
+                    else if (tableError.message?.includes('timeout')) errorType = 'timeout';
+                    else if (tableError.message?.includes('connection')) errorType = 'connection';
+                    errorDetails = formatError(tableError);
+                }
+            } catch (tableException) {
+                errorType = 'connection';
+                errorDetails = 'Direct table query unavailable';
+            }
+
+            // Determine overall status
+            if (rpcAvailable || tableQueryAvailable) {
+                return {
+                    status: 'online',
+                    details: {
+                        rpcAvailable,
+                        tableQueryAvailable,
+                        errorType,
+                        errorDetails
+                    }
+                };
+            } else {
+                return {
+                    status: 'offline',
+                    details: {
+                        rpcAvailable,
+                        tableQueryAvailable,
+                        errorType,
+                        errorDetails
+                    }
+                };
+            }
+
+        } catch (error: any) {
+            return {
+                status: 'offline',
+                details: {
+                    rpcAvailable,
+                    tableQueryAvailable,
+                    errorType: 'connection',
+                    errorDetails: formatError(error)
+                }
+            };
+        }
+    },
+
+    /**
+     * Internal method to fetch enquiries from database
+     */
+    async fetchEnquiriesFromDatabase(branchId?: string | null): Promise<{
+        success: boolean;
+        data?: EnquiryDetails[];
+        error?: string;
+    }> {
+        try {
+            let query = supabase
+                .from('enquiries')
+                .select('*')
+                .eq('conversion_state', 'NOT_CONVERTED')
+                .eq('is_archived', false)
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: false });
+
+            // If branchId is specified, filter by it; otherwise load all accessible
+            if (branchId) {
+                query = query.eq('branch_id', branchId);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            return { success: true, data: data || [] };
+        } catch (error: any) {
+            return { success: false, error: formatError(error) };
+        }
+    },
+
     /**
      * Create sample enquiry data for testing (temporary function)
      */

@@ -131,65 +131,17 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
     }, [branchId]);
 
     const fetchEnquiries = useCallback(async (isSilent = false, isRetry = false) => {
-        // Three-tier fallback system:
-        // 1. Try RPC function
-        // 2. Fallback to direct table query
-        // 3. Final fallback to localStorage cache
-
         if (!isSilent) {
             setLoading(true);
         }
         setError(null);
 
-        let dataLoaded = false;
-        let lastError = null;
-
-        // Tier 1: Try RPC function
         try {
-            const { data, error: rpcError } = await supabase.rpc('get_enquiries_for_node', {
-                p_branch_id: branchId
-            });
+            // Use the new health-aware fetch method
+            const result = await EnquiryService.fetchEnquiriesWithHealthCheck(branchId);
 
-            if (rpcError) throw rpcError;
-
-            setEnquiries(data || []);
-            dataLoaded = true;
-
-            // Cache successful data for offline use
-            localStorage.setItem('enquiries_cache', JSON.stringify({
-                data: data || [],
-                timestamp: new Date().toISOString(),
-                branchId: branchId
-            }));
-
-            // Update debug info
-            const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
-            localStorage.setItem('enquiry_debug_info', JSON.stringify({
-                ...existingDebug,
-                lastError: null,
-                lastSuccessfulLoad: new Date(),
-                loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-                currentSource: 'rpc'
-            }));
-
-            return { success: true, source: 'rpc' };
-        } catch (err: any) {
-            console.warn("RPC failed, trying direct query:", formatError(err));
-            lastError = err;
-        }
-
-        // Tier 2: Direct table query fallback
-        try {
-            const fallbackResult = await fallbackFetchEnquiries(true); // Silent mode
-            if (fallbackResult.success) {
-                dataLoaded = true;
-
-                // Cache successful data for offline use
-                localStorage.setItem('enquiries_cache', JSON.stringify({
-                    data: fallbackResult.data,
-                    timestamp: new Date().toISOString(),
-                    branchId: branchId
-                }));
+            if (result.success && result.data) {
+                setEnquiries(result.data);
 
                 // Update debug info
                 const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
@@ -198,71 +150,56 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                     lastError: null,
                     lastSuccessfulLoad: new Date(),
                     loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-                    currentSource: 'table'
+                    currentSource: result.source,
+                    cacheAge: result.cacheAge
                 }));
 
-                return { success: true, source: 'table' };
-            } else {
-                throw new Error(fallbackResult.error);
-            }
-        } catch (err: any) {
-            console.warn("Direct query failed, trying cache:", formatError(err));
-            lastError = err;
-        }
-
-        // Tier 3: localStorage cache fallback
-        try {
-            const cached = localStorage.getItem('enquiries_cache');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                // Check if cache is for the same branch and not too old (24 hours)
-                const cacheAge = Date.now() - new Date(parsed.timestamp).getTime();
-                const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-
-                if ((!branchId || parsed.branchId === branchId) && cacheAge < maxAge) {
-                    setEnquiries(parsed.data || []);
-                    dataLoaded = true;
-                    console.log("Loaded data from cache (age:", Math.round(cacheAge / 60000), "minutes)");
-
-                    // Update debug info for cache load
-                    const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
-                    localStorage.setItem('enquiry_debug_info', JSON.stringify({
-                        ...existingDebug,
-                        lastError: null,
-                        lastSuccessfulLoad: new Date(),
-                        loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-                        currentSource: 'cache'
-                    }));
-
-                    return { success: true, source: 'cache' };
+                if (!isSilent) {
+                    setLoading(false);
                 }
+
+                return { success: true, source: result.source };
+            } else {
+                // No data available - show appropriate error
+                const errorMessage = result.errorDetails || 'Unable to load enquiry data';
+                setError(errorMessage);
+
+                // Update debug info for failure
+                const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
+                localStorage.setItem('enquiry_debug_info', JSON.stringify({
+                    ...existingDebug,
+                    lastError: errorMessage,
+                    loadAttempts: (existingDebug.loadAttempts || 0) + 1,
+                    currentSource: 'failed'
+                }));
+
+                if (!isSilent) {
+                    setLoading(false);
+                }
+
+                return { success: false, source: 'failed' };
             }
         } catch (err: any) {
-            console.warn("Cache loading failed:", formatError(err));
-        }
-
-        // Store debug information
-        const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
-        localStorage.setItem('enquiry_debug_info', JSON.stringify({
-            lastError: !dataLoaded ? (lastError ? formatError(lastError) : "All data sources unavailable") : null,
-            lastSuccessfulLoad: dataLoaded ? new Date() : existingDebug.lastSuccessfulLoad,
-            loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-            currentSource: dataLoaded ? 'cache' : 'failed' // This will be updated by the successful tier
-        }));
-
-        // All tiers failed - set error state
-        if (!dataLoaded) {
-            const errorMessage = lastError ? formatError(lastError) : "All data sources unavailable";
+            const errorMessage = formatError(err);
+            console.error('Failed to fetch enquiries:', errorMessage);
             setError(errorMessage);
-            console.error("All enquiry loading tiers failed:", errorMessage);
-        }
 
-        if (!isSilent) {
-            setLoading(false);
-        }
+            // Update debug info for exception
+            const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
+            localStorage.setItem('enquiry_debug_info', JSON.stringify({
+                ...existingDebug,
+                lastError: errorMessage,
+                loadAttempts: (existingDebug.loadAttempts || 0) + 1,
+                currentSource: 'failed'
+            }));
 
-        return { success: dataLoaded, source: dataLoaded ? 'cache' : 'failed' };
-    }, [branchId, fallbackFetchEnquiries]);
+            if (!isSilent) {
+                setLoading(false);
+            }
+
+            return { success: false, source: 'failed' };
+        }
+    }, [branchId]);
 
     useEffect(() => {
         fetchEnquiries();
