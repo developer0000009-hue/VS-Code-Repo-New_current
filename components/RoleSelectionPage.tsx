@@ -91,7 +91,7 @@ const ROLE_META: Record<string, { label: string; description: string; color: str
 };
 
 const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onComplete }) => {
-    const { roles, loading } = useRoles();
+    const { authorizedScopes, availableRoles, loading, registerRole, refetchScopes } = useRoles();
     const [isSchoolAdminModalOpen, setIsSchoolAdminModalOpen] = useState(false);
     const [joinLoading, setJoinLoading] = useState(false);
     const [joinSuccess, setJoinSuccess] = useState(false);
@@ -99,12 +99,38 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
     const [joinError, setJoinError] = useState<string | null>(null);
     const [invitationCode, setInvitationCode] = useState('');
     const [selectedRole, setSelectedRole] = useState<string | null>(null);
+    const [registeringRole, setRegisteringRole] = useState<string | null>(null);
 
-    // Filter roles based on the metadata we have defined
-    const displayRoles = roles.filter(r => ROLE_META[r]);
+    // Authorized scopes - roles user has already created
+    const authorizedScopeNames = new Set(authorizedScopes.map(s => s.role_name));
+    
+    // Available roles - roles user can still register
+    const availableRoleNames = new Set(availableRoles.map(r => r.name));
+
+    // Filter authorized scopes based on metadata
+    const authorizedDisplay = authorizedScopes.filter(s => ROLE_META[s.role_name]);
+    
+    // Filter available roles based on metadata
+    const availableDisplay = availableRoles.filter(r => ROLE_META[r.name]);
+
+    const handleAuthorizedScopeClick = async (scope: typeof authorizedScopes[0]) => {
+        if (selectedRole || createLoading || joinLoading) return;
+        setSelectedRole(scope.role_name);
+        await Promise.resolve(onRoleSelect(scope.role_name as Role)).catch(() => setSelectedRole(null));
+    };
+
+    const handleAvailableRoleClick = async (role: typeof availableRoles[0]) => {
+        if (registeringRole || createLoading || joinLoading) return;
+        setRegisteringRole(role.name);
+        const result = await registerRole(role.name);
+        setRegisteringRole(null);
+        if (result.success) {
+            await Promise.resolve(onRoleSelect(role.name as Role)).catch(() => {});
+        }
+    };
 
     const handleRoleClick = (role: Role) => {
-        if (selectedRole || createLoading || joinLoading) return;
+        if (selectedRole || registeringRole || createLoading || joinLoading) return;
         
         setSelectedRole(role);
 
@@ -181,53 +207,149 @@ const RoleSelectionPage: React.FC<RoleSelectionPageProps> = ({ onRoleSelect, onC
                 </p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
-                {displayRoles.map((name, idx) => {
-                    const meta = ROLE_META[name];
-                    const Icon = ROLE_ICONS[name] || UsersIcon;
-                    const isProcessing = selectedRole === name;
-                    const isFaded = selectedRole && selectedRole !== name;
+            {/* AUTHORIZED SCOPES SECTION */}
+            {authorizedDisplay.length > 0 && (
+                <div className="mb-16">
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent to-emerald-500/30" />
+                        <h2 className="text-2xl font-serif font-black text-emerald-400 tracking-tight flex items-center gap-3">
+                            <CheckCircleIcon className="w-6 h-6" />
+                            Authorized Scopes
+                        </h2>
+                        <div className="flex-1 h-px bg-gradient-to-l from-transparent to-emerald-500/30" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
+                        {authorizedDisplay.map((scope, idx) => {
+                            const meta = ROLE_META[scope.role_name];
+                            const Icon = ROLE_ICONS[scope.role_name] || UsersIcon;
+                            const isProcessing = selectedRole === scope.role_name;
+                            const isFaded = (selectedRole || registeringRole) && selectedRole !== scope.role_name;
 
-                    return (
-                        <button
-                            key={name}
-                            onClick={() => handleRoleClick(name)}
-                            disabled={!!selectedRole || createLoading}
-                            aria-pressed={isProcessing}
-                            style={{ animationDelay: `${idx * 100}ms` }}
-                            className={`
-                                group relative flex flex-col items-start text-left p-8 rounded-[2.5rem] border-2 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden animate-in fade-in slide-in-from-bottom-10
-                                ${isProcessing 
-                                    ? 'border-primary ring-4 ring-primary/10 bg-card scale-[0.98] shadow-2xl z-10' 
-                                    : isFaded 
-                                        ? 'opacity-30 scale-95 grayscale' 
-                                        : 'bg-card/60 backdrop-blur-xl border-white/5 hover:border-primary/40 hover:shadow-2xl hover:-translate-y-2'
-                                }
-                            `}
-                        >
-                            <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
-                            
-                            <div className="relative z-10 w-full">
-                                <div className={`
-                                    w-16 h-16 rounded-2xl flex items-center justify-center mb-8 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:rotate-3
-                                    ${isProcessing ? 'bg-primary text-white shadow-lg' : `bg-muted/80 ${meta.color} group-hover:bg-white dark:group-hover:bg-black group-hover:shadow-md`}
-                                `}>
-                                    {isProcessing ? <Spinner size="sm" className="text-white" /> : <Icon className="w-8 h-8" />}
-                                </div>
+                            return (
+                                <button
+                                    key={scope.role_name}
+                                    onClick={() => handleAuthorizedScopeClick(scope)}
+                                    disabled={!!isProcessing || createLoading}
+                                    aria-pressed={isProcessing}
+                                    style={{ animationDelay: `${idx * 100}ms` }}
+                                    className={`
+                                        group relative flex flex-col items-start text-left p-8 rounded-[2.5rem] border-2 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden animate-in fade-in slide-in-from-bottom-10
+                                        ${isProcessing 
+                                            ? 'border-emerald-500 ring-4 ring-emerald-500/10 bg-card scale-[0.98] shadow-2xl z-10' 
+                                            : isFaded 
+                                                ? 'opacity-30 scale-95 grayscale' 
+                                                : 'bg-card/60 backdrop-blur-xl border-emerald-500/30 hover:border-emerald-400/60 hover:shadow-2xl hover:-translate-y-2'
+                                        }
+                                    `}
+                                >
+                                    <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
+                                    
+                                    <div className="absolute top-4 right-4">
+                                        <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
+                                    </div>
 
-                                <div className="space-y-3">
-                                    <h3 className={`text-xl font-black tracking-tight transition-colors duration-300 ${isProcessing ? 'text-primary' : 'text-foreground group-hover:text-primary'}`}>
-                                        {meta.label}
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground font-medium leading-relaxed transition-colors group-hover:text-foreground/80">
-                                        {meta.description}
-                                    </p>
-                                </div>
-                            </div>
-                        </button>
-                    );
-                })}
-            </div>
+                                    <div className="relative z-10 w-full">
+                                        <div className={`
+                                            w-16 h-16 rounded-2xl flex items-center justify-center mb-8 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:rotate-3
+                                            ${isProcessing ? 'bg-emerald-500 text-white shadow-lg' : `bg-muted/80 ${meta.color} group-hover:bg-white dark:group-hover:bg-black group-hover:shadow-md`}
+                                        `}>
+                                            {isProcessing ? <Spinner size="sm" className="text-white" /> : <Icon className="w-8 h-8" />}
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <h3 className={`text-xl font-black tracking-tight transition-colors duration-300 ${isProcessing ? 'text-emerald-400' : 'text-foreground group-hover:text-emerald-400'}`}>
+                                                {meta.label}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground font-medium leading-relaxed transition-colors group-hover:text-foreground/80">
+                                                {meta.description}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] uppercase tracking-widest font-bold text-emerald-500/70 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                                                    Active Session
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* REGISTER NEW SCOPE SECTION */}
+            {availableDisplay.length > 0 && (
+                <div>
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent to-primary/30" />
+                        <h2 className="text-2xl font-serif font-black text-primary tracking-tight flex items-center gap-3">
+                            <ShieldCheckIcon className="w-6 h-6" />
+                            Register New Scope
+                        </h2>
+                        <div className="flex-1 h-px bg-gradient-to-l from-transparent to-primary/30" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
+                        {availableDisplay.map((role, idx) => {
+                            const meta = ROLE_META[role.name];
+                            const Icon = ROLE_ICONS[role.name] || UsersIcon;
+                            const isRegistering = registeringRole === role.name;
+                            const isFaded = (selectedRole || registeringRole) && registeringRole !== role.name;
+
+                            return (
+                                <button
+                                    key={role.name}
+                                    onClick={() => handleAvailableRoleClick(role)}
+                                    disabled={!!isRegistering || createLoading}
+                                    aria-pressed={isRegistering}
+                                    style={{ animationDelay: `${idx * 100}ms` }}
+                                    className={`
+                                        group relative flex flex-col items-start text-left p-8 rounded-[2.5rem] border-2 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden animate-in fade-in slide-in-from-bottom-10
+                                        ${isRegistering 
+                                            ? 'border-primary ring-4 ring-primary/10 bg-card scale-[0.98] shadow-2xl z-10' 
+                                            : isFaded 
+                                                ? 'opacity-30 scale-95 grayscale' 
+                                                : 'bg-card/60 backdrop-blur-xl border-white/5 hover:border-primary/40 hover:shadow-2xl hover:-translate-y-2'
+                                        }
+                                    `}
+                                >
+                                    <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
+                                    
+                                    <div className="relative z-10 w-full">
+                                        <div className={`
+                                            w-16 h-16 rounded-2xl flex items-center justify-center mb-8 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:rotate-3
+                                            ${isRegistering ? 'bg-primary text-white shadow-lg' : `bg-muted/80 ${meta.color} group-hover:bg-white dark:group-hover:bg-black group-hover:shadow-md`}
+                                        `}>
+                                            {isRegistering ? <Spinner size="sm" className="text-white" /> : <Icon className="w-8 h-8" />}
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <h3 className={`text-xl font-black tracking-tight transition-colors duration-300 ${isRegistering ? 'text-primary' : 'text-foreground group-hover:text-primary'}`}>
+                                                {meta.label}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground font-medium leading-relaxed transition-colors group-hover:text-foreground/80">
+                                                {meta.description}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] uppercase tracking-widest font-bold text-primary/70 px-2 py-1 rounded-full bg-primary/10 border border-primary/20">
+                                                    + Register
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {authorizedDisplay.length === 0 && availableDisplay.length === 0 && (
+                <div className="text-center py-20">
+                    <p className="text-muted-foreground">No roles available. Please contact your administrator.</p>
+                </div>
+            )}
 
             {isSchoolAdminModalOpen && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex justify-center items-center z-[100] p-4 animate-in fade-in duration-300" onClick={() => !createLoading && !joinLoading && setIsSchoolAdminModalOpen(false)}>
