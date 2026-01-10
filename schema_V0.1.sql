@@ -1957,8 +1957,12 @@ DROP POLICY IF EXISTS "Admins can manage enquiries in their branch" ON public.en
 CREATE POLICY "Admins can manage enquiries in their branch" ON public.enquiries
 FOR ALL USING (
     branch_id IN (SELECT get_my_branch_ids()) OR
-    (branch_id IS NULL AND admission_id IN (
-        SELECT id FROM public.admissions WHERE branch_id IN (SELECT get_my_branch_ids())
+    (branch_id IS NULL AND (
+        admission_id IN (SELECT id FROM public.admissions WHERE branch_id IN (SELECT get_my_branch_ids())) OR
+        EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND (
+            is_super_admin = true OR
+            role IN ('School Administration', 'Branch Admin', 'Principal', 'HR Manager', 'Academic Coordinator', 'Accountant')
+        ))
     ))
 );
 

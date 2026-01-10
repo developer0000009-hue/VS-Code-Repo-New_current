@@ -36,14 +36,8 @@ const EnquiryDebugPanel: React.FC<EnquiryDebugPanelProps> = ({
     const updateDebugInfo = async () => {
         setIsRefreshing(true);
         try {
-            // Check cache status
-            const cache = EnquiryService.cache.get(branchId);
-            const cacheStatus = cache ? {
-                exists: true,
-                age: Math.round((Date.now() - new Date(cache.timestamp).getTime()) / 60000), // minutes
-                branchId: cache.data ? 'N/A' : branchId,
-                itemCount: cache.data?.length || 0
-            } : { exists: false };
+        // Check cache status - EnquiryService doesn't have cache, so we'll show N/A
+        const cacheStatus = { exists: false };
 
             // Get stored debug info from localStorage
             const storedDebug = localStorage.getItem('enquiry_debug_info');
@@ -80,7 +74,7 @@ const EnquiryDebugPanel: React.FC<EnquiryDebugPanelProps> = ({
     }, [isVisible, branchId]);
 
     const clearCache = () => {
-        EnquiryService.cache.clear();
+        // No cache to clear in EnquiryService
         updateDebugInfo();
     };
 

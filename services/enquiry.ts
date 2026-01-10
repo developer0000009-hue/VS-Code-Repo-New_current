@@ -160,20 +160,11 @@ export const EnquiryService = {
         error?: string;
     }> {
         try {
-            let query = supabase
-                .from('enquiries')
-                .select('*')
-                .eq('conversion_state', 'NOT_CONVERTED')
-                .eq('is_archived', false)
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false });
+            // Use the RPC function which handles RLS properly
+            const { data, error } = await supabase.rpc('get_enquiries_for_node', {
+                p_branch_id: branchId
+            });
 
-            // If branchId is specified, filter by it; otherwise load all accessible
-            if (branchId) {
-                query = query.eq('branch_id', branchId);
-            }
-
-            const { data, error } = await query;
             if (error) throw error;
 
             return { success: true, data: data || [] };
