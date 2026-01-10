@@ -258,9 +258,9 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                         <div className="w-32 h-32 bg-white/[0.01] rounded-[3rem] flex items-center justify-center mb-10 border border-white/5 shadow-inner">
                             <MailIcon className="h-14 w-14 text-white/10" />
                         </div>
-                        <h3 className="text-3xl font-serif font-black text-white uppercase tracking-tighter leading-none mb-6">No Verified <span className="text-white/20 italic">Enquiries</span></h3>
+                        <h3 className="text-3xl font-serif font-black text-white uppercase tracking-tighter leading-none mb-6">No <span className="text-white/20 italic">Enquiries</span></h3>
                         <p className="text-white/30 max-w-sm mx-auto font-serif italic text-lg leading-relaxed">
-                            No verified enquiries found. All enquiries must be verified before appearing in the desk.
+                            No enquiries found in the system.
                         </p>
                         <div className="flex gap-4 mt-12">
                             <button

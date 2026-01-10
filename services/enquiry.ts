@@ -10,7 +10,7 @@ export const EnquiryService = {
 
     /**
      * Direct database enquiry fetching
-     * Always fetches verified enquiries directly from Supabase database
+     * Always fetches enquiries directly from Supabase database
      */
     async fetchEnquiriesWithHealthCheck(branchId?: string | null): Promise<{
         success: boolean;
@@ -163,7 +163,6 @@ export const EnquiryService = {
             let query = supabase
                 .from('enquiries')
                 .select('*')
-                .eq('verification_status', 'VERIFIED')
                 .eq('conversion_state', 'NOT_CONVERTED')
                 .eq('is_archived', false)
                 .eq('is_deleted', false)
