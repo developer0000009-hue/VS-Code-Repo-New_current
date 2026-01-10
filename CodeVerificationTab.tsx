@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { supabase, formatError } from '../services/supabase';
-import { EnquiryService } from '../services/enquiry';
-import { VerifiedShareCodeData } from '../types';
-import Spinner from './common/Spinner';
-import { KeyIcon } from './icons/KeyIcon';
-import { CheckCircleIcon } from './icons/CheckCircleIcon';
-import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
-import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
-import { UsersIcon } from './icons/UsersIcon';
-import { RotateCcwIcon } from './icons/RotateCcwIcon';
+import { supabase, formatError } from './services/supabase';
+import { EnquiryService } from './services/enquiry';
+import { VerifiedShareCodeData } from './types';
+import Spinner from './components/common/Spinner';
+import { KeyIcon } from './components/icons/KeyIcon';
+import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
+import { ShieldCheckIcon } from './components/icons/ShieldCheckIcon';
+import { AlertTriangleIcon } from './components/icons/AlertTriangleIcon';
+import { UsersIcon } from './components/icons/UsersIcon';
+import { RotateCcwIcon } from './components/icons/RotateCcwIcon';
 
 interface CodeVerificationTabProps {
     branchId?: string | null;
@@ -41,7 +41,7 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
         setVerificationResult(null);
 
         try {
-            // Step 1: Pure Validation RPC
+            // Step 1: Initial Handshake Validation
             const { data, error: rpcError } = await supabase.rpc('admin_verify_share_code', { 
                 p_code: cleanCode 
             });
@@ -51,7 +51,7 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
             if (data && data.found) {
                 setVerificationResult(data);
             } else {
-                setError("Verification Failed: The code entered is invalid, expired, or not found in the institutional registry.");
+                setError("Validation Failed: The access key entered is invalid, expired, or not recognized by the security node.");
             }
         } catch (err: any) {
             setError(formatError(err));
@@ -66,13 +66,14 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
         setError(null);
         
         try {
-            // Step 2: Domain-Specific Processing
+            // Step 2: Domain-Specific Uplink
             if (verificationResult.code_type === 'Enquiry') {
-                // FIXED: Use admission_id (the reference to the enquiry) instead of .id (the share code id)
+                // FIXED: Use admission_id (maps to enquiry record ID) and pass current branchId for sync
                 const result = await EnquiryService.processEnquiryVerification(verificationResult.admission_id, branchId);
                 if (result.success) {
                     setSyncSuccess(true);
-                    setTimeout(() => onNavigate?.('Enquiries'), 2000);
+                    // Standard redirection to Enquiry Desk
+                    setTimeout(() => onNavigate?.('Enquiries'), 1800);
                 }
             } else {
                 // Admission Import Flow
@@ -85,10 +86,16 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
                 
                 if (impError) throw impError;
                 setSyncSuccess(true);
-                setTimeout(() => onNavigate?.('Admissions'), 2000);
+                setTimeout(() => onNavigate?.('Admissions'), 1800);
             }
         } catch (err: any) {
-            setError(formatError(err));
+            const formatted = formatError(err);
+            // Translate technical registry errors into admin-friendly instructions
+            if (formatted.includes("Registry Mismatch")) {
+                setError("Node Not Found: The enquiry associated with this key could not be located in the master registry. Please verify the code hasn't been revoked.");
+            } else {
+                setError(formatted);
+            }
         } finally {
             setProcessing(false);
         }
@@ -137,12 +144,12 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
                                     <AlertTriangleIcon className="w-6 h-6 flex-shrink-0" />
                                 </div>
                                 <div className="space-y-2 py-1 text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Verification Failed</p>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Handshake Interrupted</p>
                                     <p className="leading-relaxed text-red-200/90 font-serif italic text-base">"{error}"</p>
                                 </div>
                             </div>
                             <button onClick={resetState} className="self-end flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">
-                                <RotateCcwIcon className="w-3.5 h-3.5"/> Retry Verification
+                                <RotateCcwIcon className="w-3.5 h-3.5"/> Restart Protocol
                             </button>
                         </div>
                     )}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { UserProfile, Role, SchoolAdminProfileData, SchoolBranch, BuiltInRoles } from './types';
 import Navbar from './components/admin/Navbar';
@@ -135,8 +134,9 @@ const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ profile, on
             setCurrentBranchId(targetId);
 
         } catch (e: any) {
-            console.error("Institutional Context Sync Error:", e);
-            setDataError(formatError(e));
+            const formatted = formatError(e);
+            console.error("Institutional Context Sync Error:", formatted);
+            setDataError(formatted);
         } finally {
             setLoadingData(false);
         }

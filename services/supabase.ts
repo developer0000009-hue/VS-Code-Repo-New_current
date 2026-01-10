@@ -23,16 +23,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const formatError = (err: any): string => {
     if (!err) return "Synchronization Idle.";
     
-    const JUNK_STRINGS = ["[object Object]", "{}", "null", "undefined"];
-
-    // Handle string errors
-    if (typeof err === 'string') {
-        if (JUNK_STRINGS.includes(err)) return "Institutional system synchronization exception.";
-        if (err.toLowerCase().includes("abort") || err.toLowerCase().includes("signal")) {
-            return "Protocol Interrupted: Request was cancelled or timed out.";
-        }
-        return err;
-    }
+    const JUNK_STRINGS = ["[object Object]", "{}", "null", "undefined", "error"];
 
     // Helper to find a descriptive message in an error object
     const getDeepMessage = (obj: any): string | null => {
@@ -44,6 +35,12 @@ export const formatError = (err: any): string => {
                 return "Request timed out or was cancelled by the browser.";
             }
             return obj.message;
+        }
+
+        // Handle string errors
+        if (typeof obj === 'string') {
+            if (JUNK_STRINGS.includes(obj)) return null;
+            return obj;
         }
 
         // Standard Supabase/Postgres error keys
@@ -79,5 +76,10 @@ export const formatError = (err: any): string => {
         // Fallback for circular references
     }
 
-    return String(err) || "Institutional system exception during verification.";
+    const finalFallback = String(err);
+    if (JUNK_STRINGS.includes(finalFallback)) {
+        return "Institutional system exception: Data context unavailable.";
+    }
+
+    return finalFallback;
 };

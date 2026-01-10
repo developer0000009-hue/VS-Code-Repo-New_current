@@ -97,7 +97,7 @@ export const RequestDocumentsModal: React.FC<{
                             <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Verification Protocol</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
                         <XIcon className="w-5 h-5"/>
                     </button>
                 </div>
@@ -293,7 +293,12 @@ const AdmissionsTab: React.FC<{ branchId?: string | null }> = ({ branchId }) => 
                                             <div className="flex items-center gap-6">
                                                 <PremiumAvatar src={app.profile_photo_url} name={app.applicant_name} size="xs" className="group-hover:scale-105 transition-transform duration-500" />
                                                 <div className="min-w-0">
-                                                    <p className="font-serif font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors text-[16px]">{app.applicant_name}</p>
+                                                    <div className="flex items-center gap-3">
+                                                        <p className="font-serif font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors text-[16px]">{app.applicant_name}</p>
+                                                        {app.enquiry_id && (
+                                                            <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-md font-black uppercase tracking-widest border border-indigo-500/20">Promoted</span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">Grade {app.grade} Node</p>
                                                 </div>
                                             </div>
