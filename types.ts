@@ -60,6 +60,8 @@ export interface AdmissionApplication {
     gender?: string;
     parent_id?: string;
     student_user_id?: string;
+    branch_id?: string;
+    enquiry_id?: string;
 }
 
 export interface StudentDashboardData {
