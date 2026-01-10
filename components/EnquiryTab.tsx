@@ -2,14 +2,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, formatError } from '../services/supabase';
-import { Enquiry, EnquiryStatus, ServiceStatus, VerificationStatus } from '../types';
-import { useServiceStatus } from '../hooks/useServiceStatus';
+import { Enquiry, EnquiryStatus } from '../types';
 import { EnquiryService } from '../services/enquiry';
 import Spinner from './common/Spinner';
-import VerificationStatusWidget from './VerificationStatusWidget';
-import SystemStatusBanner from './SystemStatusBanner';
 import { SearchIcon } from './icons/SearchIcon';
-import { KeyIcon } from './icons/KeyIcon';
 import { MailIcon } from './icons/MailIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { ClockIcon } from './icons/ClockIcon';
@@ -20,7 +16,6 @@ import { FilterIcon } from './icons/FilterIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
-import EnquiryDebugPanel from './common/EnquiryDebugPanel';
 
 const statusColors: Record<string, string> = {
   'NEW': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
@@ -68,145 +63,50 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
     const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [showDebugPanel, setShowDebugPanel] = useState(false);
-
-    // Use centralized service status management
-    const {
-        serviceStatus,
-        lastChecked: lastSyncTime,
-        pendingCount: pendingVerificationsCount,
-        isChecking: isRetrying,
-        message: serviceMessage,
-        checkServiceHealth,
-        // Separate enquiry status tracking
-        enquiryStatus,
-        enquiryLastChecked,
-        enquiryMessage,
-        enquiryHealthDetails,
-        checkEnquiryHealth
-    } = useServiceStatus();
-
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'updated_at', direction: 'descending' });
-    const [retryCount, setRetryCount] = useState(0);
-    const [nextRetryAt, setNextRetryAt] = useState<Date | null>(null);
 
-    // Fallback query that loads enquiries directly from table when RPC fails
-    const fallbackFetchEnquiries = useCallback(async (isSilent = false) => {
-        // Always try to load enquiries, regardless of branchId
-        // If branchId is null/undefined, load all accessible enquiries
-
-        if (!isSilent) setLoading(true);
-        try {
-            // Direct query to enquiries table - this should always work
-            let query = supabase
-                .from('enquiries')
-                .select('*')
-                .eq('conversion_state', 'NOT_CONVERTED')
-                .eq('is_archived', false)
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false });
-
-            // If branchId is specified, filter by it; otherwise load all accessible
-            if (branchId) {
-                query = query.eq('branch_id', branchId);
-            }
-
-            const { data, error } = await query;
-            if (error) throw error;
-
-            setEnquiries(data || []);
-            return { success: true, data: data || [] };
-        } catch (err: any) {
-            const formattedError = formatError(err);
-            console.error('Fallback enquiry loading failed:', formattedError);
-
-            // Don't set blocking error here - let the caller handle it
-            // This allows for multiple fallback layers
-            return { success: false, error: formattedError };
-        } finally {
-            if (!isSilent) setLoading(false);
-        }
-    }, [branchId]);
-
-    const fetchEnquiries = useCallback(async (isSilent = false, isRetry = false) => {
+    const fetchEnquiries = useCallback(async (isSilent = false) => {
         if (!isSilent) {
             setLoading(true);
         }
         setError(null);
 
         try {
-            // Use the new health-aware fetch method
+            // Always fetch directly from database
             const result = await EnquiryService.fetchEnquiriesWithHealthCheck(branchId);
 
             if (result.success && result.data) {
                 setEnquiries(result.data);
-
-                // Update debug info
-                const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
-                localStorage.setItem('enquiry_debug_info', JSON.stringify({
-                    ...existingDebug,
-                    lastError: null,
-                    lastSuccessfulLoad: new Date(),
-                    loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-                    currentSource: result.source,
-                    cacheAge: result.cacheAge
-                }));
-
                 if (!isSilent) {
                     setLoading(false);
                 }
-
-                return { success: true, source: result.source };
+                return { success: true };
             } else {
                 // No data available - show appropriate error
                 const errorMessage = result.errorDetails || 'Unable to load enquiry data';
                 setError(errorMessage);
-
-                // Update debug info for failure
-                const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
-                localStorage.setItem('enquiry_debug_info', JSON.stringify({
-                    ...existingDebug,
-                    lastError: errorMessage,
-                    loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-                    currentSource: 'failed'
-                }));
-
                 if (!isSilent) {
                     setLoading(false);
                 }
-
-                return { success: false, source: 'failed' };
+                return { success: false };
             }
         } catch (err: any) {
             const errorMessage = formatError(err);
             console.error('Failed to fetch enquiries:', errorMessage);
             setError(errorMessage);
-
-            // Update debug info for exception
-            const existingDebug = JSON.parse(localStorage.getItem('enquiry_debug_info') || '{}');
-            localStorage.setItem('enquiry_debug_info', JSON.stringify({
-                ...existingDebug,
-                lastError: errorMessage,
-                loadAttempts: (existingDebug.loadAttempts || 0) + 1,
-                currentSource: 'failed'
-            }));
-
             if (!isSilent) {
                 setLoading(false);
             }
-
-            return { success: false, source: 'failed' };
+            return { success: false };
         }
     }, [branchId]);
 
     useEffect(() => {
         fetchEnquiries();
 
-        // Initialize enquiry database health check
-        checkEnquiryHealth();
-
+        // Real-time updates
         const channel = supabase.channel(`enquiries-desk-sync-${branchId || 'master'}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, (payload) => {
                 const record = payload.new as any || payload.old as any;
@@ -217,66 +117,8 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [fetchEnquiries, branchId, checkEnquiryHealth]);
+    }, [fetchEnquiries, branchId]);
 
-    // Background retry logic for verification sync when offline
-    useEffect(() => {
-        if (serviceStatus !== 'offline') return;
-
-        const retryInterval = setInterval(() => {
-            console.log('Background retry: attempting verification sync...');
-            fetchEnquiries(true); // Silent retry
-        }, 60000); // Retry every 60 seconds
-
-        return () => clearInterval(retryInterval);
-    }, [serviceStatus, fetchEnquiries]);
-
-    // Auto-retry with exponential backoff for enquiry loading failures
-    useEffect(() => {
-        if (!error || enquiries.length > 0) {
-            // Reset retry state when we have data or no error
-            setRetryCount(0);
-            setNextRetryAt(null);
-            return;
-        }
-
-        const maxRetries = 5;
-        if (retryCount >= maxRetries) {
-            console.log('Max retries reached, stopping auto-retry');
-            return;
-        }
-
-        // Exponential backoff: 5s, 15s, 45s, 135s, 405s (about 7 minutes)
-        const baseDelay = 5000; // 5 seconds
-        const delayMs = baseDelay * Math.pow(3, retryCount);
-
-        console.log(`Scheduling auto-retry ${retryCount + 1}/${maxRetries} in ${Math.round(delayMs / 1000)} seconds`);
-
-        const retryAt = new Date(Date.now() + delayMs);
-        setNextRetryAt(retryAt);
-
-        const timeoutId = setTimeout(async () => {
-            console.log(`Auto-retry ${retryCount + 1}/${maxRetries}: attempting to load enquiries...`);
-            setRetryCount(prev => prev + 1);
-            await fetchEnquiries(true, true); // Silent retry
-        }, delayMs);
-
-        return () => clearTimeout(timeoutId);
-    }, [error, enquiries.length, retryCount, fetchEnquiries]);
-
-    // Keyboard shortcut for debug panel (Ctrl+Shift+D)
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.ctrlKey && event.shiftKey && event.key === 'D') {
-                event.preventDefault();
-                setShowDebugPanel(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, []);
-    
     const processedEnquiries = useMemo(() => {
         let data = enquiries.filter(enq => {
             // Only show enquiries that haven't been converted to admissions
@@ -297,7 +139,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
             if (aVal > bVal) return 1 * factor;
             return 0;
         });
-        
+
         return data;
     }, [enquiries, searchTerm, filterStatus, sortConfig]);
 
@@ -331,73 +173,6 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                     <p className="text-white/40 text-[18px] leading-relaxed font-serif italic border-l border-white/5 pl-8">
                         Centralized workspace for managing inbound identity handshakes and verified institutional leads.
                     </p>
-                    <div className="flex flex-wrap items-center gap-3 mt-4">
-                        {/* Verification Service Status */}
-                        <VerificationStatusWidget
-                            status={serviceStatus}
-                            lastSync={lastSyncTime}
-                            pendingCount={pendingVerificationsCount}
-                            isRefreshing={isRetrying}
-                            onRetry={() => {
-                                checkServiceHealth();
-                            }}
-                        />
-
-                        {/* Enquiry Database Status */}
-                        <div className="flex items-center gap-2">
-                            <div className={`px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-[0.1em] flex items-center gap-2 ${
-                                enquiryStatus === 'online'
-                                    ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                                    : enquiryStatus === 'offline'
-                                    ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                                    : enquiryStatus === 'degraded'
-                                    ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
-                                    : 'bg-gray-500/10 border-gray-500/20 text-gray-400'
-                            }`}>
-                                <div className={`w-2 h-2 rounded-full ${
-                                    enquiryStatus === 'online'
-                                        ? 'bg-green-400'
-                                        : enquiryStatus === 'offline'
-                                        ? 'bg-red-400'
-                                        : enquiryStatus === 'degraded'
-                                        ? 'bg-yellow-400 animate-pulse'
-                                        : 'bg-gray-400'
-                                }`}></div>
-                                <span>Enquiry DB</span>
-                            </div>
-
-                            {/* Detailed Error Info */}
-                            {enquiryHealthDetails?.errorDetails && enquiryStatus === 'offline' && (
-                                <div className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-[8px] font-mono max-w-xs truncate" title={enquiryHealthDetails.errorDetails}>
-                                    {enquiryHealthDetails.errorType}: {enquiryHealthDetails.errorDetails.substring(0, 30)}...
-                                </div>
-                            )}
-
-                            {/* Connection Details */}
-                            {enquiryHealthDetails && enquiryStatus === 'online' && (
-                                <div className="flex items-center gap-1">
-                                    {enquiryHealthDetails.rpcAvailable && (
-                                        <div className="px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-[8px] font-black uppercase tracking-[0.05em]">
-                                            RPC
-                                        </div>
-                                    )}
-                                    {enquiryHealthDetails.tableQueryAvailable && (
-                                        <div className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-black uppercase tracking-[0.05em]">
-                                            TABLE
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Cached Data Indicator */}
-                        {serviceStatus !== 'online' && enquiries.length > 0 && (
-                            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-black uppercase tracking-[0.1em] flex items-center gap-2">
-                                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-                                Cached Data
-                            </div>
-                        )}
-                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <button
@@ -413,45 +188,8 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                     >
                         <UsersIcon className="w-5 h-5" /> New Enquiry
                     </button>
-                    {onNavigate && (
-                        <button
-                            onClick={() => onNavigate('Code Verification')}
-                            disabled={serviceStatus === 'offline'}
-                            className={`px-8 py-5 font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-2xl transition-all flex items-center justify-center gap-3 transform active:scale-95 ring-4 ${
-                                serviceStatus === 'offline'
-                                    ? 'bg-gray-500/20 text-gray-400/50 cursor-not-allowed ring-gray-500/10'
-                                    : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90 hover:-translate-y-1 ring-primary/10'
-                            }`}
-                        >
-                            <KeyIcon className="w-5 h-5" /> Start Verification
-                        </button>
-                    )}
                 </div>
             </div>
-
-            {/* Unified System Status Banner */}
-            {(enquiryStatus === 'offline' || enquiryStatus === 'degraded' || serviceStatus === 'syncing' || error) && (
-                <SystemStatusBanner
-                    status={error ? 'offline' : enquiryStatus}
-                    message={
-                        error
-                            ? `Connection failed: ${error}`
-                            : enquiryStatus === 'offline'
-                            ? "Enquiry service is temporarily unavailable. Data is cached locally and will be available when service recovers."
-                            : enquiryStatus === 'degraded'
-                            ? "Enquiry service is experiencing delays. Some operations may be slower than usual."
-                            : serviceStatus === 'syncing'
-                            ? "Reconnecting to services..."
-                            : "Checking enquiry service status..."
-                    }
-                    lastSync={enquiryLastChecked || undefined}
-                    pendingCount={enquiryStatus === 'offline' ? 0 : pendingVerificationsCount}
-                    onRetry={() => {
-                        fetchEnquiries(); // Retry enquiry loading instead of verification check
-                    }}
-                    isRetrying={isRetrying}
-                />
-            )}
 
             {/* Stats Deck */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -459,7 +197,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                 <StatBox title="Approved Stream" value={stats.approved} icon={<ShieldCheckIcon className="h-7 w-7"/>} color="bg-teal-500" desc="Ready for Conversion" />
                 <StatBox title="PROMOTED" value={stats.converted} icon={<CheckCircleIcon className="h-7 w-7"/>} color="bg-emerald-500" desc="Converted nodes" />
             </div>
-            
+
             {/* Filter Hub */}
             <div className="flex flex-col xl:flex-row gap-8 justify-between items-center bg-[#0d0f14]/80 backdrop-blur-3xl p-6 rounded-[2.8rem] border border-white/5 shadow-2xl ring-1 ring-white/5">
                 <div className="relative w-full md:max-w-xl group">
@@ -472,7 +210,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                         className="w-full pl-16 pr-6 py-5 bg-black/40 border border-white/5 rounded-3xl text-[14px] font-bold text-white focus:bg-black/60 focus:border-primary/50 outline-none transition-all placeholder:text-white/5 tracking-wider"
                     />
                 </div>
-                
+
                 <div className="flex bg-black/60 p-2 rounded-[1.8rem] border border-white/5 overflow-x-auto no-scrollbar w-full xl:w-auto shadow-inner">
                     {['All', 'NEW', 'APPROVED', 'CONTACTED', 'VERIFIED'].map(f => (
                         <button
@@ -493,7 +231,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
             {/* Desktop Registry Table */}
             <div className="bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/5 rounded-[3.5rem] shadow-[0_64px_128px_-24px_rgba(0,0,0,1)] overflow-hidden flex flex-col min-h-[600px] ring-1 ring-white/5 relative group">
                 <div className="absolute inset-0 bg-gradient-to-tr from-primary/[0.01] to-transparent pointer-events-none"></div>
-                
+
                 {loading && enquiries.length === 0 ? (
                     <div className="flex flex-col justify-center items-center py-48 gap-8">
                         <Spinner size="lg" className="text-primary" />
@@ -520,28 +258,11 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                         <div className="w-32 h-32 bg-white/[0.01] rounded-[3rem] flex items-center justify-center mb-10 border border-white/5 shadow-inner">
                             <MailIcon className="h-14 w-14 text-white/10" />
                         </div>
-                        <h3 className="text-3xl font-serif font-black text-white uppercase tracking-tighter leading-none mb-6">No <span className="text-white/20 italic">Enquiries</span></h3>
+                        <h3 className="text-3xl font-serif font-black text-white uppercase tracking-tighter leading-none mb-6">No Verified <span className="text-white/20 italic">Enquiries</span></h3>
                         <p className="text-white/30 max-w-sm mx-auto font-serif italic text-lg leading-relaxed">
-                            No enquiry records found. Create your first enquiry to get started.
+                            No verified enquiries found. All enquiries must be verified before appearing in the desk.
                         </p>
                         <div className="flex gap-4 mt-12">
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const result = await EnquiryService.createSampleEnquiry();
-                                        if (result.success) {
-                                            await fetchEnquiries(); // Refresh the data
-                                        } else {
-                                            console.error('Failed to create sample enquiry:', result.error);
-                                        }
-                                    } catch (error) {
-                                        console.error('Error creating sample enquiry:', error);
-                                    }
-                                }}
-                                className="px-8 py-4 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] transition-all border border-blue-500/20"
-                            >
-                                Create Sample Data
-                            </button>
                             <button
                                 onClick={() => navigate('/enquiry-entry')}
                                 className="px-8 py-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] transition-all border border-emerald-500/20"
@@ -646,14 +367,6 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                     </div>
                 )}
             </div>
-
-            {/* Debug Panel */}
-            <EnquiryDebugPanel
-                isVisible={showDebugPanel}
-                onClose={() => setShowDebugPanel(false)}
-                branchId={branchId}
-            />
-
         </div>
     );
 };

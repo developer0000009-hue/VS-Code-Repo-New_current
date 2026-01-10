@@ -6,120 +6,43 @@ import { EnquiryDetails } from '../types';
  * Manages the domain-isolated lifecycle of enquiries.
  */
 export const EnquiryService = {
-    /**
-     * Cache management for enquiry data
-     */
-    cache: {
-        set: (data: EnquiryDetails[], branchId?: string | null) => {
-            try {
-                localStorage.setItem('enquiries_cache', JSON.stringify({
-                    data,
-                    timestamp: new Date().toISOString(),
-                    branchId: branchId || null
-                }));
-                return true;
-            } catch (error) {
-                console.warn('Failed to cache enquiry data:', error);
-                return false;
-            }
-        },
 
-        get: (branchId?: string | null, maxAge: number = 24 * 60 * 60 * 1000) => {
-            try {
-                const cached = localStorage.getItem('enquiries_cache');
-                if (!cached) return null;
-
-                const parsed = JSON.parse(cached);
-                const cacheAge = Date.now() - new Date(parsed.timestamp).getTime();
-
-                // Check if cache is for the same branch and not too old
-                if ((!branchId || parsed.branchId === branchId) && cacheAge < maxAge) {
-                    return {
-                        data: parsed.data,
-                        timestamp: parsed.timestamp,
-                        age: cacheAge
-                    };
-                }
-                return null;
-            } catch (error) {
-                console.warn('Failed to retrieve cached enquiry data:', error);
-                return null;
-            }
-        },
-
-        clear: () => {
-            try {
-                localStorage.removeItem('enquiries_cache');
-                return true;
-            } catch (error) {
-                console.warn('Failed to clear enquiry cache:', error);
-                return false;
-            }
-        }
-    },
 
     /**
-     * Health-aware enquiry fetching with fallback to cache
-     * Checks database health first, then fetches or uses cache accordingly
+     * Direct database enquiry fetching
+     * Always fetches verified enquiries directly from Supabase database
      */
     async fetchEnquiriesWithHealthCheck(branchId?: string | null): Promise<{
         success: boolean;
         data?: EnquiryDetails[];
-        source: 'database' | 'cache' | 'failed';
+        source: 'database' | 'failed';
         healthStatus: 'online' | 'offline' | 'degraded';
         errorType?: 'auth' | 'permission' | 'connection' | 'timeout' | 'unknown';
         errorDetails?: string;
-        cacheAge?: number;
     }> {
         try {
-            // First check database health
-            const healthResult = await this.checkEnquiryDatabaseHealth();
-
-            if (healthResult.status === 'online') {
-                // Database is healthy, try to fetch fresh data
-                try {
-                    const fetchResult = await this.fetchEnquiriesFromDatabase(branchId);
-                    if (fetchResult.success) {
-                        // Cache successful data
-                        this.cache.set(fetchResult.data!, branchId);
-                        return {
-                            success: true,
-                            data: fetchResult.data,
-                            source: 'database',
-                            healthStatus: 'online'
-                        };
-                    }
-                } catch (fetchError) {
-                    console.warn('Failed to fetch from healthy database, falling back to cache:', fetchError);
-                }
-            }
-
-            // If we reach here, either database is offline/degraded or fetch failed
-            // Try to use cached data
-            const cached = this.cache.get(branchId);
-            if (cached) {
+            // Always fetch directly from database
+            const fetchResult = await this.fetchEnquiriesFromDatabase(branchId);
+            if (fetchResult.success) {
                 return {
                     success: true,
-                    data: cached.data,
-                    source: 'cache',
-                    healthStatus: healthResult.status,
-                    errorType: healthResult.details?.errorType,
-                    errorDetails: healthResult.details?.errorDetails,
-                    cacheAge: Math.round(cached.age / 60000) // minutes
+                    data: fetchResult.data,
+                    source: 'database',
+                    healthStatus: 'online'
                 };
             }
 
-            // No cached data available
+            // Fetch failed
             return {
                 success: false,
                 source: 'failed',
-                healthStatus: healthResult.status,
-                errorType: healthResult.details?.errorType,
-                errorDetails: healthResult.details?.errorDetails || 'No cached data available and database is unreachable'
+                healthStatus: 'offline',
+                errorType: 'connection',
+                errorDetails: fetchResult.error || 'Failed to fetch enquiries from database'
             };
 
         } catch (error: any) {
-            console.error('Health check failed:', error);
+            console.error('Database fetch failed:', error);
             return {
                 success: false,
                 source: 'failed',
@@ -240,6 +163,7 @@ export const EnquiryService = {
             let query = supabase
                 .from('enquiries')
                 .select('*')
+                .eq('verification_status', 'VERIFIED')
                 .eq('conversion_state', 'NOT_CONVERTED')
                 .eq('is_archived', false)
                 .eq('is_deleted', false)

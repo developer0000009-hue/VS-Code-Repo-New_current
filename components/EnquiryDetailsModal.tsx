@@ -200,6 +200,11 @@ const EnquiryDetailsModal: React.FC<EnquiryDetailsModalProps> = ({
             alert('Enquiry must be verified or in review to convert');
             return;
         }
+        // Additional check: ensure enquiry has VERIFIED status in database
+        if (enquiry.verification_status !== 'VERIFIED') {
+            alert('Enquiry must be verified before conversion');
+            return;
+        }
         setShowConvertConfirm(true);
     };
 
