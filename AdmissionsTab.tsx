@@ -62,8 +62,8 @@ export const RequestDocumentsModal: React.FC<{
         setStatus(null);
 
         try {
-            const { error } = await supabase.rpc('request_admission_documents', {
-                p_admission_id: parseInt(admissionId),
+            const { error } = await supabase.rpc('admin_request_documents', {
+                p_admission_id: admissionId,
                 p_documents: selectedDocs,
                 p_message: message
             });
