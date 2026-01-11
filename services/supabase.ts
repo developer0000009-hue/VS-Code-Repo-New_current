@@ -17,69 +17,52 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
- * Robust error formatter for enterprise-grade user feedback.
- * Prevents [object Object] by recursively extracting messages or stringifying the payload.
+ * Standardized error formatter to prevent [object Object] in logs/telemetry.
+ * Targeted for Postgres error codes and nested API responses.
  */
 export const formatError = (err: any): string => {
-    if (!err) return "Synchronization Idle.";
+    if (!err) return "An unknown error occurred.";
     
-    const JUNK_STRINGS = ["[object Object]", "{}", "null", "undefined", "error"];
+    // If it's a string, ensure it's not the generic "[object Object]"
+    if (typeof err === 'string') {
+        const isJunk = err === "[object Object]" || err === "{}" || err === "null" || err === "undefined";
+        return isJunk ? "System synchronization exception." : err;
+    }
 
-    // Helper to find a descriptive message in an error object
-    const getDeepMessage = (obj: any): string | null => {
-        if (!obj) return null;
-        
-        // If it's an error instance, get message
-        if (obj instanceof Error) {
-            if (obj.name === 'AbortError' || obj.message.includes('aborted')) {
-                return "Request timed out or was cancelled by the browser.";
-            }
-            return obj.message;
-        }
+    // Postgres / Supabase specific codes
+    if (err.code === '22P02') return "Data Alignment Error: Legacy identity mismatch detected. Migration 14.2.9 required.";
+    if (err.code === '42883') return "Identity Handshake Failure: Operator type mismatch. Update to Migration 14.2.9 required.";
+    if (err.code === 'PGRST116') return "The requested record was not found in the institutional node.";
 
-        // Handle string errors
-        if (typeof obj === 'string') {
-            if (JUNK_STRINGS.includes(obj)) return null;
-            return obj;
-        }
+    // Inspection Priority
+    // 1. Direct message or error_description
+    const message = err.message || err.error_description || err.details || err.hint;
+    if (message && typeof message === 'string' && !message.includes("[object Object]")) {
+        return message;
+    }
 
-        // Standard Supabase/Postgres error keys
-        const keys = ['message', 'error_description', 'details', 'hint', 'error', 'code'];
-        
-        if (typeof obj === 'object') {
-            for (const key of keys) {
-                const val = obj[key];
-                if (val && typeof val === 'string' && !JUNK_STRINGS.includes(val)) return val;
-                if (val && typeof val === 'object') {
-                    const deep = getDeepMessage(val);
-                    if (deep) return deep;
-                }
-            }
-        }
-        return null;
-    };
+    // 2. Nested error object (Supabase Auth style)
+    if (err.error) {
+        if (typeof err.error === 'string' && err.error !== "[object Object]") return err.error;
+        if (typeof err.error === 'object' && err.error?.message && typeof err.error.message === 'string') return err.error.message;
+    }
 
-    // Handle specific Postgres error codes
-    if (err.code === '42501') return "Security Violation: Access denied to this database node. Check RLS and Grants.";
-    if (err.code === '42804') return "Database Engine Error: Type mismatch detected (UUID vs BIGINT).";
-    if (err.code === '22P02') return "Data Integrity Error: Invalid identification format detected.";
-    if (err.code === '23505') return "Registry Conflict: This identity node is already registered.";
+    // 3. Response object from RPC that might contain a success/message payload
+    if (err.msg || err.message_text) return String(err.msg || err.message_text);
 
-    const extracted = getDeepMessage(err);
-    if (extracted) return extracted;
-
-    // Last resort: Stringify the object to avoid [object Object]
+    // 4. Try stringifying for raw details if it's not a generic object
     try {
         const str = JSON.stringify(err);
-        if (str && !JUNK_STRINGS.includes(str)) return str;
-    } catch (e) {
-        // Fallback for circular references
-    }
+        if (str && str !== '{}' && str !== '[]' && !str.includes("[object Object]")) {
+            return str.length > 200 ? str.substring(0, 197) + "..." : str;
+        }
+    } catch { }
 
-    const finalFallback = String(err);
-    if (JUNK_STRINGS.includes(finalFallback)) {
-        return "Institutional system exception: Data context unavailable.";
+    // 5. Final Fallback
+    const stringified = String(err);
+    if (stringified === '[object Object]' || stringified === 'undefined' || stringified === 'null') {
+        return "Institutional system exception (identity sync fail).";
     }
-
-    return finalFallback;
+    
+    return stringified;
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { Enquiry, EnquiryStatus } from '../types';
@@ -9,13 +8,14 @@ import { KeyIcon } from './icons/KeyIcon';
 import { MailIcon } from './icons/MailIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { ClockIcon } from './icons/ClockIcon';
+import { FilterIcon } from './icons/FilterIcon';
+import { MegaphoneIcon } from './icons/MegaphoneIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
-import { FilterIcon } from './icons/FilterIcon';
-import { UsersIcon } from './icons/UsersIcon';
-import { SparklesIcon } from './icons/SparklesIcon';
 import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
+// FIX: Added missing SparklesIcon import to resolve "Cannot find name 'SparklesIcon'" error.
+import { SparklesIcon } from './icons/SparklesIcon';
 
 const statusColors: Record<string, string> = {
   'ENQUIRY_ACTIVE': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -34,22 +34,22 @@ const statusLabels: Record<string, string> = {
 type SortableKeys = 'applicant_name' | 'grade' | 'status' | 'updated_at';
 
 interface EnquiryTabProps {
-    branchId?: string | null;
+    branchId?: number | null;
     onNavigate?: (component: string) => void;
 }
 
 const StatBox: React.FC<{ title: string; value: number; icon: React.ReactNode; color: string; desc: string }> = ({ title, value, icon, color, desc }) => (
-    <div className="bg-[#0d0f14]/80 backdrop-blur-3xl border border-white/5 p-10 rounded-[3rem] shadow-2xl hover:shadow-primary/10 transition-all duration-700 group overflow-hidden relative ring-1 ring-white/5">
-        <div className={`absolute -right-8 -top-8 w-48 h-48 ${color} opacity-[0.03] rounded-full blur-[100px] group-hover:opacity-[0.08] transition-opacity duration-1000`}></div>
+    <div className="bg-[#0d0f14] p-8 rounded-[2.5rem] border border-white/5 shadow-2xl flex flex-col justify-between transition-all hover:border-primary/30 group relative overflow-hidden ring-1 ring-white/5">
+        <div className={`absolute -right-6 -top-6 w-32 h-32 ${color} opacity-[0.03] rounded-full blur-3xl group-hover:opacity-[0.08] transition-opacity duration-1000`}></div>
         <div className="flex justify-between items-start relative z-10">
-            <div className={`p-4 rounded-[1.25rem] bg-white/5 text-white/30 ring-1 ring-white/10 shadow-inner group-hover:scale-110 group-hover:text-primary transition-all duration-700`}>
+            <div className={`p-3.5 rounded-2xl bg-white/5 text-white/30 ring-1 ring-white/10 group-hover:scale-110 group-hover:text-primary transition-all duration-500`}>
                 {icon}
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">{desc}</div>
+            <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{desc}</span>
         </div>
-        <div className="mt-12 relative z-10">
-            <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.4em] mb-3">{title}</p>
-            <h3 className="text-6xl font-serif font-black text-white tracking-tighter leading-none">{value}</h3>
+        <div className="mt-10 relative z-10">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] mb-2">{title}</p>
+            <h3 className="text-5xl font-serif font-black text-white tracking-tighter leading-none">{value}</h3>
         </div>
     </div>
 );
@@ -102,18 +102,19 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
     }, [fetchEnquiries, branchId]);
     
     const processedEnquiries = useMemo(() => {
-        let data = enquiries.filter(enq => {
+        const source = Array.isArray(enquiries) ? enquiries : [];
+        let data = source.filter(enq => {
             const matchesStatus = !filterStatus || enq.status === filterStatus;
-            const searchLower = searchTerm.toLowerCase();
+            const searchLower = (searchTerm || '').toLowerCase();
             const matchesSearch = !searchTerm || 
-                enq.applicant_name.toLowerCase().includes(searchLower) ||
+                (enq.applicant_name || '').toLowerCase().includes(searchLower) ||
                 (enq.parent_name || '').toLowerCase().includes(searchLower);
             return matchesStatus && matchesSearch;
         });
 
         data.sort((a, b) => {
-            const aVal = a[sortConfig.key] || '';
-            const bVal = b[sortConfig.key] || '';
+            const aVal = (a[sortConfig.key] || '').toString();
+            const bVal = (b[sortConfig.key] || '').toString();
             const factor = sortConfig.direction === 'ascending' ? 1 : -1;
             if (aVal < bVal) return -1 * factor;
             if (aVal > bVal) return 1 * factor;
@@ -123,11 +124,14 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
         return data;
     }, [enquiries, searchTerm, filterStatus, sortConfig]);
 
-    const stats = useMemo(() => ({
-        total: enquiries.length,
-        verified: enquiries.filter(e => e.status === 'ENQUIRY_VERIFIED').length,
-        converted: enquiries.filter(e => e.status === 'CONVERTED').length
-    }), [enquiries]);
+    const stats = useMemo(() => {
+        const source = Array.isArray(enquiries) ? enquiries : [];
+        return {
+            total: source.length,
+            verified: source.filter(e => e.status === 'ENQUIRY_VERIFIED').length,
+            converted: source.filter(e => e.status === 'CONVERTED').length
+        };
+    }, [enquiries]);
 
     const handleSort = (key: SortableKeys) => {
         setSortConfig(prev => ({
@@ -173,25 +177,25 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                 </div>
             </div>
 
+            {/* Stats Deck */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <StatBox title="Total Ledger" value={stats.total} icon={<MailIcon className="w-7 h-7"/>} color="bg-blue-500" desc="Total Nodes" />
+                <StatBox title="Verified Stream" value={stats.verified} icon={<ShieldCheckIcon className="h-7 w-7"/>} color="bg-teal-500" desc="Clearance Active" />
+                <StatBox title="Promoted" value={stats.converted} icon={<CheckCircleIcon className="w-7 h-7"/>} color="bg-emerald-500" desc="Converted nodes" />
+            </div>
+
             {error && (
                 <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-center justify-between shadow-xl animate-in shake">
                     <div className="flex items-center gap-4">
                         <AlertTriangleIcon className="w-8 h-8 text-red-500 shrink-0" />
                         <div>
-                            <p className="text-xs font-black uppercase text-red-500 tracking-widest">Sync Failure</p>
+                            <p className="text-xs font-black uppercase text-red-500 tracking-widest">Fetch Failure</p>
                             <p className="text-sm font-bold text-red-200/70 mt-1">{error}</p>
                         </div>
                     </div>
-                    <button onClick={() => fetchEnquiries()} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95">Retry Sync</button>
+                    <button onClick={() => fetchEnquiries()} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95">Retry Protocol</button>
                 </div>
             )}
-
-            {/* Stats Deck */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <StatBox title="Total Ledger" value={stats.total} icon={<MailIcon className="w-7 h-7"/>} color="bg-blue-500" desc="Total Nodes" />
-                <StatBox title="Verified Stream" value={stats.verified} icon={<ShieldCheckIcon className="h-7 w-7"/>} color="bg-teal-500" desc="Clearance Active" />
-                <StatBox title="PROMOTED" value={stats.converted} icon={<CheckCircleIcon className="h-7 w-7"/>} color="bg-emerald-500" desc="Converted nodes" />
-            </div>
             
             {/* Filter Hub */}
             <div className="flex flex-col xl:flex-row gap-8 justify-between items-center bg-[#0d0f14]/80 backdrop-blur-3xl p-6 rounded-[2.8rem] border border-white/5 shadow-2xl ring-1 ring-white/5">
@@ -227,7 +231,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
             <div className="bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/5 rounded-[3.5rem] shadow-[0_64px_128px_-24px_rgba(0,0,0,1)] overflow-hidden flex flex-col min-h-[600px] ring-1 ring-white/5 relative group">
                 <div className="absolute inset-0 bg-gradient-to-tr from-primary/[0.01] to-transparent pointer-events-none"></div>
                 
-                {loading && enquiries.length === 0 ? (
+                {loading && (enquiries || []).length === 0 ? (
                     <div className="flex flex-col justify-center items-center py-48 gap-8">
                         <Spinner size="lg" className="text-primary" />
                         <p className="text-[11px] font-black uppercase text-white/20 tracking-[0.5em] animate-pulse">Syncing Lifecycle Protocol</p>
@@ -239,14 +243,14 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                         </div>
                         <h3 className="text-3xl font-serif font-black text-white uppercase tracking-tighter leading-none mb-6">Desk <span className="text-white/20 italic">Standby.</span></h3>
                         <p className="text-white/30 max-w-sm mx-auto font-serif italic text-lg leading-relaxed">
-                            Verified enquiries from the <strong className="text-primary">Verification Center</strong> will appear here upon authorization.
+                            Verified enquiries from the <strong className="text-primary">Handshake Center</strong> will appear here upon authorization.
                         </p>
                         {onNavigate && (
                             <button 
                                 onClick={() => onNavigate('Code Verification')}
                                 className="mt-12 px-10 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-[0.3em] transition-all border border-white/5"
                             >
-                                Enter Verification Center
+                                Enter Verification Vault
                             </button>
                         )}
                     </div>
@@ -259,7 +263,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                                     <th className="p-10">Placement Context</th>
                                     <th className="p-10">Lifecycle Status</th>
                                     <th className="p-10 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('updated_at')}>Registry Pulse</th>
-                                    <th className="p-10 text-right pr-12">Action</th>
+                                    <th className="p-10 text-right pr-12">Protocols</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5 relative z-10">
@@ -291,6 +295,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                                                 <span className="inline-flex items-center px-4 py-1.5 rounded-xl text-[10px] font-black uppercase bg-white/5 text-white/30 border border-white/5 tracking-[0.1em] w-fit shadow-sm">
                                                     Grade {enq.grade}
                                                 </span>
+                                                <span className="text-[8px] font-mono text-white/10 uppercase tracking-widest pl-1">CONTEXT_ACAD_PROT</span>
                                             </div>
                                         </td>
                                         <td className="p-10">
@@ -306,6 +311,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                                                     <ClockIcon className="w-3.5 h-3.5 opacity-40 group-hover:rotate-12 transition-transform" />
                                                     {new Date(enq.updated_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                                                 </div>
+                                                <span className="text-[9px] text-white/10 font-bold uppercase tracking-widest pl-5">Sync Logged</span>
                                             </div>
                                         </td>
                                         <td className="p-10 text-right pr-12">

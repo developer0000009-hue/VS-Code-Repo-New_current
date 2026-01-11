@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { ParentProfileData } from '../../types';
 import { UserIcon } from '../icons/UserIcon';
@@ -114,23 +115,23 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
         setSyncedFields(new Set());
         setMapUrl(null);
 
-        // Fallback Logic: IP-based hint (Mock for frontend robustness)
-        const ipFallback = async () => {
-            console.log("Telemetry: Falling back to Tier 2 (Contextual Hint)...");
+        const ipFallback = async (reason?: string) => {
+            console.log(`Telemetry: Falling back to Tier 2 (${reason || 'Contextual Hint'})...`);
             setSyncStatus('Regional Lookup Active...');
-            // In a real environment, this would call a geolocation microservice
             await new Promise(r => setTimeout(r, 1000));
             handleSelectChange('country', false)('India');
             setSyncedFields(new Set(['country']));
             setSyncError({
-                message: "Location access was denied. We've defaulted to your institutional home region (India). Please enter specific residency details manually.",
+                message: reason === 'timeout' 
+                    ? "Location request timed out. We've defaulted to your institutional home region (India). Please enter specific residency details manually."
+                    : "Location access was denied or unavailable. We've defaulted to your home region (India).",
                 isWarning: true
             });
             setIsLocating(false);
         };
 
         if (!navigator.geolocation) {
-            await ipFallback();
+            await ipFallback('unsupported');
             return;
         }
 
@@ -141,22 +142,24 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                 setSyncStatus('Identifying Neural Node...');
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 
-                const prompt = `Perform a high-accuracy address lookup for coordinates: ${latitude}, ${longitude}.
+                const prompt = `Identify the high-accuracy official address components for the coordinates: ${latitude}, ${longitude}.
                 
                 INSTRUCTIONS:
-                1. Use the googleMaps tool to find the official residential address.
-                2. Return ONLY a valid JSON object.
-                3. Field 'state' must be the full official name (e.g. 'Rajasthan').
-                4. Field 'country' must be 'India' if applicable.
+                1. You MUST use the googleMaps tool to extract precise location metadata.
+                2. Your response MUST contain a single JSON object inside a markdown code block.
+                3. Field 'state' MUST be the full official name (e.g. 'Rajasthan').
+                4. Field 'country' MUST be 'India' if applicable.
 
-                JSON SCHEMA:
+                RESPONSE TEMPLATE:
+                \`\`\`json
                 { 
-                  "address": "Building Name/No, Street, Area", 
-                  "city": "City Name", 
-                  "state": "Official State Name", 
-                  "country": "Country Name", 
+                  "address": "Specific building/street information", 
+                  "city": "City name", 
+                  "state": "Official state name", 
+                  "country": "Country name", 
                   "pin_code": "6-digit code" 
-                }`;
+                }
+                \`\`\``;
 
                 const response = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
@@ -167,13 +170,11 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                     }
                 });
 
-                // Extract maps metadata for UX verification
                 const mapsUri = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.find((chunk: any) => chunk.maps?.uri)?.maps?.uri;
                 if (mapsUri) setMapUrl(mapsUri);
 
                 const text = response.text || '';
-                
-                // Robust Regex extraction to bypass markdown junk
+                // Robust extraction skipping citations or preamble text
                 const jsonMatch = text.match(/\{[\s\S]*\}/);
                 const jsonStr = jsonMatch ? jsonMatch[0] : null;
                 
@@ -184,7 +185,6 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                     const fields = ['country', 'state', 'city', 'address', 'pin_code'];
                     setSyncedFields(new Set(fields));
 
-                    // Staggered UI population for premium "neural sync" feel
                     if (data.country) handleSelectChange('country', false)(data.country);
                     await new Promise(r => setTimeout(r, 200));
                     if (data.state) handleSelectChange('state', false)(data.state);
@@ -196,6 +196,7 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                     setSyncStatus('Identity Synced.');
                     setTimeout(() => setSyncStatus(''), 3000);
                 } else {
+                    console.error("AI Response was missing expected data payload. Text received:", text);
                     throw new Error("Tier 1 Payload Mismatch");
                 }
             } catch (err: any) {
@@ -209,12 +210,16 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                 setIsLocating(false);
             }
         }, async (err) => {
-            console.error("Geolocation Protocol Blocked:", err.code);
-            await ipFallback();
+            console.error("Geolocation Error Code:", err.code);
+            if (err.code === 3) {
+                await ipFallback('timeout');
+            } else {
+                await ipFallback('denied');
+            }
         }, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 300000
         });
     };
 
@@ -299,10 +304,9 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                 </div>
             </div>
 
-            {/* Robust User-Friendly Banner */}
             {syncError && (
                 <div className={`mb-10 p-6 border rounded-3xl flex items-center justify-between gap-5 animate-in slide-in-from-top-4 shadow-xl
-                    ${syncError.isWarning ? 'bg-amber-500/10 border-amber-500/20' : 'bg-red-500/10 border-red-500/20'}
+                    ${syncError.isWarning ? 'bg-amber-50/50 border-amber-200 text-amber-900 dark:bg-amber-900/10 dark:border-amber-800 dark:text-amber-200' : 'bg-red-500/10 border-red-500/20 text-red-500'}
                 `}>
                     <div className={`flex items-center gap-4 ${syncError.isWarning ? 'text-amber-500' : 'text-red-500'}`}>
                         {syncError.isWarning ? <AlertTriangleIcon className="w-8 h-8 shrink-0" /> : <XCircleIcon className="w-8 h-8 shrink-0" />}

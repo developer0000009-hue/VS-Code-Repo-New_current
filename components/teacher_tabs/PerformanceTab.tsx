@@ -45,9 +45,11 @@ export const PerformanceTab: FunctionComponentWithIcon<PerformanceTabProps> = ({
         setRoster([]);
         setSummary(null);
 
+        const classIdNum = parseInt(selectedClassId);
+
         const [rosterRes, summaryRes] = await Promise.all([
-            supabase.rpc('get_class_roster_for_admin', { p_class_id: selectedClassId }),
-            supabase.rpc('get_teacher_class_performance_summary', { p_class_id: selectedClassId })
+            supabase.rpc('get_class_roster_for_admin', { p_class_id: classIdNum }),
+            supabase.rpc('get_teacher_class_performance_summary', { p_class_id: classIdNum })
         ]);
 
         if (rosterRes.error) setError(rosterRes.error.message);
@@ -108,7 +110,7 @@ export const PerformanceTab: FunctionComponentWithIcon<PerformanceTabProps> = ({
             {viewingStudent && selectedClassId && (
                 <StudentReportModal 
                     student={viewingStudent} 
-                    classId={selectedClassId}
+                    classId={parseInt(selectedClassId)}
                     onClose={() => setViewingStudent(null)}
                     currentUserId={currentUserId}
                 />
@@ -118,7 +120,7 @@ export const PerformanceTab: FunctionComponentWithIcon<PerformanceTabProps> = ({
     );
 };
 
-const StudentReportModal: React.FC<{student: StudentRosterItem, classId: string, onClose:()=>void, currentUserId: string}> = ({student, classId, onClose, currentUserId}) => {
+const StudentReportModal: React.FC<{student: StudentRosterItem, classId: number, onClose:()=>void, currentUserId: string}> = ({student, classId, onClose, currentUserId}) => {
     const [report, setReport] = useState<StudentPerformanceReport | null>(null);
     const [loading, setLoading] = useState(true);
 

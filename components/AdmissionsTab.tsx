@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { AdmissionApplication, AdmissionStatus } from '../types';
@@ -97,7 +98,7 @@ export const RequestDocumentsModal: React.FC<{
                             <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Verification Protocol</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
+                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-all text-white/30 hover:text-white">
                         <XIcon className="w-5 h-5"/>
                     </button>
                 </div>
@@ -170,7 +171,7 @@ export const RequestDocumentsModal: React.FC<{
     );
 };
 
-const AdmissionsTab: React.FC<{ branchId?: string | null }> = ({ branchId }) => {
+const AdmissionsTab: React.FC<{ branchId?: number | null }> = ({ branchId }) => {
     const [applicants, setApplicants] = useState<AdmissionApplication[]>([]);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -178,7 +179,7 @@ const AdmissionsTab: React.FC<{ branchId?: string | null }> = ({ branchId }) => 
     const [selectedAdmission, setSelectedAdmission] = useState<AdmissionApplication | null>(null);
     
     const fetchApplicants = useCallback(async () => {
-        if (branchId === undefined) {
+        if (!branchId) {
             setLoading(false);
             return;
         }

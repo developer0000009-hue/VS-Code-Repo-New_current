@@ -19,13 +19,12 @@ import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { UserPlusIcon } from './icons/UserPlusIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
-// Fix: Import StudentDetailModal as a replacement for the missing/truncated StudentProfileModal default export
-import StudentProfileModal from './StudentDetailModal';
+import StudentProfileModal from './students/StudentProfileModal';
 import BulkStudentActionsModal, { BulkStudentActionType } from './students/BulkStudentActionsModal';
 import PremiumAvatar from './common/PremiumAvatar';
 
 interface StudentManagementTabProps {
-    branchId?: string | null;
+    branchId?: number | null;
 }
 
 const KPICard: React.FC<{ 
@@ -267,7 +266,7 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                                             <PremiumAvatar src={student.profile_photo_url} name={student.display_name} size="xs" className="w-14 h-14 rounded-2xl border border-white/10 shadow-2xl relative z-10" />
                                             <div>
                                                 <p className="font-serif font-black text-white text-lg tracking-tight uppercase group-hover:text-primary transition-colors">{student.display_name}</p>
-                                                <p className="text-[10px] text-white/30 font-mono tracking-widest mt-1 uppercase">NODE_{student.student_id_number || String(student.id).slice(0, 8)}</p>
+                                                <p className="text-[10px] text-white/30 font-mono tracking-widest mt-1 uppercase">NODE_{student.student_id_number || student.id.slice(0, 8)}</p>
                                             </div>
                                         </div>
                                     </td>

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { ExpenseDashboardData, Expense } from '../../types';
@@ -26,8 +27,7 @@ const ExpenseDashboard: React.FC<ExpenseDashboardProps> = ({ data, onRefresh }) 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('All');
     const [filterStatus, setFilterStatus] = useState('All');
-    // Fix: Key type for updatingStatus must be string to match Expense.id
-    const [updatingStatus, setUpdatingStatus] = useState<Record<string, boolean>>({});
+    const [updatingStatus, setUpdatingStatus] = useState<Record<number, boolean>>({});
     
     const filteredExpenses = useMemo(() => {
         return (data.recent_expenses || []).filter(exp => {
@@ -40,8 +40,7 @@ const ExpenseDashboard: React.FC<ExpenseDashboardProps> = ({ data, onRefresh }) 
         });
     }, [data.recent_expenses, searchTerm, filterCategory, filterStatus]);
 
-    // Fix: expenseId parameter must be string to match Expense interface
-    const handleStatusUpdate = async (expenseId: string, newStatus: 'Approved' | 'Rejected') => {
+    const handleStatusUpdate = async (expenseId: number, newStatus: 'Approved' | 'Rejected') => {
         setUpdatingStatus(prev => ({ ...prev, [expenseId]: true }));
         try {
             const { error } = await supabase.rpc('update_expense_status', {

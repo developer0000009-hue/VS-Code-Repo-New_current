@@ -25,7 +25,7 @@ interface StudentHeaderProps {
 }
 
 const StudentSwitcher: React.FC<Omit<StudentHeaderProps, 'pageTitle' | 'onMenuClick' | 'onSignOut' | 'onSwitchRole' | 'onSelectRole'>> = (props) => {
-    const { allMyChildren, currentChildId, onSwitchStudent, currentStudentName } = props;
+    const { allMyChildren = [], currentChildId, onSwitchStudent, currentStudentName } = props;
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,9 +41,9 @@ const StudentSwitcher: React.FC<Omit<StudentHeaderProps, 'pageTitle' | 'onMenuCl
 
     // Even if 1 child, we might want to show context, but usually dropdown implies choice.
     // If only 1 child, we just show the name, no dropdown arrow.
-    const hasMultiple = allMyChildren.length > 1;
+    const hasMultiple = (allMyChildren || []).length > 1;
     // Fix: Type comparison now between string and string.
-    const currentChild = allMyChildren.find(c => c.id === currentChildId);
+    const currentChild = (allMyChildren || []).find(c => c.id === currentChildId);
 
     return (
         <div ref={dropdownRef} className="relative">

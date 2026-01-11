@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './services/supabase';
 import { ShareCode, ShareCodeStatus, AdmissionApplication, ShareCodeType } from './types';
@@ -6,7 +7,7 @@ import Spinner from './components/common/Spinner';
 // --- Icons (as they are not in separate files) ---
 const CopyIcon: React.FC<{className?: string}> = ({className = "h-5 w-5"}) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 12-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
     </svg>
 );
 const CheckIcon: React.FC<{className?: string}> = ({className = "h-5 w-5"}) => (
@@ -106,8 +107,7 @@ export default function ShareCodesTab() {
     }
   };
   
-  // Fix: handleRevokeCode parameter id must be string to match ShareCode type definition.
-  const handleRevokeCode = async (id: string) => {
+  const handleRevokeCode = async (id: number) => {
     if (window.confirm('Are you sure you want to revoke this code?')) {
         const { error } = await supabase.rpc('revoke_my_share_code', { p_code_id: id });
         if (error) {
@@ -213,7 +213,7 @@ export default function ShareCodesTab() {
                                     <div className={`w-4 h-4 rounded-full border-2 absolute top-4 right-4 flex items-center justify-center ${codeType === 'Enquiry' ? 'border-blue-500' : 'border-muted-foreground/30'}`}>{codeType === 'Enquiry' && <div className="w-2 h-2 bg-blue-500 rounded-full" />}</div>
                                     <span className="block font-bold text-sm mb-1 text-foreground">Enquiry</span><span className="block text-xs text-muted-foreground group-hover:text-foreground/70">For initial questions & desk visits</span>
                                 </button>
-                                <button type="button" onClick={() => setCodeType('Admission')} className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 group ${codeType === 'Admission' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/20 ring-1 ring-purple-500/30' : 'border-border bg-card hover:border-blue-300/50 hover:bg-blue-50/30'}`}>
+                                <button type="button" onClick={() => setCodeType('Admission')} className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 group ${codeType === 'Admission' ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/20 ring-1 ring-purple-500/30' : 'border-border bg-card hover:border-purple-300/50 hover:bg-blue-50/30'}`}>
                                     <div className={`w-4 h-4 rounded-full border-2 absolute top-4 right-4 flex items-center justify-center ${codeType === 'Admission' ? 'border-purple-500' : 'border-muted-foreground/30'}`}>{codeType === 'Admission' && <div className="w-2 h-2 bg-purple-500 rounded-full" />}</div>
                                     <span className="block font-bold text-sm mb-1 text-foreground">Admission</span><span className="block text-xs text-muted-foreground group-hover:text-foreground/70">Share full documents for review</span>
                                 </button>

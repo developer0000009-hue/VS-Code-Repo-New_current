@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { TeacherClassOverview, TeacherClassDetails, ClassSubject, LessonPlan, FunctionComponentWithIcon } from '../../types';
@@ -16,7 +15,7 @@ interface MyClassesTabProps {
 
 const MyClassesTab: FunctionComponentWithIcon<MyClassesTabProps> = ({ currentUserId }) => {
     const [overviews, setOverviews] = useState<TeacherClassOverview[]>([]);
-    const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+    const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
     const [classDetails, setClassDetails] = useState<TeacherClassDetails | null>(null);
     const [loading, setLoading] = useState({ overviews: true, details: false });
     const [error, setError] = useState<string | null>(null);
@@ -38,7 +37,7 @@ const MyClassesTab: FunctionComponentWithIcon<MyClassesTabProps> = ({ currentUse
         fetchOverviews();
     }, [fetchOverviews]);
 
-    const handleSelectClass = useCallback(async (classId: string) => {
+    const handleSelectClass = useCallback(async (classId: number) => {
         if (selectedClassId === classId) {
             setSelectedClassId(null);
             setClassDetails(null);
@@ -47,7 +46,6 @@ const MyClassesTab: FunctionComponentWithIcon<MyClassesTabProps> = ({ currentUse
         setSelectedClassId(classId);
         setLoading(prev => ({ ...prev, details: true }));
         setError(null);
-        
         const { data, error } = await supabase.rpc('get_teacher_class_details', { p_class_id: classId });
         if (error) setError(`Failed to fetch class details: ${error.message}`);
         else setClassDetails(data);
@@ -205,7 +203,7 @@ const MaterialsView: React.FC<{details: TeacherClassDetails, onAdd: ()=>void}> =
     );
 };
 
-const AddAssignmentModal: React.FC<{classId: string, subjects: ClassSubject[], onClose:()=>void, onSuccess:()=>void, currentUserId: string}> = ({classId, subjects, onClose, onSuccess, currentUserId}) => {
+const AddAssignmentModal: React.FC<{classId: number, subjects: ClassSubject[], onClose:()=>void, onSuccess:()=>void, currentUserId: string}> = ({classId, subjects, onClose, onSuccess, currentUserId}) => {
     const [title, setTitle] = useState('');
     const [subjectId, setSubjectId] = useState<string>(subjects?.[0]?.id?.toString() || '');
     const [dueDate, setDueDate] = useState('');
@@ -223,7 +221,7 @@ const AddAssignmentModal: React.FC<{classId: string, subjects: ClassSubject[], o
 
         const { error: rpcError } = await supabase.rpc('create_homework_assignment', {
             p_class_id: classId,
-            p_subject_id: subjectId,
+            p_subject_id: parseInt(subjectId),
             p_teacher_id: currentUserId, 
             p_title: title,
             p_description: description,
@@ -269,7 +267,7 @@ const AddAssignmentModal: React.FC<{classId: string, subjects: ClassSubject[], o
     );
 };
 
-const AddMaterialModal: React.FC<{classId: string, subjects: ClassSubject[], onClose:()=>void, onSuccess:()=>void, currentUserId: string}> = ({classId, subjects, onClose, onSuccess, currentUserId}) => {
+const AddMaterialModal: React.FC<{classId: number, subjects: ClassSubject[], onClose:()=>void, onSuccess:()=>void, currentUserId: string}> = ({classId, subjects, onClose, onSuccess, currentUserId}) => {
     const [title, setTitle] = useState('');
     const [subjectId, setSubjectId] = useState<string>(subjects?.[0]?.id?.toString() || '');
     const [description, setDescription] = useState('');
@@ -294,7 +292,7 @@ const AddMaterialModal: React.FC<{classId: string, subjects: ClassSubject[], onC
 
             const { error: rpcError } = await supabase.rpc('teacher_create_study_material', {
                 p_class_id: classId,
-                p_subject_id: subjectId,
+                p_subject_id: parseInt(subjectId),
                 p_title: title,
                 p_description: description,
                 p_file_name: file.name,

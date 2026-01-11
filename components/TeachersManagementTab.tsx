@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase, formatError } from '../services/supabase';
+import { supabase } from '../services/supabase';
 import { TeacherExtended, UserProfile } from '../types';
 import Spinner from './common/Spinner';
 import { TeacherIcon } from './icons/TeacherIcon';
@@ -72,8 +72,7 @@ const getRandomStatus = () => {
 
 interface TeachersManagementTabProps {
     profile: UserProfile;
-    // FIX: Changed branchId from number to string | null to resolve type mismatch with SchoolBranch IDs.
-    branchId: string | null;
+    branchId: number | null;
 }
 
 const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, branchId }) => {
@@ -150,7 +149,22 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
             const matchesBranch = !branchId || t.details?.branch_id === branchId;
             if (!matchesBranch) return false;
             const searchLower = searchTerm.toLowerCase();
-            const matchesSearch = !searchTerm || (t.display_name || '').toLowerCase().includes(searchLower) || (t.email || '').toLowerCase().includes(searchLower) || (t.details?.employee_id && t.details.employee_id.toLowerCase().includes(searchLower)) || (t.phone && t.phone.includes(searchLower)) || (t.details?.subject && t.details.subject.toLowerCase().includes(searchLower)) || (t.details?.department && t.details.department.toLowerCase().includes(searchLower));
+            
+            const displayName = t.display_name || '';
+            const email = t.email || '';
+            const employeeId = t.details?.employee_id || '';
+            const phone = t.phone || '';
+            const subject = t.details?.subject || '';
+            const department = t.details?.department || '';
+
+            const matchesSearch = !searchTerm || 
+                displayName.toLowerCase().includes(searchLower) || 
+                email.toLowerCase().includes(searchLower) || 
+                employeeId.toLowerCase().includes(searchLower) || 
+                phone.includes(searchLower) || 
+                subject.toLowerCase().includes(searchLower) || 
+                department.toLowerCase().includes(searchLower);
+
             let matchesQuickFilter = true;
             if (quickFilter === 'Active') matchesQuickFilter = t.is_active && t.details?.employment_status !== 'Pending Verification';
             if (quickFilter === 'Pending Verification') matchesQuickFilter = t.details?.employment_status === 'Pending Verification';
@@ -197,12 +211,16 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
     const handleSort = (key: string) => setSortConfig(current => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' }));
 
     const handleSelectAll = () => {
-        if (selectedIds.size === paginatedTeachers.length) setSelectedIds(new Set());
-        else {
-            const newSet = new Set(selectedIds);
-            paginatedTeachers.forEach(t => newSet.add(t.id));
-            setSelectedIds(newSet);
+        const pageIds = paginatedTeachers.map(t => t.id);
+        const allOnPageSelected = pageIds.every(id => selectedIds.has(id));
+        
+        const newSet = new Set(selectedIds);
+        if (allOnPageSelected) {
+            pageIds.forEach(id => newSet.delete(id));
+        } else {
+            pageIds.forEach(id => newSet.add(id));
         }
+        setSelectedIds(newSet);
     };
 
     const handleSelectRow = (id: string) => {
@@ -214,7 +232,7 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
 
     const handleExport = () => {
         const dataToExport = selectedIds.size > 0 ? sortedTeachers.filter(t => selectedIds.has(t.id)) : sortedTeachers;
-        const csvContent = "data:text/csv;charset=utf-8,Name,Email,Phone,Employee ID,Department,Designation,Status\n" + dataToExport.map(t => `"${t.display_name}","${t.email}","${t.phone}","${t.details?.employee_id || ''}","${t.details?.department || ''}","${t.details?.designation || ''}","${t.details?.employment_status}"`).join("\n");
+        const csvContent = "data:text/csv;charset=utf-8,Name,Email,Phone,Employee ID,Department,Designation,Status\n" + dataToExport.map(t => `"${t.display_name || ''}","${t.email || ''}","${t.phone || ''}","${t.details?.employee_id || ''}","${t.details?.department || ''}","${t.details?.designation || ''}","${t.details?.employment_status || ''}"`).join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -328,7 +346,7 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                                             <tr key={teacher.id} className={`group hover:bg-muted/30 transition-colors cursor-pointer ${selectedIds.has(teacher.id) ? 'bg-primary/5' : ''}`} onClick={() => setSelectedTeacher(teacher)}>
                                                 <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="rounded border-input text-primary focus:ring-primary cursor-pointer w-4 h-4" checked={selectedIds.has(teacher.id)} onChange={() => handleSelectRow(teacher.id)} /></td>
                                                 <td className="p-4"><div className="flex items-center gap-3"><div className="relative"><div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-sm overflow-hidden border-2 border-background">{teacher.details?.profile_picture_url ? <img src={teacher.details.profile_picture_url} className="w-full h-full object-cover" alt=""/> : (teacher.display_name || '?').charAt(0)}</div><div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${(teacher as any).dailyStatus === 'Present' ? 'bg-green-500' : (teacher as any).dailyStatus === 'Absent' ? 'bg-red-500' : 'bg-amber-500'}`}></div></div><div><p className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">{teacher.display_name}</p><p className="text-[10px] text-muted-foreground uppercase font-bold">{teacher.details?.designation || 'Teacher'}</p></div></div></td>
-                                                <td className="p-4"><div className="flex flex-col gap-1"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><MailIcon className="w-3 h-3"/> <span className="truncate max-w-[150px]" title={teacher.email}>{teacher.email}</span></div>{teacher.phone && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><PhoneIcon className="w-3 h-3"/> {teacher.phone}</div>}</div></td>
+                                                <td className="p-4"><div className="flex flex-col gap-1"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><MailIcon className="w-3 h-3"/> <span className="truncate max-w-[150px]" title={teacher.email || ''}>{teacher.email || ''}</span></div>{teacher.phone && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><PhoneIcon className="w-3 h-3"/> {teacher.phone}</div>}</div></td>
                                                 <td className="p-4 text-xs font-mono font-medium text-muted-foreground">{teacher.details?.employee_id || '—'}</td>
                                                 <td className="p-4">{teacher.details?.department && <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-foreground border border-border">{teacher.details.department}</span>}</td>
                                                 <td className="p-4"><AttendanceBadge status={(teacher as any).dailyStatus} /></td>
@@ -341,7 +359,7 @@ const TeachersManagementTab: React.FC<TeachersManagementTabProps> = ({ profile, 
                             </div>
                         )}
                         <div className="p-4 border-t border-border bg-muted/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-medium text-muted-foreground">
-                            <div className="flex items-center gap-2"><span>Rows per page:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-background border border-input rounded px-2 py-1"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><span className="ml-2">Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedTeachers.length)} of {sortedTeachers.length}</span></div>
+                            <div className="flex items-center gap-2"><span>Rows:</span><select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="bg-background border border-input rounded px-2 py-1"><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><span className="ml-2">Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, sortedTeachers.length)} of {sortedTeachers.length}</span></div>
                             <div className="flex items-center gap-2"><button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 border border-transparent hover:border-border transition-all"><ChevronLeftIcon className="w-4 h-4"/></button><span className="mx-2 font-bold text-foreground">Page {currentPage} of {totalPages}</span><button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-background disabled:opacity-50 border border-transparent hover:border-border transition-all"><ChevronRightIcon className="w-4 h-4"/></button></div>
                         </div>
                     </div>

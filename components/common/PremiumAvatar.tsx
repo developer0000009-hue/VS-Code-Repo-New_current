@@ -21,7 +21,7 @@ const PremiumAvatar: React.FC<PremiumAvatarProps> = ({ src, name, size = 'md', s
             return;
         }
 
-        if (src.startsWith('http')) {
+        if (typeof src === 'string' && src.startsWith('http')) {
             setResolvedUrl(src);
             setImgStatus('loading');
             return;
@@ -44,8 +44,10 @@ const PremiumAvatar: React.FC<PremiumAvatarProps> = ({ src, name, size = 'md', s
     };
 
     const getInitials = (n: string) => {
-        if (!n) return '?';
-        return n.split(' ').map(i => i[0]).slice(0, 2).join('').toUpperCase();
+        if (!n || typeof n !== 'string') return '?';
+        const parts = n.split(' ').filter(Boolean);
+        if (parts.length === 0) return '?';
+        return parts.map(i => i[0]).slice(0, 2).join('').toUpperCase();
     };
 
     const getColorFromHash = (n: string) => {
@@ -56,6 +58,7 @@ const PremiumAvatar: React.FC<PremiumAvatarProps> = ({ src, name, size = 'md', s
             'from-rose-600 to-orange-600',
             'from-cyan-600 to-sky-700'
         ];
+        if (!n || typeof n !== 'string') return colors[0];
         let hash = 0;
         for (let i = 0; i < n.length; i++) {
             hash = n.charCodeAt(i) + ((hash << 5) - hash);
@@ -73,7 +76,7 @@ const PremiumAvatar: React.FC<PremiumAvatarProps> = ({ src, name, size = 'md', s
                 {resolvedUrl && imgStatus !== 'error' && (
                     <img 
                         src={resolvedUrl} 
-                        alt={name}
+                        alt={name || 'Avatar'}
                         onLoad={() => setImgStatus('loaded')}
                         onError={() => setImgStatus('error')}
                         className={`w-full h-full object-cover transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] z-10 ${imgStatus === 'loaded' ? 'opacity-100 scale-100' : 'opacity-0 scale-110'}`}

@@ -202,8 +202,7 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
     const [viewingSyllabusFor, setViewingSyllabusFor] = useState<string | null>(null);
     const [submittingAssignment, setSubmittingAssignment] = useState<StudentAssignment | null>(null);
     const [localStudyMaterials, setLocalStudyMaterials] = useState<StudyMaterial[]>(Array.isArray(data?.studyMaterials) ? data.studyMaterials : []);
-    // FIX: downloadingFileId should be string to match StudyMaterial ID type.
-    const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+    const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
 
     useEffect(() => {
         setLocalStudyMaterials(Array.isArray(data?.studyMaterials) ? data.studyMaterials : []);
@@ -246,8 +245,7 @@ const AcademicsTab: React.FC<AcademicsTabProps> = ({ data, onRefresh, currentUse
         }
     };
 
-    // FIX: Parameter materialId should be string to match StudyMaterial ID type.
-    const handleToggleBookmark = async (materialId: string) => {
+    const handleToggleBookmark = async (materialId: number) => {
         const originalMaterials = [...localStudyMaterials];
         setLocalStudyMaterials(currentMaterials =>
             currentMaterials.map(m =>

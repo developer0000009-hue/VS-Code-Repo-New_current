@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { EnquiryService } from '../services/enquiry';
 import { VerifiedShareCodeData } from '../types';
@@ -7,29 +7,42 @@ import { KeyIcon } from './icons/KeyIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 import { AlertTriangleIcon } from './icons/AlertTriangleIcon';
+import { LockIcon } from './icons/LockIcon';
 import { UsersIcon } from './icons/UsersIcon';
-import { RotateCcwIcon } from './icons/RotateCcwIcon';
+import { XCircleIcon } from './icons/XCircleIcon';
+import { ChevronRightIcon } from './icons/ChevronRightIcon';
+import { ActivityIcon } from './icons/ActivityIcon';
+import { PhoneIcon } from './icons/PhoneIcon';
+
+interface InfoRowProps {
+    label: string;
+    value: string | null | undefined;
+    valueClassName?: string;
+    subLabel?: string;
+}
+
+const TechnicalInfoRow: React.FC<InfoRowProps> = ({ label, value, valueClassName = "text-white font-bold", subLabel }) => (
+    <div className="space-y-1.5 group/row">
+        <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em] group-hover/row:text-primary/60 transition-colors">{label}</p>
+        <div className="flex flex-col">
+            <p className={`text-base md:text-lg leading-tight truncate ${valueClassName}`}>{value || '—'}</p>
+            {subLabel && <p className="text-[9px] text-white/20 uppercase font-bold mt-1 tracking-widest">{subLabel}</p>}
+        </div>
+    </div>
+);
 
 interface CodeVerificationTabProps {
-    branchId?: string | null;
+    branchId?: number | null;
     onNavigate?: (component: string) => void;
 }
 
 const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onNavigate }) => {
     const [code, setCode] = useState('');
     const [verifying, setVerifying] = useState(false);
-    const [processing, setProcessing] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [verificationResult, setVerificationResult] = useState<VerifiedShareCodeData & { id?: string } | null>(null);
-    const [syncSuccess, setSyncSuccess] = useState(false);
-
-    const resetState = () => {
-        setError(null);
-        setVerificationResult(null);
-        setSyncSuccess(false);
-        setVerifying(false);
-        setProcessing(false);
-    };
+    const [verifiedData, setVerifiedData] = useState<VerifiedShareCodeData & { id?: number } | null>(null);
+    const [importSuccess, setImportSuccess] = useState(false);
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,10 +51,10 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
         
         setVerifying(true);
         setError(null);
-        setVerificationResult(null);
+        setVerifiedData(null);
 
         try {
-            // Step 1: Pure Validation RPC
+            // First step: Verify if code exists and retrieve its type and node context
             const { data, error: rpcError } = await supabase.rpc('admin_verify_share_code', { 
                 p_code: cleanCode 
             });
@@ -49,62 +62,64 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
             if (rpcError) throw rpcError;
             
             if (data && data.found) {
-                setVerificationResult(data);
+                setVerifiedData(data);
             } else {
-                setError("Verification Failed: The code entered is invalid, expired, or not found in the institutional registry.");
+                setError(data?.error || "Invalid or expired protocol token.");
             }
         } catch (err: any) {
+            console.error("Identity Handshake Error:", err);
             setError(formatError(err));
         } finally {
             setVerifying(false);
         }
     };
     
-    const handleProcess = async () => {
-        if (!verificationResult) return;
-        setProcessing(true);
+    const handleImport = async () => {
+        if (!verifiedData) return;
+
+        setLoading(true);
         setError(null);
         
         try {
-            // Step 2: Domain-Specific Processing
-            if (verificationResult.code_type === 'Enquiry') {
-                // FIXED: Use admission_id (the reference to the enquiry) instead of .id (the share code id)
-                const result = await EnquiryService.processEnquiryVerification(verificationResult.admission_id, branchId);
+            const branchToLink = branchId === undefined || branchId === null ? null : branchId;
+
+            if (verifiedData.code_type === 'Enquiry') {
+                // Specialized Enquiry Verification & Context Linking
+                const result = await EnquiryService.verifyAndLinkEnquiry(code, branchToLink);
                 if (result.success) {
-                    setSyncSuccess(true);
-                    setTimeout(() => onNavigate?.('Enquiries'), 2000);
+                    setImportSuccess(true);
+                    setTimeout(() => onNavigate?.(result.targetModule), 1500);
                 }
             } else {
-                // Admission Import Flow
+                // Admission Node Integration
                 const { data, error: impError } = await supabase.rpc('admin_import_record_from_share_code', {
-                    p_admission_id: verificationResult.admission_id,
-                    p_code_type: verificationResult.code_type,
-                    p_branch_id: branchId || null,
-                    p_code_id: verificationResult.id
+                    p_admission_id: verifiedData.admission_id,
+                    p_code_type: verifiedData.code_type,
+                    p_branch_id: branchToLink,
+                    p_code_id: verifiedData.id
                 });
-                
                 if (impError) throw impError;
-                setSyncSuccess(true);
-                setTimeout(() => onNavigate?.('Admissions'), 2000);
+                setImportSuccess(true);
+                setTimeout(() => onNavigate?.('Admissions'), 1500);
             }
         } catch (err: any) {
             setError(formatError(err));
         } finally {
-            setProcessing(false);
+            setLoading(false);
         }
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-16 py-12 animate-in fade-in duration-1000 pb-32">
+        <div className="max-w-6xl mx-auto space-y-16 py-12 animate-in fade-in duration-1000">
             <div className="text-center relative">
                 <div className="relative inline-block mb-8">
                     <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full animate-pulse"></div>
-                    <div className="relative w-24 h-24 bg-[#101218] rounded-[2.5rem] border border-white/10 flex items-center justify-center shadow-2xl ring-1 ring-white/5">
+                    <div className="relative w-24 h-24 bg-[#101218] rounded-[2.5rem] border border-white/10 flex items-center justify-center shadow-2xl">
                         <ShieldCheckIcon className="w-12 h-12 text-primary" />
                     </div>
                 </div>
-                <h2 className="text-5xl md:text-7xl font-serif font-black text-white tracking-tighter uppercase mb-4">Access <span className="text-white/20 italic">Verification.</span></h2>
-                <p className="text-white/40 text-lg md:text-xl max-w-2xl mx-auto font-medium italic">Validate identity credentials and synchronize institutional records.</p>
+                <h2 className="text-5xl md:text-7xl font-serif font-black text-white tracking-tighter uppercase mb-4">Quick <span className="text-white/20 italic">Verification.</span></h2>
+                <p className="text-white/40 text-lg md:text-xl max-w-2xl mx-auto font-medium italic">Resolve identity handshakes using secure cryptographic tokens.</p>
             </div>
 
             <div className="max-w-2xl mx-auto px-4">
@@ -114,88 +129,59 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
                     </div>
                     <input
                         type="text"
-                        placeholder="ENTER ACCESS KEY"
+                        placeholder="ENTER PROTOCOL KEY"
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
-                        disabled={verifying || syncSuccess}
+                        disabled={verifying || importSuccess}
                         className="w-full bg-[#0d0f14]/80 backdrop-blur-3xl border-2 border-white/5 rounded-[3rem] pl-20 pr-44 py-8 text-3xl font-mono font-black tracking-[0.4em] focus:ring-[15px] focus:ring-primary/5 focus:border-primary/50 outline-none text-white transition-all shadow-2xl"
                     />
                     <button 
                         type="submit" 
-                        disabled={verifying || !code.trim() || syncSuccess}
+                        disabled={verifying || !code.trim() || importSuccess}
                         className="absolute right-4 top-4 bottom-4 bg-primary text-white font-black px-10 rounded-[2.2rem] shadow-xl hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
                     >
-                        {verifying ? <Spinner size="sm" className="text-white" /> : 'Validate'}
+                        {verifying ? <Spinner size="sm" className="text-white" /> : 'Initialize'}
                     </button>
                 </form>
 
-                <div className="mt-8 min-h-[100px]">
+                <div className="mt-8">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-8 py-6 rounded-[2.5rem] text-sm font-bold flex flex-col gap-4 animate-in shake ring-1 ring-red-500/30 shadow-2xl backdrop-blur-xl">
-                            <div className="flex items-start gap-6">
-                                <div className="p-3.5 bg-red-500/10 rounded-[1.25rem] shrink-0 border border-red-500/20 shadow-inner">
-                                    <AlertTriangleIcon className="w-6 h-6 flex-shrink-0" />
-                                </div>
-                                <div className="space-y-2 py-1 text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Verification Failed</p>
-                                    <p className="leading-relaxed text-red-200/90 font-serif italic text-base">"{error}"</p>
-                                </div>
-                            </div>
-                            <button onClick={resetState} className="self-end flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">
-                                <RotateCcwIcon className="w-3.5 h-3.5"/> Retry Verification
-                            </button>
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-8 py-6 rounded-[2rem] text-sm font-bold flex items-center gap-5 animate-in shake">
+                            <AlertTriangleIcon className="w-6 h-6 flex-shrink-0" />
+                            <span>{error}</span>
                         </div>
                     )}
-                    {syncSuccess && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-8 py-6 rounded-[2rem] text-sm font-bold flex items-center gap-4 animate-in zoom-in-95 backdrop-blur-xl">
-                            <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 shadow-inner">
-                                <CheckCircleIcon className="w-6 h-6" /> 
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Synchronization Complete</p>
-                                <p className="text-base font-serif italic">
-                                    Identity record strictly routed to the <strong className="text-white">{verificationResult?.code_type === 'Enquiry' ? 'Enquiry Desk' : 'Admission Vault'}</strong>. Redirecting...
-                                </p>
-                            </div>
+                    {importSuccess && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-8 py-6 rounded-[2rem] text-sm font-bold flex items-center gap-4 animate-in zoom-in-95">
+                            <CheckCircleIcon className="w-6 h-6" /> 
+                            <span>Node Identity Synchronized. Redirecting to desk...</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            {verificationResult && !error && !syncSuccess && (
-                <div className="bg-[#0c0e14] border border-white/5 rounded-[4rem] p-12 md:p-16 shadow-2xl animate-in slide-in-from-bottom-12 duration-1000 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-12 opacity-[0.02] group-hover:scale-110 transition-transform duration-1000 pointer-events-none">
-                        <UsersIcon className="w-64 h-64 text-white" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 relative z-10">
+            {verifiedData && !error && !importSuccess && (
+                <div className="bg-[#0c0e14] border border-white/5 rounded-[4rem] p-16 shadow-2xl animate-in slide-in-from-bottom-12 duration-1000 ring-1 ring-white/5">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                         <div className="space-y-12">
-                             <div className="space-y-1.5">
-                                <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Verified Identity</p>
-                                <p className="text-4xl md:text-5xl font-serif font-black text-white leading-tight uppercase truncate">{verificationResult.applicant_name}</p>
-                            </div>
+                            <TechnicalInfoRow label="Subject Identity" value={verifiedData.applicant_name} valueClassName="text-4xl font-serif font-black text-white" />
                             <div className="grid grid-cols-2 gap-8">
-                                <div className="space-y-1.5">
-                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Academic Level</p>
-                                    <p className="text-xl font-bold text-white">Grade {verificationResult.grade}</p>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Verification Domain</p>
-                                    <p className="text-xl font-black text-primary uppercase tracking-widest">{verificationResult.code_type}</p>
-                                </div>
+                                <TechnicalInfoRow label="Grade Level" value={`Grade ${verifiedData.grade}`} />
+                                <TechnicalInfoRow label="Token Type" value={verifiedData.code_type} valueClassName="text-primary font-black uppercase" />
                             </div>
                         </div>
-                        <div className="flex flex-col justify-center gap-6">
-                             <div className="bg-white/[0.03] border border-white/5 p-6 rounded-2xl mb-2">
-                                 <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Strict Routing Instruction</p>
-                                 <p className="text-sm text-white/60 font-serif italic">
-                                     This record is categorized as an <strong className="text-white">{verificationResult.code_type}</strong> node. 
-                                     Processing will route it to the <strong className="text-primary">{verificationResult.code_type === 'Enquiry' ? 'Enquiry Desk' : 'Admission Vault'}</strong>.
-                                 </p>
-                             </div>
-                             <button onClick={handleProcess} disabled={processing} className="w-full py-7 bg-primary hover:bg-primary/90 text-white font-black text-xs uppercase tracking-[0.4em] rounded-[2.2rem] shadow-2xl transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 ring-4 ring-primary/10">
-                                 {processing ? <Spinner size="sm" className="text-white"/> : `UPLINK AS ${verificationResult.code_type.toUpperCase()}`}
+                        <div className="flex flex-col justify-center">
+                             <button onClick={handleImport} disabled={loading} className="w-full py-6 bg-primary hover:bg-primary/90 text-white font-black text-sm uppercase tracking-[0.4em] rounded-[2rem] shadow-2xl shadow-primary/20 transition-all transform active:scale-95 group">
+                                 {loading ? <Spinner size="sm" className="text-white"/> : (
+                                    <div className="flex items-center justify-center gap-4">
+                                        <span>Synchronize as {verifiedData.code_type}</span>
+                                        <ChevronRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                    </div>
+                                 )}
                              </button>
+                             <p className="text-[10px] text-white/20 text-center mt-6 font-bold uppercase tracking-widest leading-relaxed">
+                                Proceeding will bind this identity node to your current branch context.
+                             </p>
                         </div>
                     </div>
                 </div>

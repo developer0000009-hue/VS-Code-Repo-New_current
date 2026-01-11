@@ -9,13 +9,13 @@ import { TeacherIcon } from './icons/TeacherIcon';
 import { TransportIcon } from './icons/TransportIcon';
 import { CartIcon } from './icons/CartIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
-// Fix: Added missing import for MegaphoneIcon
 import { MegaphoneIcon } from './icons/MegaphoneIcon';
 
 // --- ICONS ---
 const SendIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <line x1="22" y1="2" x2="11" y2="13"></line>
+        {/* FIX: Consolidated individual coordinate props into the points attribute to resolve "Property x3 does not exist" and other SVG polygon assignment errors. */}
         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
     </svg>
 );
@@ -209,8 +209,8 @@ const CommunicationTab: React.FC<CommunicationTabProps> = ({ profile }) => {
                             <div className="flex justify-between items-center">
                                 <label className="text-sm font-semibold text-foreground">Recipients</label>
                                 <div className="flex bg-muted p-0.5 rounded-lg">
-                                    <button type="button" onClick={() => setTargetType('roles')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${targetType === 'roles' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Role</button>
-                                    <button type="button" onClick={() => setTargetType('class')} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${targetType === 'class' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Class</button>
+                                    <button type="button" onClick={() => setTargetType('roles')} className={`px-3 px-1 text-xs font-medium rounded-md transition-all ${targetType === 'roles' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Role</button>
+                                    <button type="button" onClick={() => setTargetType('class')} className={`px-3 px-1 text-xs font-medium rounded-md transition-all ${targetType === 'class' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>By Class</button>
                                 </div>
                             </div>
 
@@ -334,8 +334,9 @@ const CommunicationTab: React.FC<CommunicationTabProps> = ({ profile }) => {
                     ) : (
                         history.map((msg) => {
                              const isClassTarget = msg.target_criteria && msg.target_criteria.type === 'class';
-                             const PrimaryRole = !isClassTarget && msg.recipients?.[0] ? msg.recipients[0] : 'default';
+                             const PrimaryRole = !isClassTarget && (msg.recipients && Array.isArray(msg.recipients) && msg.recipients[0]) ? msg.recipients[0] : 'default';
                              const IconComp = ROLE_ICONS_MAP[PrimaryRole] || ROLE_ICONS_MAP['default'];
+                             const recipients = msg.recipients || [];
                              
                              return (
                                 <div key={msg.id} className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow group relative animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -363,11 +364,11 @@ const CommunicationTab: React.FC<CommunicationTabProps> = ({ profile }) => {
                                                             {msg.target_criteria.label ? `Class ${msg.target_criteria.label}` : `Class ID: ${msg.target_criteria.value}`}
                                                         </span>
                                                     ) : (
-                                                        msg.recipients.slice(0, 3).map(r => (
+                                                        recipients.slice(0, 3).map(r => (
                                                             <span key={r} className="bg-muted px-2 py-0.5 rounded border border-border/50">{r}</span>
                                                         ))
                                                     )}
-                                                    {!isClassTarget && msg.recipients.length > 3 && <span>+{msg.recipients.length - 3} more</span>}
+                                                    {!isClassTarget && recipients.length > 3 && <span>+{recipients.length - 3} more</span>}
                                                 </div>
                                                 <div className="flex items-center text-xs text-muted-foreground font-medium">
                                                     <ClockIcon className="w-3.5 h-3.5 mr-1" />

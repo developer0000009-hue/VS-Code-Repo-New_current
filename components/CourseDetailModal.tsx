@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { Course, CourseModule } from '../types';
@@ -51,8 +52,7 @@ const CourseDetailModal: React.FC<CourseDetailModalProps> = ({ course, onClose }
         }
     };
 
-    // FIX: Parameter id should be string to match CourseModule ID type
-    const handleDeleteModule = async (id: string) => {
+    const handleDeleteModule = async (id: number) => {
         if (!confirm('Delete this module?')) return;
         await supabase.from('course_modules').delete().eq('id', id);
         fetchDetails();

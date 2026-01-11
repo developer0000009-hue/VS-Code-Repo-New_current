@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { supabase, formatError } from '../services/supabase';
+import { supabase } from '../services/supabase';
 import { UserProfile, Role } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import Spinner from './common/Spinner';
@@ -54,14 +53,14 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
                 const [std, tea, fin, adm] = await Promise.all([
                     supabase.from('student_profiles').select('*', { count: 'exact', head: true }),
                     supabase.from('teacher_profiles').select('*', { count: 'exact', head: true }),
-                    supabase.rpc('get_finance_dashboard_data').catch(() => ({ data: { revenue_ytd: 0 } })),
+                    supabase.rpc('get_finance_dashboard_data'),
                     supabase.from('admissions').select('*', { count: 'exact', head: true }).eq('status', 'Pending Review')
                 ]);
                 
                 const statsObj = {
                     students: std.count || 0,
                     teachers: tea.count || 0,
-                    revenue: (fin as any).data?.revenue_ytd || 0,
+                    revenue: fin.data?.revenue_ytd || 0,
                     applications: adm.count || 0
                 };
                 setStats(statsObj);
@@ -73,7 +72,7 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
                 });
                 setAiInsight(response.text || null);
             } catch (e) {
-                console.error("Metric sync failed:", formatError(e));
+                console.error("Metric sync failed:", e);
             } finally {
                 setLoading(false);
             }

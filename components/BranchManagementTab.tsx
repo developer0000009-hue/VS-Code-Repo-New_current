@@ -45,7 +45,7 @@ const BranchCard: React.FC<{
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!invitation) return;
-        // Fix: Use navigator.clipboard
+        // Fix: Use navigator.clipboard instead of undefined 'labels'
         navigator.clipboard.writeText(invitation.code);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -194,13 +194,13 @@ interface BranchManagementTabProps {
     isLoading: boolean;
     error: string | null;
     onBranchUpdate: (updatedBranch?: SchoolBranch, isDelete?: boolean) => void;
-    onSelectBranch: (id: string) => void;
+    onSelectBranch: (id: number) => void;
     schoolProfile: SchoolAdminProfileData | null;
 }
 
 export const BranchManagementTab: React.FC<BranchManagementTabProps> = ({ isHeadOfficeAdmin, branches, onBranchUpdate, schoolProfile }) => {
-    const [invitations, setInvitations] = useState<Record<string, BranchInvitation>>({});
-    const [generatingMap, setGeneratingMap] = useState<Record<string, boolean>>({});
+    const [invitations, setInvitations] = useState<Record<number, BranchInvitation>>({});
+    const [generatingMap, setGeneratingMap] = useState<Record<number, boolean>>({});
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [branchToEdit, setBranchToEdit] = useState<SchoolBranch | null>(null);
     const [branchToDelete, setBranchToDelete] = useState<SchoolBranch | null>(null);
@@ -214,7 +214,7 @@ export const BranchManagementTab: React.FC<BranchManagementTabProps> = ({ isHead
             .is('redeemed_at', null);
         
         if (!error && data) {
-            const map: Record<string, BranchInvitation> = {};
+            const map: Record<number, BranchInvitation> = {};
             data.forEach(inv => map[inv.branch_id] = inv);
             setInvitations(map);
         }
@@ -224,7 +224,7 @@ export const BranchManagementTab: React.FC<BranchManagementTabProps> = ({ isHead
         fetchInvitations(); 
     }, [fetchInvitations, branches]);
 
-    const handleGenerateKey = async (branchId: string) => {
+    const handleGenerateKey = async (branchId: number) => {
         setGeneratingMap(prev => ({ ...prev, [branchId]: true }));
         try {
             const { data, error } = await supabase.rpc('generate_branch_access_key', { 
@@ -246,7 +246,7 @@ export const BranchManagementTab: React.FC<BranchManagementTabProps> = ({ isHead
         }
     };
 
-    const handleRevokeKey = async (branchId: string) => {
+    const handleRevokeKey = async (branchId: number) => {
         try {
             const { error } = await supabase.rpc('revoke_branch_access_key', { p_branch_id: branchId });
             if (error) throw error;

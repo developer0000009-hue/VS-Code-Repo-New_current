@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { SchoolClass, StudentRosterItem, AttendanceRecord, AttendanceStatus, FunctionComponentWithIcon } from '../../types';
@@ -55,8 +54,8 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
             setUpdatedAttendance({});
             
             const [rosterRes, attendanceRes] = await Promise.all([
-                supabase.rpc('get_class_roster', { p_class_id: selectedClassId }),
-                supabase.rpc('get_attendance', { p_class_id: selectedClassId, p_attendance_date: selectedDate })
+                supabase.rpc('get_class_roster', { p_class_id: parseInt(selectedClassId) }),
+                supabase.rpc('get_attendance', { p_class_id: parseInt(selectedClassId), p_attendance_date: selectedDate })
             ]);
 
             if (rosterRes.error) setError(`Failed to fetch roster: ${rosterRes.error.message}`);
@@ -104,7 +103,7 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
             const originalNotes = originalRecord?.notes ?? '';
 
             return {
-                class_id: selectedClassId,
+                class_id: parseInt(selectedClassId),
                 student_id,
                 attendance_date: selectedDate,
                 status: changes.status ?? originalStatus,
@@ -122,7 +121,7 @@ const AttendanceTab: FunctionComponentWithIcon<{}> = () => {
             alert(`Failed to save changes: ${error.message}`);
         } else {
             setUpdatedAttendance({});
-            const { data } = await supabase.rpc('get_attendance', { p_class_id: selectedClassId, p_attendance_date: selectedDate });
+            const { data } = await supabase.rpc('get_attendance', { p_class_id: parseInt(selectedClassId), p_attendance_date: selectedDate });
             if (data) setAttendance(data);
         }
         setIsSaving(false);

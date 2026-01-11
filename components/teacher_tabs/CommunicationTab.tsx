@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../services/supabase';
 import { useRoles } from '../../contexts/RoleContext';
@@ -323,8 +322,9 @@ const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = (
                     ) : (
                         history.map((msg) => {
                              const isClassTarget = msg.target_criteria && msg.target_criteria.type === 'class';
-                             const PrimaryRole = !isClassTarget && msg.recipients?.[0] ? msg.recipients[0] : 'default';
+                             const PrimaryRole = !isClassTarget && (msg.recipients && Array.isArray(msg.recipients) && msg.recipients[0]) ? msg.recipients[0] : 'default';
                              const IconComp = ROLE_ICONS_MAP[PrimaryRole] || ROLE_ICONS_MAP['default'];
+                             const recipients = msg.recipients || [];
                              
                              return (
                                 <div key={msg.id} className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow group relative animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -352,11 +352,11 @@ const CommunicationTab: FunctionComponentWithIcon<{ currentUserId: string }> = (
                                                             {msg.target_criteria.label ? `Class ${msg.target_criteria.label}` : `Class ID: ${msg.target_criteria.value}`}
                                                         </span>
                                                     ) : (
-                                                        msg.recipients.slice(0, 3).map(r => (
+                                                        recipients.slice(0, 3).map(r => (
                                                             <span key={r} className="bg-muted px-2 py-0.5 rounded border border-border/50">{r}</span>
                                                         ))
                                                     )}
-                                                    {!isClassTarget && msg.recipients.length > 3 && <span>+{msg.recipients.length - 3} more</span>}
+                                                    {!isClassTarget && recipients.length > 3 && <span>+{recipients.length - 3} more</span>}
                                                 </div>
                                                 <div className="flex items-center text-xs text-muted-foreground font-medium">
                                                     <ClockIcon className="w-3.5 h-3.5 mr-1" />

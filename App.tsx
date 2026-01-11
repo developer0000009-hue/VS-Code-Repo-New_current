@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, STORAGE_KEY, formatError } from './services/supabase';
 import { UserProfile, BuiltInRoles, Role } from './types';
 import AuthPage from './components/AuthPage';
@@ -16,7 +15,7 @@ import NotFound from './components/common/NotFound';
 const App: React.FC = () => {
     const [session, setSession] = useState<any | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState<boolean>(true);
     const [onboardingStep, setOnboardingStep] = useState<string | null>(null);
     
     const navigate = useNavigate();
@@ -27,51 +26,60 @@ const App: React.FC = () => {
         isFetching.current = true;
         
         try {
+            // Identity Handshake: Verify core registry exists
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', currentSession.user.id)
                 .maybeSingle();
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                const errorStr = formatError(profileError);
+                if (errorStr.toLowerCase().includes('permission denied')) {
+                    throw new Error("Identity Lock: Database permissions rejected. Deployment of Version 19.13.0 required in SQL Editor.");
+                }
+                throw profileError;
+            }
 
             if (!profileData) {
-                // Fallback for race condition: create profile from metadata if trigger hasn't finished
+                // Initialize missing profile using identity metadata
                 const metadata = currentSession.user.user_metadata || {};
-                const { data: newProfile, error: upsertError } = await supabase
-                    .from('profiles')
-                    .upsert({
-                        id: currentSession.user.id,
-                        email: currentSession.user.email,
-                        display_name: metadata.display_name || 'Identity Node',
-                        phone: metadata.phone || currentSession.user.phone || null,
-                        role: null,
-                        is_active: true,
-                        profile_completed: false
-                    }, { onConflict: 'id' })
-                    .select()
-                    .maybeSingle();
+                const { data: newProfile, error: insertError } = await supabase.from('profiles').upsert({
+                    id: currentSession.user.id,
+                    email: currentSession.user.email,
+                    display_name: metadata.display_name || 'Anonymous Node',
+                    role: metadata.role || null,
+                    is_active: true,
+                    profile_completed: false
+                }).select().maybeSingle();
                 
-                if (upsertError) throw upsertError;
+                if (insertError) {
+                    const insErrStr = formatError(insertError);
+                    if (insErrStr.toLowerCase().includes('permission denied')) {
+                        throw new Error("Handshake Protocol Failure: Access Denied to Registry. Please execute Migration 19.13.0 in Supabase SQL Editor.");
+                    }
+                    throw insertError;
+                }
                 setProfile(newProfile as UserProfile);
             } else {
                 setProfile(profileData as UserProfile);
                 
-                // Fetch admin onboarding state if applicable
+                // Track administrative onboarding lifecycle
                 if (profileData.role === BuiltInRoles.SCHOOL_ADMINISTRATION) {
-                    const { data: adminProfile, error: adminError } = await supabase
+                    const { data: adminProfile } = await supabase
                         .from('school_admin_profiles')
                         .select('onboarding_step')
                         .eq('user_id', profileData.id)
                         .maybeSingle();
-                    
-                    if (!adminError) {
-                        setOnboardingStep(adminProfile?.onboarding_step || 'profile');
-                    }
+                    setOnboardingStep(adminProfile?.onboarding_step || 'profile');
                 }
             }
         } catch (e) {
             console.error("CRITICAL: Identity Sync Protocol failure.", formatError(e));
+            const errMessage = formatError(e);
+            if (errMessage.includes("Version 19.13.0")) {
+                alert(errMessage);
+            }
         } finally {
             isFetching.current = false;
             setLoading(false);
@@ -85,11 +93,10 @@ const App: React.FC = () => {
             else setLoading(false);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
             setSession(currentSession);
-            if (currentSession) {
-                loadUserData(currentSession, true);
-            } else {
+            if (currentSession) loadUserData(currentSession, true);
+            else {
                 setProfile(null);
                 setLoading(false);
             }
@@ -102,15 +109,17 @@ const App: React.FC = () => {
         if (session) await loadUserData(session, true);
     };
 
-    const handleRoleSelect = async (role: Role) => {
+    const handleRoleSelect = async (role: Role, isExisting?: boolean) => {
         setLoading(true);
         try {
+            // Contextual Switch: Transition the active identity node
             const { error } = await supabase.rpc('switch_active_role', { p_target_role: role });
             if (error) throw error;
+
             if (session) await loadUserData(session, true);
             navigate('/', { replace: true });
         } catch (err: any) {
-            console.error("Role Switch Protocol failed:", formatError(err));
+            console.error("Role Switch Protocol failed:", err);
             alert(formatError(err));
             setLoading(false);
         }
@@ -128,7 +137,7 @@ const App: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0c] text-center p-6">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#08090a] text-center p-6">
                 <Spinner size="lg" />
                 <p className="mt-4 text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-pulse">Establishing Identity Stream</p>
             </div>
@@ -137,7 +146,7 @@ const App: React.FC = () => {
 
     if (!session || !profile) return <AuthPage />;
 
-    // Force onboarding if role is missing or profile incomplete
+    // Force Onboarding if profile is incomplete
     if (!profile.role || (!profile.profile_completed && profile.role !== BuiltInRoles.SUPER_ADMIN)) {
         return (
             <OnboardingFlow 
@@ -167,7 +176,7 @@ const App: React.FC = () => {
             case BuiltInRoles.TEACHER:
                 return <TeacherDashboard profile={profile} onSignOut={handleSignOut} onProfileUpdate={handleOnboardingComplete} onSelectRole={handleRoleSelect} onSwitchRole={() => handleRoleSelect(null as any)} />;
             default:
-                return <div className="p-20 text-center font-serif italic text-white/40">Identity Mismatch: Role {profile.role} is not mapped to a telemetry dashboard.</div>;
+                return <div className="p-20 text-center">Identity Mismatch: Role {profile.role} is not mapped to a telemetry dashboard.</div>;
         }
     };
 

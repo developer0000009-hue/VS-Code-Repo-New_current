@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { Workshop, TeacherProfessionalDevelopmentData, FunctionComponentWithIcon } from '../../types';
@@ -13,8 +14,7 @@ const ProfessionalDevelopmentTab: FunctionComponentWithIcon<ProfessionalDevelopm
     const [pdData, setPdData] = useState<TeacherProfessionalDevelopmentData | null>(null);
     const [loading, setLoading] = useState({ workshops: true, pd: true });
     const [error, setError] = useState<string | null>(null);
-    // FIX: enrollingId should be string to match Workshop ID type in types.ts
-    const [enrollingId, setEnrollingId] = useState<string | null>(null);
+    const [enrollingId, setEnrollingId] = useState<number | null>(null);
 
     const fetchData = useCallback(async () => {
         setLoading({ workshops: true, pd: true });
@@ -38,8 +38,7 @@ const ProfessionalDevelopmentTab: FunctionComponentWithIcon<ProfessionalDevelopm
         fetchData();
     }, [fetchData]);
 
-    // FIX: Parameter workshopId should be string to match Workshop ID type
-    const handleEnroll = async (workshopId: string) => {
+    const handleEnroll = async (workshopId: number) => {
         setEnrollingId(workshopId);
         const { error } = await supabase.rpc('enroll_in_workshop', { p_workshop_id: workshopId, p_teacher_id: currentUserId });
         if (error) alert(`Enrollment failed: ${error.message}`);

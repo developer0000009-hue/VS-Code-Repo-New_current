@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase, formatError } from '../services/supabase';
+import { supabase } from '../services/supabase';
 import { SchoolClass, Course, UserProfile, SchoolAdminProfileData } from '../types';
 import Spinner from './common/Spinner';
 import { ClassIcon } from './icons/ClassIcon';
@@ -22,19 +23,19 @@ import { ChevronRightIcon } from './icons/ChevronRightIcon';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
 import BulkClassOperationsModal from './classes/BulkClassOperationsModal';
 import { SparklesIcon } from './icons/SparklesIcon';
-import { GridIcon } from './icons/GridIcon';
 import { GoogleGenAI } from '@google/genai';
 import CreateClassWizard from './classes/CreateClassWizard';
 import ClassWorkspace from './classes/ClassWorkspace';
 
 // --- Types ---
 
+// Fix: Redefined ExtendedClass to clearly include all properties needed for table display and sorting.
 interface ExtendedClass extends SchoolClass {
-    id: string;
+    id: number;
     name: string;
     grade_level: string;
     capacity: number;
-    class_teacher_id?: string | null; 
+    class_teacher_id?: string | null; // Fix: Explicitly included for 'No Teacher' filtering
     teacher_name?: string;
     student_count?: number;
     created_at?: string;
@@ -44,7 +45,7 @@ type QuickFilterType = 'All' | 'No Teacher' | 'No Students' | 'Overloaded' | 'Ne
 type ClassStatus = 'Active' | 'Pending Setup' | 'Inactive' | 'Draft' | 'Overloaded';
 
 interface ClassesTabProps {
-    branchId?: string | null;
+    branchId?: number | null;
 }
 
 // --- Local Components ---
@@ -97,11 +98,11 @@ const KPICard: React.FC<{
 
 const StatusBadge: React.FC<{ status: ClassStatus | string }> = ({ status }) => {
     const styles: Record<string, string> = {
-        'Active': 'bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-400 dark:border-emerald-800',
-        'Pending Setup': 'bg-amber-500/10 text-amber-700 border-amber-200 dark:bg-amber-400 dark:border-amber-800',
-        'Inactive': 'bg-red-500/10 text-red-700 border-red-200 dark:bg-red-400 dark:border-red-800',
-        'Draft': 'bg-purple-500/10 text-purple-700 border-purple-200 dark:bg-purple-400 dark:border-purple-800',
-        'Overloaded': 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-400 dark:border-blue-800',
+        'Active': 'bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800',
+        'Pending Setup': 'bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-400 dark:border-amber-800',
+        'Inactive': 'bg-red-500/10 text-red-700 border-red-200 dark:text-red-400 dark:border-red-800',
+        'Draft': 'bg-purple-500/10 text-purple-700 border-purple-200 dark:text-purple-400 dark:border-purple-800',
+        'Overloaded': 'bg-blue-500/10 text-blue-700 border-blue-200 dark:text-blue-400 dark:border-blue-800',
     };
     const dotColors: Record<string, string> = {
         'Active': 'bg-emerald-500',
@@ -135,13 +136,14 @@ const ClassroomAIModal: React.FC<{ classes: ExtendedClass[]; onClose: () => void
              });
         }
         setAiResponse(null);
-    }, [activeTab, teachers.length]);
+    }, [activeTab]);
 
     const runAnalysis = async () => {
         setLoading(true);
         setAiResponse(null);
         
         try {
+            if (!process.env.API_KEY) throw new Error("AI Key Missing");
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
             let prompt = "";
@@ -167,8 +169,8 @@ const ClassroomAIModal: React.FC<{ classes: ExtendedClass[]; onClose: () => void
                     Provide a rationale for each suggestion.
                 `;
             } else {
-                const totalStudents = classes.slice(0, 100).reduce((acc, c) => acc + (c.student_count || 0), 0);
-                const totalCapacity = classes.slice(0, 100).reduce((acc, c) => acc + (c.capacity || 30), 0);
+                const totalStudents = classes.reduce((acc, c) => acc + (c.student_count || 0), 0);
+                const totalCapacity = classes.reduce((acc, c) => acc + (c.capacity || 30), 0);
                 prompt = `
                     School Data: Total Students: ${totalStudents}, Total Capacity: ${totalCapacity}, Class Count: ${classes.length}.
                     Analyze the capacity utilization. Are we approaching limits? 
@@ -185,7 +187,7 @@ const ClassroomAIModal: React.FC<{ classes: ExtendedClass[]; onClose: () => void
             setAiResponse(response.text || "No response generated.");
 
         } catch (err: any) {
-            setAiResponse("AI Analysis Unavailable: " + formatError(err));
+            setAiResponse("AI Analysis Unavailable: " + (err.message || String(err)));
         } finally {
             setLoading(false);
         }
@@ -306,8 +308,8 @@ const ClassesTab: React.FC<ClassesTabProps> = ({ branchId }) => {
             const { data: schoolData } = await supabase.from('school_admin_profiles').select('*').limit(1).single();
             if(schoolData) setSchoolProfile(schoolData as SchoolAdminProfileData);
 
-        } catch (error: any) {
-            console.error("Classes fetch failed:", formatError(error));
+        } catch (error) {
+            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -363,116 +365,201 @@ const ClassesTab: React.FC<ClassesTabProps> = ({ branchId }) => {
                     <h1 className="text-3xl font-serif font-bold text-foreground tracking-tight">Classes & Grades</h1>
                     <p className="text-muted-foreground mt-2 text-lg">Manage academic structure, sections, and teacher assignments.</p>
                 </div>
+                
                 <div className="flex gap-3">
-                    <button onClick={() => setIsAIModalOpen(true)} className="px-5 py-3 bg-violet-100 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300 font-bold rounded-xl border border-violet-200 dark:border-violet-800 transition-all flex items-center gap-2 shadow-sm hover:shadow-md">
-                        <SparklesIcon className="w-4 h-4" /> AI Optimize
+                     <button 
+                        onClick={() => setIsAIModalOpen(true)}
+                        className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:scale-95"
+                    >
+                        <SparklesIcon className="w-5 h-5 text-white animate-pulse"/> AI Assistant
                     </button>
-                    <button onClick={() => setIsBulkModalOpen(true)} className="px-5 py-3 bg-card hover:bg-muted text-foreground font-bold rounded-xl border border-border/60 transition-all flex items-center gap-2 shadow-sm">
-                        <UploadIcon className="w-4 h-4" /> Bulk Mapping
+                     <button 
+                        onClick={() => setIsBulkModalOpen(true)}
+                        className="px-5 py-3 bg-card hover:bg-muted text-foreground font-bold rounded-xl border border-border/60 transition-all flex items-center gap-2 shadow-sm hover:shadow-md"
+                    >
+                        <UploadIcon className="w-5 h-5 text-muted-foreground"/> Bulk Operations
                     </button>
-                    <button onClick={() => setIsCreateModalOpen(true)} className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2 transform hover:-translate-y-0.5 active:scale-95">
-                        <PlusIcon className="w-5 h-5" /> New Class
+                    <button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:shadow-primary/30 transition-all flex items-center gap-2 transform hover:-translate-y-0.5 active:scale-95"
+                    >
+                        <PlusIcon className="w-5 h-5"/> Create New Class
                     </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <KPICard title="Total Classes" value={stats.total} icon={<ClassIcon className="w-6 h-6"/>} color="bg-blue-500" trend="+2" />
-                <KPICard title="Students Enrolled" value={stats.students} icon={<UsersIcon className="w-6 h-6"/>} color="bg-emerald-500" />
-                <KPICard title="Unique Sections" value={stats.sections} icon={<GridIcon className="w-6 h-6"/>} color="bg-purple-500" />
-                <KPICard title="Unassigned Units" value={stats.unassigned} icon={<AlertTriangleIcon className="w-6 h-6"/>} color="bg-amber-500" trend={stats.unassigned > 0 ? "Action Required" : "Stable"} />
+                <KPICard title="Total Grades" value={12} icon={<ClassIcon className="w-6 h-6"/>} color="bg-blue-500" active={false}/>
+                <KPICard title="Total Classes" value={stats.total} icon={<UsersIcon className="w-6 h-6"/>} color="bg-emerald-500" />
+                <KPICard title="Students Assigned" value={stats.students} icon={<CheckCircleIcon className="w-6 h-6"/>} color="bg-indigo-500" />
+                <KPICard title="Unassigned Classes" value={stats.unassigned} icon={<AlertTriangleIcon className="w-6 h-6"/>} color="bg-amber-500" trend={stats.unassigned > 0 ? 'Action Needed' : undefined} onClick={() => setQuickFilter('No Teacher')} active={quickFilter === 'No Teacher'} />
             </div>
-
-            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[600px]">
-                <div className="p-4 border-b border-border bg-muted/5 flex flex-col lg:flex-row gap-4 justify-between items-center sticky top-0 z-20 backdrop-blur-md">
-                    <div className="relative w-full lg:w-96 group">
-                        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors"/>
-                        <input type="text" placeholder="Search class or teacher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-input bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm" />
+            
+            {filteredClasses.some(c => (c.student_count || 0) > (c.capacity || 30)) && (
+                <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between animate-in slide-in-from-top-2 shadow-sm">
+                    <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
+                        <div className="p-2 bg-red-500/10 rounded-lg"><AlertTriangleIcon className="w-5 h-5"/></div>
+                        <span className="font-bold text-sm">Capacity Alert: Some classes are overfilled. Use AI Assistant to rebalance distribution.</span>
                     </div>
-                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide w-full lg:w-auto p-1">
-                        {(['All', 'No Teacher', 'No Students', 'Overloaded', 'Full'] as QuickFilterType[]).map(f => (
-                            <button key={f} onClick={() => setQuickFilter(f)} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${quickFilter === f ? 'bg-primary/10 text-primary border-primary/20 shadow-sm' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50 hover:text-foreground'}`}>
-                                {f}
-                            </button>
-                        ))}
+                    <button onClick={() => setIsAIModalOpen(true)} className="text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 px-4 py-2 rounded-xl transition-colors">Optimize Now</button>
+                </div>
+            )}
+
+            <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col min-h-[600px] ring-1 ring-black/5">
+                <div className="p-5 border-b border-border bg-muted/5 backdrop-blur-md flex flex-col md:flex-row gap-4 justify-between items-center sticky top-0 z-20">
+                    <div className="relative w-full md:max-w-md group">
+                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <input 
+                            type="text" 
+                            placeholder="Search class, teacher..." 
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-11 pr-4 py-3 rounded-xl border border-input/50 bg-background/50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                        />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide w-full md:w-auto p-1">
+                         {(['All', 'No Teacher', 'No Students', 'Overloaded', 'New'] as QuickFilterType[]).map(f => (
+                             <button 
+                                key={f}
+                                onClick={() => setQuickFilter(f)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${quickFilter === f ? 'bg-primary/10 text-primary border-primary/20 shadow-sm' : 'bg-transparent text-muted-foreground border-transparent hover:bg-muted/50 hover:text-foreground'}`}
+                             >
+                                 {f}
+                             </button>
+                         ))}
+                         <button className="p-2.5 bg-muted/30 border border-border/50 rounded-xl text-muted-foreground hover:text-foreground transition-colors hover:bg-muted"><FilterIcon className="w-4 h-4"/></button>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm whitespace-nowrap">
-                        <thead className="bg-muted/30 border-b border-border text-xs font-black text-muted-foreground uppercase tracking-wider">
-                            <tr>
-                                <th className="p-5 pl-8 cursor-pointer hover:text-foreground group" onClick={() => handleSort('name')}>
-                                    Class Identity <SortIcon direction={sortConfig.key === 'name' ? sortConfig.direction : null} />
-                                </th>
-                                <th className="p-5">Grade</th>
-                                <th className="p-5">Teacher Assignment</th>
-                                <th className="p-5">Enrolment</th>
-                                <th className="p-5">Status</th>
-                                <th className="p-5 text-right pr-8">Manage</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
-                            {loading ? (
-                                <tr><td colSpan={6} className="p-20 text-center"><Spinner size="lg" className="text-primary"/></td></tr>
-                            ) : filteredClasses.length === 0 ? (
-                                <tr><td colSpan={6} className="p-20 text-center text-muted-foreground italic font-medium">No classes identified matching the current filter node.</td></tr>
-                            ) : filteredClasses.map(cls => (
-                                <tr key={cls.id} className="group hover:bg-muted/20 transition-all cursor-pointer" onClick={() => setSelectedClass(cls)}>
-                                    <td className="p-5 pl-8">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-2.5 bg-muted rounded-xl text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-all border border-transparent group-hover:border-primary/20 shadow-inner">
-                                                <ClassIcon className="w-5 h-5"/>
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">{cls.name}</p>
-                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{cls.academic_year}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="p-5">
-                                        <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-[10px] font-bold uppercase border border-blue-100 dark:border-blue-800">Grade {cls.grade_level}</span>
-                                    </td>
-                                    <td className="p-5">
-                                        {cls.teacher_name ? (
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">{cls.teacher_name.charAt(0)}</div>
-                                                <span className="font-medium text-foreground/80">{cls.teacher_name}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded border border-amber-200 dark:border-amber-800 animate-pulse">Unassigned</span>
-                                        )}
-                                    </td>
-                                    <td className="p-5">
-                                        <div className="w-32">
-                                            <div className="flex justify-between items-center mb-1.5">
-                                                <span className="text-[10px] font-bold text-muted-foreground">{cls.student_count || 0} / {cls.capacity || 30}</span>
-                                                <span className="text-[9px] font-black text-muted-foreground">{Math.round(((cls.student_count || 0) / (cls.capacity || 30)) * 100)}%</span>
-                                            </div>
-                                            <div className="h-1 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                                                <div className={`h-full rounded-full transition-all duration-1000 ${(cls.student_count || 0) > (cls.capacity || 30) ? 'bg-red-500' : 'bg-primary'}`} style={{ width: `${Math.min(((cls.student_count || 0) / (cls.capacity || 30)) * 100, 100)}%` }}></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="p-5">
-                                        <StatusBadge status={getStatus(cls)} />
-                                    </td>
-                                    <td className="p-5 text-right pr-8">
-                                        <button className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><MoreHorizontalIcon className="w-5 h-5"/></button>
-                                    </td>
+                <div className="flex-grow overflow-x-auto custom-scrollbar">
+                    {loading ? (
+                        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                            <Spinner size="lg"/>
+                            <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading academic structure...</p>
+                        </div>
+                    ) : filteredClasses.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center p-8">
+                            <div className="w-20 h-20 bg-muted/30 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-border">
+                                <ClassIcon className="w-10 h-10 text-muted-foreground/40"/>
+                            </div>
+                            <h3 className="text-lg font-bold text-foreground">No Classes Found</h3>
+                            <p className="text-muted-foreground text-sm mt-1 mb-6 max-w-xs mx-auto">We couldn't find any classes matching your current filters.</p>
+                            <button onClick={() => {setSearchTerm(''); setQuickFilter('All')}} className="text-primary text-xs font-bold bg-primary/10 px-4 py-2 rounded-lg hover:bg-primary/20 transition-colors">Clear Filters</button>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="bg-muted/30 border-b border-border text-xs font-bold text-muted-foreground uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xl shadow-sm">
+                                <tr>
+                                    <th className="p-6 pl-8 cursor-pointer hover:text-foreground group transition-colors" onClick={() => handleSort('grade_level')}>
+                                        <div className="flex items-center gap-1">Grade <SortIcon direction={sortConfig.key === 'grade_level' ? sortConfig.direction : null} /></div>
+                                    </th>
+                                    <th className="p-6 cursor-pointer hover:text-foreground group transition-colors" onClick={() => handleSort('name')}>
+                                        <div className="flex items-center gap-1">Section / Name <SortIcon direction={sortConfig.key === 'name' ? sortConfig.direction : null} /></div>
+                                    </th>
+                                    <th className="p-6 cursor-pointer hover:text-foreground group transition-colors" onClick={() => handleSort('teacher_name')}>
+                                        <div className="flex items-center gap-1">Class Teacher <SortIcon direction={sortConfig.key === 'teacher_name' ? sortConfig.direction : null} /></div>
+                                    </th>
+                                    <th className="p-6">Capacity</th>
+                                    <th className="p-6 text-center">Status</th>
+                                    <th className="p-6 text-right pr-8">Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-border/40 bg-card/50">
+                                {filteredClasses.map(cls => (
+                                    <tr 
+                                        key={cls.id} 
+                                        onClick={() => setSelectedClass(cls)}
+                                        className="hover:bg-muted/40 transition-colors cursor-pointer group"
+                                    >
+                                        <td className="p-6 pl-8">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center font-black text-sm border border-blue-500/20 shadow-sm">
+                                                {cls.grade_level}
+                                            </div>
+                                        </td>
+                                        <td className="p-6">
+                                            <p className="font-bold text-foreground text-base group-hover:text-primary transition-colors">{cls.name}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5 font-medium">{cls.academic_year}</p>
+                                        </td>
+                                        <td className="p-6">
+                                            {cls.teacher_name ? (
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shadow-sm border border-white/20">
+                                                        {(cls.teacher_name || '?').charAt(0)}
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-foreground">{cls.teacher_name}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-amber-600 font-bold bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 inline-flex items-center gap-1">
+                                                    <AlertTriangleIcon className="w-3 h-3"/> Assign Teacher
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="p-6">
+                                            <div className="w-36">
+                                                <div className="flex justify-between text-[10px] mb-1.5 font-bold uppercase text-muted-foreground tracking-wide">
+                                                    <span>{cls.student_count || 0} Enrolled</span>
+                                                    <span>{cls.capacity || 30} Max</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden ring-1 ring-black/5">
+                                                    <div 
+                                                        className={`h-full rounded-full transition-all duration-1000 ease-out ${((cls.student_count || 0) > (cls.capacity || 30)) ? 'bg-red-500' : 'bg-emerald-500'}`} 
+                                                        style={{ width: `${Math.min(((cls.student_count || 0)/(cls.capacity || 30))*100, 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-6 text-center">
+                                            <StatusBadge status={getStatus(cls)} />
+                                        </td>
+                                        <td className="p-6 text-right pr-8">
+                                            <button className="p-2 hover:bg-background rounded-xl text-muted-foreground hover:text-foreground transition-all opacity-0 group-hover:opacity-100 hover:shadow-sm border border-transparent hover:border-border">
+                                                <MoreHorizontalIcon className="w-5 h-5"/>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
 
-            {/* Fix: Pass branchId as string to components instead of number */}
-            {isCreateModalOpen && <CreateClassWizard onClose={() => setIsCreateModalOpen(false)} onSuccess={fetchClasses} branchId={branchId || null} />}
-            {selectedClass && <ClassWorkspace classData={selectedClass} onClose={() => setSelectedClass(null)} onUpdate={fetchClasses} schoolProfile={schoolProfile} />}
-            {/* Fix: Pass branchId as string to components instead of number */}
-            {isBulkModalOpen && <BulkClassOperationsModal onClose={() => setIsBulkModalOpen(false)} onSuccess={fetchClasses} branchId={branchId || null} academicYear="2025-2026" />}
-            {isAIModalOpen && <ClassroomAIModal classes={classes} onClose={() => setIsAIModalOpen(false)} />}
+            {selectedClass && (
+                <ClassWorkspace 
+                    classData={selectedClass} 
+                    onClose={() => setSelectedClass(null)} 
+                    onUpdate={fetchClasses}
+                    schoolProfile={schoolProfile}
+                />
+            )}
+
+            {isCreateModalOpen && (
+                <CreateClassWizard 
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onSuccess={fetchClasses}
+                    branchId={branchId}
+                />
+            )}
+            
+            {isBulkModalOpen && (
+                <BulkClassOperationsModal 
+                    onClose={() => setIsBulkModalOpen(false)}
+                    onSuccess={() => {
+                        setIsBulkModalOpen(false);
+                        fetchClasses();
+                    }}
+                    academicYear={`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`} 
+                    branchId={branchId} 
+                />
+            )}
+            
+            {isAIModalOpen && (
+                <ClassroomAIModal 
+                    classes={classes} 
+                    onClose={() => setIsAIModalOpen(false)}
+                />
+            )}
         </div>
     );
 };
