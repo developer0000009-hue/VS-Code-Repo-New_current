@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { SchoolBranch, UserProfile, SchoolAdminProfileData, BuiltInRoles } from '../types';
@@ -16,6 +15,8 @@ import { LocationIcon } from './icons/LocationIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
 import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
+import { GoogleGenAI } from '@google/genai';
 
 interface BranchCreationPageProps {
     onNext?: () => void;
@@ -31,7 +32,7 @@ const formatError = (err: any): string => {
     return "An unexpected system error occurred.";
 };
 
-const FloatingLabelInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string, icon?: React.ReactNode }> = ({ label, icon, className, ...props }) => (
+const FloatingLabelInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string, icon?: React.ReactNode, action?: React.ReactNode }> = ({ label, icon, action, className, ...props }) => (
     <div className="relative group">
         <div className="absolute top-1/2 -translate-y-1/2 left-4 text-muted-foreground/60 group-focus-within:text-primary transition-colors duration-200 z-10 pointer-events-none">
             {icon}
@@ -39,13 +40,18 @@ const FloatingLabelInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> &
         <input
             {...props}
             placeholder=" "
-            className={`peer block w-full rounded-xl border border-input bg-background px-4 py-3.5 pl-11 text-sm text-foreground shadow-sm transition-all duration-200 hover:border-primary/50 focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${className}`}
+            className={`peer block w-full rounded-xl border border-input bg-background px-4 py-3.5 pl-11 ${action ? 'pr-12' : ''} text-sm text-foreground shadow-sm transition-all duration-200 hover:border-primary/50 focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${className}`}
         />
         <label className="absolute left-11 top-0 -translate-y-1/2 bg-card/95 px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 transition-all duration-200 
             peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:text-muted-foreground/60
             peer-focus:top-0 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:text-primary pointer-events-none">
             {label}
         </label>
+        {action && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
+                {action}
+            </div>
+        )}
     </div>
 );
 
@@ -78,6 +84,7 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingBranch, setEditingBranch] = useState<SchoolBranch | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isResolvingAddress, setIsResolvingAddress] = useState(false);
     const [modalError, setModalError] = useState<string | null>(null);
     const [deletingBranch, setDeletingBranch] = useState<SchoolBranch | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -120,7 +127,7 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
         try {
             const [branchRes, schoolRes] = await Promise.all([
                 supabase.rpc('get_school_branches'),
-                profile?.id ? supabase.from('school_admin_profiles').select('*').eq('user_id', profile.id).single() : Promise.resolve({ data: null, error: null })
+                profile?.id ? supabase.from('school_admin_profiles').select('*').eq('user_id', profile.id).maybeSingle() : Promise.resolve({ data: null, error: null })
             ]);
 
             if (branchRes.error) throw branchRes.error;
@@ -165,11 +172,48 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
         if (!isMounted.current) return;
         setEditingBranch(branch);
         setFormData({
-            name: branch.name, address: branch.address, country: 'India', state: branch.state || '', city: branch.city || '',
+            name: branch.name, address: branch.address, country: branch.country || 'India', state: branch.state || '', city: branch.city || '',
             adminName: branch.admin_name || '', adminPhone: branch.admin_phone || '', adminEmail: branch.admin_email || '', isMain: branch.is_main_branch
         });
         setModalError(null);
         setIsModalOpen(true);
+    };
+
+    const handleResolveAddress = async () => {
+        if (!formData.address.trim()) return;
+        setIsResolvingAddress(true);
+        setModalError(null);
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `Based on the street address "${formData.address}", identify the city, state, and country.
+            Output ONLY strictly as a valid JSON object: {"city": "string", "state": "string", "country": "string"}.
+            Important: The "country" must match one of these: ${countries.join(', ')}. The "state" must match a valid state in that country.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    tools: [{ googleMaps: {} }]
+                }
+            });
+
+            const text = response.text || '';
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const data = JSON.parse(jsonMatch[0]);
+                setFormData(prev => ({
+                    ...prev,
+                    city: data.city || prev.city,
+                    state: data.state || prev.state,
+                    country: data.country || prev.country
+                }));
+            }
+        } catch (err) {
+            console.error("Address auto-fill error:", err);
+            setModalError("Unable to auto-fill address details. Please enter manually.");
+        } finally {
+            setIsResolvingAddress(false);
+        }
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -177,7 +221,6 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
         setIsSaving(true);
         setModalError(null);
         try {
-            // Use adminEmail as the branch email since the explicit field was removed
             const payload = {
                 p_name: formData.name, 
                 p_address: formData.address, 
@@ -251,7 +294,7 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
                         <button
                             onClick={onBack}
                             disabled={isFinishing}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm font-semibold disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm font-medium disabled:opacity-50"
                         >
                             <ChevronLeftIcon className="w-4 h-4" />
                             Back to Pricing
@@ -288,7 +331,7 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
                         <SchoolIcon className="w-10 h-10 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
                     <h3 className="text-xl font-bold text-foreground">Welcome to Branch Setup</h3>
-                    <p className="text-muted-foreground mt-2 max-w-sm">
+                    <p className="text-muted-foreground mt-2 max-sm mx-auto">
                         You haven't added any branches yet. Let's start by establishing your <strong>Head Office</strong>.
                     </p>
                     <button className="mt-8 px-8 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 transition-all">
@@ -389,12 +432,34 @@ export const BranchCreationPage: React.FC<BranchCreationPageProps> = ({ onNext, 
                                      
                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         <div className="md:col-span-2">
-                                            <FloatingLabelInput label="Branch Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required icon={<SchoolIcon className="w-4 h-4"/>} />
+                                            <FloatingLabelInput 
+                                                label="Branch Name" 
+                                                value={formData.name} 
+                                                onChange={e => setFormData({...formData, name: e.target.value})} 
+                                                required 
+                                                icon={<SchoolIcon className="w-4 h-4"/>} 
+                                            />
                                         </div>
                                         <div className="md:col-span-2">
-                                            <FloatingLabelInput label="Street Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} required icon={<LocationIcon className="w-4 h-4"/>} />
+                                            <FloatingLabelInput 
+                                                label="Street Address" 
+                                                value={formData.address} 
+                                                onChange={e => setFormData({...formData, address: e.target.value})} 
+                                                required 
+                                                icon={<LocationIcon className="w-4 h-4"/>}
+                                                action={
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleResolveAddress}
+                                                        disabled={isResolvingAddress || !formData.address.trim()}
+                                                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-30 disabled:grayscale"
+                                                        title="Auto-fill city, state, country"
+                                                    >
+                                                        {isResolvingAddress ? <Spinner size="sm" /> : <SparklesIcon className="w-5 h-5" />}
+                                                    </button>
+                                                }
+                                            />
                                         </div>
-                                        {/* Branch Email field removed to reduce duplication. Admin email serves as contact. */}
                                         
                                         <StyledSelect label="Country" required value={formData.country} onChange={handleCountryChange} icon={<GlobeIcon className="w-4 h-4"/>}>
                                             {countries.map(c => <option key={c} value={c}>{c}</option>)}

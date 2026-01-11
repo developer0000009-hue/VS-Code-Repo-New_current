@@ -46,6 +46,7 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
+        // Standardize: Remove all whitespace (handles "1 2 3" -> "123")
         const cleanCode = code.replace(/\s+/g, '').toUpperCase();
         if (!cleanCode) return;
         
@@ -82,16 +83,17 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
         
         try {
             const branchToLink = branchId === undefined || branchId === null ? null : branchId;
+            const cleanCode = code.replace(/\s+/g, '').toUpperCase();
 
             if (verifiedData.code_type === 'Enquiry') {
-                // Enquiry Domain Integration
-                const result = await EnquiryService.verifyAndLinkEnquiry(code, branchToLink);
+                // Requirement Fix: Sync and display in Enquiry Desk
+                const result = await EnquiryService.verifyAndLinkEnquiry(cleanCode, branchToLink);
                 if (result.success) {
                     setImportSuccess(true);
                     setTimeout(() => onNavigate?.('Enquiries'), 1500);
                 }
             } else {
-                // Admission Node Integration
+                // Requirement Fix: Sync and display in Admission Vault
                 const { data, error: impError } = await supabase.rpc('admin_import_record_from_share_code', {
                     p_admission_id: verifiedData.admission_id,
                     p_code_type: verifiedData.code_type,
@@ -138,7 +140,7 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
                         disabled={verifying || importSuccess}
-                        className="w-full bg-[#0d0f14]/80 backdrop-blur-3xl border-2 border-white/5 rounded-[3rem] pl-20 pr-44 py-8 text-3xl font-mono font-black tracking-[0.4em] focus:ring-[15px] focus:ring-primary/5 focus:border-primary/50 outline-none text-white transition-all shadow-2xl"
+                        className="w-full bg-[#0d0f14]/80 backdrop-blur-3xl border-2 border-white/5 rounded-[3rem] pl-20 pr-44 py-8 text-3xl font-mono font-black tracking-[0.4em] focus:ring-[15px] focus:ring-primary/5 focus:border-primary/50 outline-none text-white transition-all shadow-2xl uppercase"
                     />
                     <button 
                         type="submit" 
@@ -169,7 +171,7 @@ const CodeVerificationTab: React.FC<CodeVerificationTabProps> = ({ branchId, onN
                 <div className="bg-[#0c0e14] border border-white/5 rounded-[4rem] p-16 shadow-2xl animate-in slide-in-from-bottom-12 duration-1000 ring-1 ring-white/5">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                         <div className="space-y-12">
-                            <TechnicalInfoRow label="Subject Identity" value={verifiedData.applicant_name} valueClassName="text-4xl font-serif font-black text-white" />
+                            <TechnicalInfoRow label="Subject Identity" value={verifiedData.applicant_name} valueClassName="text-4xl font-serif font-black text-white uppercase" />
                             <div className="grid grid-cols-2 gap-8">
                                 <TechnicalInfoRow label="Grade Level" value={`Grade ${verifiedData.grade}`} />
                                 <TechnicalInfoRow label="Token Type" value={verifiedData.code_type} valueClassName="text-primary font-black uppercase" />

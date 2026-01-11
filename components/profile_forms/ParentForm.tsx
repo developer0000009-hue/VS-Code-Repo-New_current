@@ -22,7 +22,7 @@ const LocateFixedIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const PremiumFloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> & { label: string; icon?: React.ReactNode; isTextArea?: boolean; isSynced?: boolean }> = ({ label, icon, isTextArea, isSynced, className, ...props }) => (
+const PremiumFloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement | HTMLTextAreaElement> & { label: string; icon?: React.ReactNode; isTextArea?: boolean; isSynced?: boolean; action?: React.ReactNode }> = ({ label, icon, isTextArea, isSynced, action, className, ...props }) => (
     <div className="relative group w-full">
         {label && (
             <label className={`absolute left-11 top-0 -translate-y-1/2 bg-slate-900/90 px-1.5 text-[10px] font-bold uppercase tracking-widest z-20 transition-all duration-300 pointer-events-none
@@ -37,7 +37,7 @@ const PremiumFloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement 
             <textarea
                 {...(props as any)}
                 placeholder=" "
-                className={`peer block w-full h-24 rounded-xl border transition-all duration-300 px-5 pl-12 pt-5 pb-2 text-[15px] text-white font-medium outline-none placeholder-transparent
+                className={`peer block w-full h-24 rounded-xl border transition-all duration-300 px-5 pl-12 pr-12 pt-5 pb-2 text-[15px] text-white font-medium outline-none placeholder-transparent
                     ${isSynced ? 'border-primary/40 bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.05)]' : 'border-white/10 bg-black/30 hover:border-white/20 focus:border-primary/40 focus:ring-4 focus:ring-primary/5'} 
                     ${className}`}
             />
@@ -50,7 +50,12 @@ const PremiumFloatingInput: React.FC<React.InputHTMLAttributes<HTMLInputElement 
                     ${className}`}
             />
         )}
-        {isSynced && (
+        {action && (
+            <div className="absolute right-3 top-3 z-30">
+                {action}
+            </div>
+        )}
+        {isSynced && !action && (
             <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-in zoom-in-95 duration-500">
                 <CheckCircleIcon className="w-4 h-4 text-primary shadow-[0_0_10px_rgba(var(--primary),0.4)]" />
             </div>
@@ -68,6 +73,7 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
     const [loadingStates, setLoadingStates] = useState(false);
     const [loadingCities, setLoadingCities] = useState(false);
     const [isLocating, setIsLocating] = useState(false);
+    const [isResolving, setIsResolving] = useState(false);
     const [syncStatus, setSyncStatus] = useState<string>('');
     const [syncError, setSyncError] = useState<{message: string, isWarning: boolean} | null>(null);
     const [syncedFields, setSyncedFields] = useState<Set<string>>(new Set());
@@ -98,6 +104,46 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
             const next = new Set(syncedFields);
             next.delete(name);
             setSyncedFields(next);
+        }
+    };
+
+    const handleResolveAddress = async () => {
+        if (!formData.address?.trim()) return;
+        setIsResolving(true);
+        setSyncStatus('Resolving Address...');
+        setSyncError(null);
+        
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `Based on the residential address "${formData.address}", extract or identify city, state, and country.
+            Output Strictly as valid JSON: {"city": "string", "state": "string", "country": "string"}.
+            Country must match one of: ${countries.join(', ')}.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: { tools: [{ googleMaps: {} }] }
+            });
+
+            const text = response.text || '';
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const data = JSON.parse(jsonMatch[0]);
+                const fields = ['country', 'state', 'city'];
+                setSyncedFields(new Set(fields));
+
+                if (data.country) handleSelectChange('country', false)(data.country);
+                if (data.state) handleSelectChange('state', false)(data.state);
+                if (data.city) handleSelectChange('city', false)(data.city);
+                
+                setSyncStatus('Address Resolved.');
+                setTimeout(() => setSyncStatus(''), 3000);
+            }
+        } catch (err) {
+            console.error("Resolve failed", err);
+            setSyncError({ message: "Auto-fill failed. Please enter manually.", isWarning: true });
+        } finally {
+            setIsResolving(false);
         }
     };
 
@@ -261,6 +307,17 @@ const ParentForm: React.FC<FormProps> = ({ formData, handleChange, activeTab }) 
                     isTextArea 
                     isSynced={syncedFields.has('address')}
                     icon={<LocationIcon className="w-4 h-4"/>} 
+                    action={
+                        <button 
+                            type="button"
+                            onClick={handleResolveAddress}
+                            disabled={isResolving || !formData.address?.trim()}
+                            className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-all disabled:opacity-30"
+                            title="Auto-fill city, state, country"
+                        >
+                            {isResolving ? <Spinner size="sm" /> : <SparklesIcon className="w-5 h-5" />}
+                        </button>
+                    }
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

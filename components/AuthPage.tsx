@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
 import ForgotPasswordForm from './ForgotPasswordForm';
@@ -19,7 +20,11 @@ const AuthPage: React.FC = () => {
     };
 
     const renderSuccessMessage = () => (
-        <div className="bg-[#0d0f14]/80 backdrop-blur-3xl p-10 md:p-16 rounded-[3rem] border border-white/10 text-center animate-in fade-in zoom-in-95 duration-700 w-full max-w-lg mx-auto shadow-2xl relative overflow-hidden ring-1 ring-white/5">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#0d0f14]/80 backdrop-blur-3xl p-10 md:p-16 rounded-[3rem] border border-white/10 text-center shadow-2xl relative overflow-hidden ring-1 ring-white/5"
+        >
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-transparent animate-scanner-move pointer-events-none"></div>
             <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-8 ring-8 ring-emerald-500/5 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
                 <CheckIcon className="w-10 h-10" />
@@ -34,17 +39,41 @@ const AuthPage: React.FC = () => {
             >
                 Initialize Console
             </button>
-        </div>
+        </motion.div>
     );
 
+    const variants = {
+        enter: (direction: number) => ({
+            x: direction > 0 ? 50 : -50,
+            opacity: 0,
+            scale: 0.98
+        }),
+        center: {
+            zIndex: 1,
+            x: 0,
+            opacity: 1,
+            scale: 1
+        },
+        exit: (direction: number) => ({
+            zIndex: 0,
+            x: direction < 0 ? 50 : -50,
+            opacity: 0,
+            scale: 0.98
+        })
+    };
+
     return (
-        <div className="min-h-screen flex bg-[#08090a] selection:bg-primary/20 selection:text-primary overflow-hidden relative">
+        <div className="min-h-screen flex bg-[#08090a] selection:bg-primary/20 selection:text-primary overflow-hidden relative font-sans">
             {/* Ambient Background */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.2) 1px, transparent 0)`, backgroundSize: '40px 40px' }}></div>
             
+            {/* Mesh Gradient for Background Flair */}
+            <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[140px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px]"></div>
+
             {/* Left Column: Visual Brand Story (Desktop Only) */}
             <div className="hidden lg:flex lg:w-[50%] xl:w-[60%] relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1523050335102-c8845180f12d?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40 grayscale mix-blend-luminosity"></div>
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1523050335102-c8845180f12d?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-30 grayscale mix-blend-luminosity"></div>
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/40 via-[#0a0a0c]/90 to-[#0a0a0c] z-10"></div>
                 
                 <div className="relative z-20 flex flex-col justify-between w-full p-16 xl:p-24 text-white h-full">
@@ -85,32 +114,43 @@ const AuthPage: React.FC = () => {
                 </div>
 
                 <div className="flex-grow flex items-center justify-center p-4 sm:p-12 relative">
-                    <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[150px] pointer-events-none opacity-40"></div>
-                    
                     <div className="w-full max-w-[480px] z-10 relative">
-                        {signupSuccess ? (
-                            renderSuccessMessage()
-                        ) : (
-                            <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                                {view === 'login' && (
-                                    <LoginForm 
-                                        onSwitchToSignup={() => setView('signup')} 
-                                        onForgotPassword={() => setView('forgot')} 
-                                    />
-                                )}
-                                {view === 'signup' && (
-                                    <SignupForm 
-                                        onSuccess={handleSignupSuccess} 
-                                        onSwitchToLogin={() => setView('login')} 
-                                    />
-                                )}
-                                {view === 'forgot' && (
-                                    <ForgotPasswordForm 
-                                        onBack={() => setView('login')} 
-                                    />
-                                )}
-                            </div>
-                        )}
+                        <AnimatePresence mode="wait">
+                            {signupSuccess ? (
+                                renderSuccessMessage()
+                            ) : (
+                                <motion.div 
+                                    key={view}
+                                    custom={view === 'signup' ? 1 : -1}
+                                    variants={variants}
+                                    initial="enter"
+                                    animate="center"
+                                    exit="exit"
+                                    transition={{
+                                        x: { type: "spring", stiffness: 300, damping: 30 },
+                                        opacity: { duration: 0.2 }
+                                    }}
+                                >
+                                    {view === 'login' && (
+                                        <LoginForm 
+                                            onSwitchToSignup={() => setView('signup')} 
+                                            onForgotPassword={() => setView('forgot')} 
+                                        />
+                                    )}
+                                    {view === 'signup' && (
+                                        <SignupForm 
+                                            onSuccess={handleSignupSuccess} 
+                                            onSwitchToLogin={() => setView('login')} 
+                                        />
+                                    )}
+                                    {view === 'forgot' && (
+                                        <ForgotPasswordForm 
+                                            onBack={() => setView('login')} 
+                                        />
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         
                         <div className="mt-16 text-center">
                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/10">Global Education Trust Authorization Node</p>

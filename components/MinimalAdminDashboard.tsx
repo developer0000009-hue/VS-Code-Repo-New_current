@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { motion } from 'framer-motion';
+import { supabase, formatError } from '../services/supabase';
 import { UserProfile, Role } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import Spinner from './common/Spinner';
@@ -19,7 +20,10 @@ import ProfileDropdown from './common/ProfileDropdown';
 import ThemeSwitcher from './common/ThemeSwitcher';
 
 const StatBox: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string; trend?: string; desc?: string }> = ({ title, value, icon, color, trend, desc }) => (
-    <div className="bg-[#0d0f14]/80 backdrop-blur-3xl border border-white/5 p-8 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] hover:shadow-primary/10 transition-all duration-500 group overflow-hidden relative ring-1 ring-white/5">
+    <motion.div 
+        whileHover={{ y: -5 }}
+        className="bg-[#0d0f14]/80 backdrop-blur-3xl border border-white/5 p-8 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.8)] hover:shadow-primary/10 transition-all duration-500 group overflow-hidden relative ring-1 ring-white/5"
+    >
         <div className={`absolute -right-8 -top-8 w-48 h-48 ${color} opacity-[0.03] rounded-full blur-[100px] group-hover:opacity-[0.08] transition-opacity duration-1000`}></div>
         <div className="flex justify-between items-start relative z-10">
             <div className={`p-4 rounded-2xl bg-white/5 text-white/30 ring-1 ring-white/10 shadow-inner group-hover:scale-110 group-hover:text-primary transition-all duration-500`}>
@@ -32,7 +36,7 @@ const StatBox: React.FC<{ title: string; value: string | number; icon: React.Rea
             <h3 className="text-5xl font-serif font-black text-white tracking-tighter leading-none">{value}</h3>
             {desc && <p className="text-[11px] text-white/30 mt-4 font-medium italic leading-relaxed">{desc}</p>}
         </div>
-    </div>
+    </motion.div>
 );
 
 interface MinimalAdminDashboardProps {
@@ -72,7 +76,7 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
                 });
                 setAiInsight(response.text || null);
             } catch (e) {
-                console.error("Metric sync failed:", e);
+                console.error("Metric sync failed:", formatError(e));
             } finally {
                 setLoading(false);
             }
@@ -92,7 +96,7 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
             <div className="max-w-[1800px] mx-auto p-6 md:p-10 lg:p-16 space-y-12 animate-in fade-in duration-1000">
                 
                 {/* Navbar Area */}
-                <div className="flex justify-between items-center bg-[#0d0f14]/90 p-4 rounded-[2.5rem] border border-white/5 shadow-2xl backdrop-blur-3xl sticky top-6 z-50 ring-1 ring-white/10">
+                <div className="flex justify-between items-center bg-[#0d0f14]/90 p-4 rounded-[2.5rem] border border-white/5 shadow-2xl backdrop-blur-xl sticky top-6 z-50 ring-1 ring-white/10">
                     <div className="flex items-center gap-6 pl-4">
                         <div className="p-2.5 bg-primary/10 rounded-xl shadow-inner border border-primary/20">
                             <SchoolIcon className="w-7 h-7 text-primary" />
@@ -115,18 +119,31 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
                     <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-900/10 rounded-full blur-[100px] opacity-30"></div>
 
                     <div className="relative z-10 space-y-10 max-w-4xl">
-                        <div className="inline-flex items-center gap-5 px-6 py-2.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md shadow-inner">
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="inline-flex items-center gap-5 px-6 py-2.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md shadow-inner"
+                        >
                             <ActivityIcon className="w-4 h-4 text-primary animate-pulse" />
                             <span className="text-[11px] font-black uppercase tracking-[0.5em] text-primary">Live Pulse Synchronization</span>
-                        </div>
+                        </motion.div>
                         
-                        <h1 className="text-6xl md:text-8xl lg:text-9xl font-serif font-black text-white tracking-tighter leading-[0.85] uppercase">
+                        <motion.h1 
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="text-6xl md:text-8xl lg:text-9xl font-serif font-black text-white tracking-tighter leading-[0.85] uppercase"
+                        >
                             Global <br/> <span className="text-white/30 italic lowercase">oversight.</span>
-                        </h1>
+                        </motion.h1>
                         
-                        <p className="text-xl md:text-2xl text-white/40 font-serif italic leading-relaxed border-l-4 border-primary/30 pl-10 max-w-2xl">
+                        <motion.p 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.3 }}
+                            className="text-xl md:text-2xl text-white/40 font-serif italic leading-relaxed border-l-4 border-primary/30 pl-10 max-w-2xl"
+                        >
                             Real-time intelligence dashboard aggregating telemetry from all institutional branch nodes, financial centers, and academic clusters.
-                        </p>
+                        </motion.p>
                     </div>
                     
                     <div className="xl:w-[400px] w-full space-y-6 relative z-10">
@@ -146,11 +163,15 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
                         </div>
 
                         {aiInsight && (
-                            <div className="bg-primary/5 border border-primary/20 p-8 rounded-[2.5rem] relative group overflow-hidden animate-in fade-in slide-in-from-right-8 duration-1000">
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="bg-primary/5 border border-primary/20 p-8 rounded-[2.5rem] relative group overflow-hidden duration-1000"
+                            >
                                 <SparklesIcon className="absolute -right-2 -top-2 w-16 h-16 text-primary/10 group-hover:scale-110 transition-transform" />
                                 <p className="text-[9px] font-black uppercase tracking-[0.4em] text-primary mb-3">AI Intelligence Summary</p>
                                 <p className="text-sm font-serif italic text-white/70 leading-relaxed">"{aiInsight}"</p>
-                            </div>
+                            </motion.div>
                         )}
                     </div>
                 </header>
@@ -207,7 +228,12 @@ const MinimalAdminDashboard: React.FC<MinimalAdminDashboardProps> = ({ profile, 
                         <div className="h-[250px] flex items-end justify-between gap-6 px-4">
                             {[40, 70, 55, 90, 65, 85, 95, 75].map((h, i) => (
                                 <div key={i} className="flex-1 bg-white/[0.02] rounded-full relative group/bar hover:bg-primary/5 transition-all duration-700" style={{ height: '100%' }}>
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary/30 to-primary rounded-full transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)]" style={{ height: `${h}%` }}></div>
+                                    <motion.div 
+                                        initial={{ height: 0 }}
+                                        animate={{ height: `${h}%` }}
+                                        transition={{ duration: 1.5, ease: "circOut", delay: i * 0.1 }}
+                                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary/30 to-primary rounded-full"
+                                    ></motion.div>
                                 </div>
                             ))}
                         </div>

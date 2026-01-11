@@ -12,9 +12,12 @@ export const EnquiryService = {
         try {
             if (!code) throw new Error("Verification token required.");
 
+            // Standardize code: Remove all whitespace and capitalize
+            const cleanCode = code.replace(/\s+/g, '').toUpperCase();
+
             // branchId can be null for Head Office
             const { data, error } = await supabase.rpc('admin_verify_enquiry_code', {
-                p_code: code.trim().toUpperCase(),
+                p_code: cleanCode,
                 p_branch_id: branchId
             });
 
@@ -29,10 +32,7 @@ export const EnquiryService = {
             };
         } catch (err) {
             const formatted = formatError(err);
-            // If we catch a specific alignment error, we re-wrap it for better UX
-            if (formatted.includes("Data Alignment Error")) {
-                console.error("Critical identity mapping failure. Migration 14.2.9 required.");
-            }
+            console.error("Enquiry Link Failure:", formatted);
             throw new Error(formatted);
         }
     },

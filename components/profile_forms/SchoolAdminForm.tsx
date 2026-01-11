@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { SchoolAdminProfileData } from '../../types';
 import { countries, statesByCountry, citiesByState } from '../data/locations';
@@ -16,7 +15,10 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { BookIcon } from '../icons/BookIcon';
 import { HashIcon } from '../icons/HashIcon';
 import { LayersIcon } from '../icons/LayersIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
 import CustomSelect from '../common/CustomSelect';
+import { GoogleGenAI } from '@google/genai';
+import Spinner from '../common/Spinner';
 
 // --- Constants ---
 const MONTHS = [
@@ -42,7 +44,7 @@ const GRADES = [
 
 // --- Styled Components ---
 
-const PremiumInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; icon?: React.ReactNode; fullWidth?: boolean }> = ({ label, icon, fullWidth, className, ...props }) => (
+const PremiumInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; icon?: React.ReactNode; action?: React.ReactNode; fullWidth?: boolean }> = ({ label, icon, action, fullWidth, className, ...props }) => (
     <div className={`relative group ${fullWidth ? 'w-full' : ''}`}>
         <div className="absolute top-1/2 -translate-y-1/2 left-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors duration-300 z-10 pointer-events-none">
             {icon}
@@ -50,13 +52,18 @@ const PremiumInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { lab
         <input
             {...props}
             placeholder=" "
-            className={`peer block w-full h-[56px] rounded-xl border border-input/60 bg-background/50 px-4 ${icon ? 'pl-11' : 'pl-4'} pt-5 pb-1 text-sm text-foreground font-medium shadow-sm transition-all duration-200 hover:bg-background hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${className}`}
+            className={`peer block w-full h-[56px] rounded-xl border border-input/60 bg-background/50 px-4 ${icon ? 'pl-11' : 'pl-4'} ${action ? 'pr-12' : ''} pt-5 pb-1 text-sm text-foreground font-medium shadow-sm transition-all duration-200 hover:bg-background hover:border-primary/30 focus:border-primary focus:ring-4 focus:ring-primary/10 focus:outline-none placeholder-transparent ${className}`}
         />
         <label className={`absolute left-4 top-4 z-10 origin-[0] -translate-y-2.5 scale-75 transform text-[10px] font-bold uppercase tracking-wider text-muted-foreground duration-200 
             peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-xs peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case
             peer-focus:-translate-y-2.5 peer-focus:scale-75 peer-focus:text-[10px] peer-focus:font-bold peer-focus:uppercase peer-focus:text-primary ${icon ? 'peer-placeholder-shown:left-11' : ''}`}>
             {label}
         </label>
+        {action && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
+                {action}
+            </div>
+        )}
     </div>
 );
 
@@ -85,8 +92,8 @@ interface FormProps {
 const SchoolAdminForm: React.FC<FormProps> = ({ formData, handleChange, isInitialCreation, activeTab, onTabChange }) => {
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-    // If activeTab is passed, we rely solely on it. If not, we use local state.
     const [internalTab, setInternalTab] = useState<TabType>('details');
+    const [isResolving, setIsResolving] = useState(false);
     
     const currentTab = activeTab !== undefined ? activeTab : internalTab;
     
@@ -116,6 +123,36 @@ const SchoolAdminForm: React.FC<FormProps> = ({ formData, handleChange, isInitia
             const reader = new FileReader();
             reader.onloadend = () => setBannerPreview(reader.result as string);
             reader.readAsDataURL(file);
+        }
+    };
+
+    const handleResolveAddress = async () => {
+        if (!formData.address?.trim()) return;
+        setIsResolving(true);
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const prompt = `From the street address "${formData.address}", extract or identify the city, state, and country.
+            Output Strictly as valid JSON: {"city": "string", "state": "string", "country": "string"}.
+            Values for country must match the closest official name from: ${countries.join(', ')}.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: { tools: [{ googleMaps: {} }] }
+            });
+
+            const text = response.text || '';
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const data = JSON.parse(jsonMatch[0]);
+                if (data.city) handleChange({ target: { name: 'city', value: data.city } } as any);
+                if (data.state) handleChange({ target: { name: 'state', value: data.state } } as any);
+                if (data.country) handleChange({ target: { name: 'country', value: data.country } } as any);
+            }
+        } catch (err) {
+            console.error("Auto-fill failed", err);
+        } finally {
+            setIsResolving(false);
         }
     };
 
@@ -264,6 +301,17 @@ const SchoolAdminForm: React.FC<FormProps> = ({ formData, handleChange, isInitia
                                 required 
                                 icon={<LocationIcon className="w-5 h-5"/>}
                                 fullWidth
+                                action={
+                                    <button 
+                                        type="button" 
+                                        onClick={handleResolveAddress}
+                                        disabled={isResolving || !formData.address?.trim()}
+                                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-all disabled:opacity-30 disabled:grayscale"
+                                        title="Auto-fill Location"
+                                    >
+                                        {isResolving ? <Spinner size="sm" /> : <SparklesIcon className="w-5 h-5" />}
+                                    </button>
+                                }
                             />
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

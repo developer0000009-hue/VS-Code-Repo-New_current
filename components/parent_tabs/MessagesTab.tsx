@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, formatError } from '../../services/supabase';
 import { MyEnquiry, TimelineItem, EnquiryStatus, Communication } from '../../types';
@@ -15,14 +14,17 @@ import { ShieldCheckIcon } from '../icons/ShieldCheckIcon';
 type Tab = 'inbox' | 'enquiries';
 
 // Updated to include all EnquiryStatus values used in the UI
+// Fix: Added missing EnquiryStatus keys (CONTACTED, REJECTED) to statusColors to satisfy exhaustive type checking.
 const statusColors: { [key in EnquiryStatus]: string } = {
   'New': 'bg-blue-400/10 text-blue-400 border-blue-400/20',
   'Contacted': 'bg-amber-400/10 text-amber-400 border-amber-400/20',
+  'CONTACTED': 'bg-amber-400/10 text-amber-400 border-amber-400/20',
   'Verified': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
   'ENQUIRY_VERIFIED': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
   'In Review': 'bg-purple-400/10 text-purple-400 border-purple-400/20',
   'ENQUIRY_IN_PROGRESS': 'bg-purple-400/10 text-purple-400 border-purple-400/20',
   'ENQUIRY_ACTIVE': 'bg-indigo-400/10 text-indigo-400 border-indigo-400/20',
+  'REJECTED': 'bg-rose-400/10 text-red-400 border-red-400/20',
   'Completed': 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
   'CONVERTED': 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
 };
@@ -113,7 +115,7 @@ const MessagesTab: React.FC = () => {
                             {(['inbox', 'enquiries'] as Tab[]).map(t => (
                                 <button 
                                     key={t} onClick={() => handleTabSwitch(t)}
-                                    className={`flex-1 py-4 text-[10px] font-black uppercase tracking-[0.3em] rounded-full transition-all duration-500 relative overflow-hidden group ${activeTab === t ? 'bg-[#1a1d24] text-primary shadow-2xl ring-1 ring-white/10 scale-[1.02]' : 'text-white/20 hover:text-white/40'}`}
+                                    className={`flex-1 py-4 text-[10px] font-black uppercase tracking-custom rounded-full transition-all duration-500 relative overflow-hidden group ${activeTab === t ? 'bg-[#1a1d24] text-primary shadow-2xl ring-1 ring-white/10 scale-[1.02]' : 'text-white/20 hover:text-white/40'}`}
                                 >
                                     <span className="relative z-10">{t === 'inbox' ? 'Broadcasts' : 'Enquiries'}</span>
                                 </button>
@@ -257,7 +259,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
 
     const fetchTimeline = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.rpc('get_enquiry_timeline', { p_node_id: primaryId });
+        const { data } = await supabase.rpc('get_enquiry_timeline', { p_enquiry_id: primaryId });
         if (data) setTimeline(data);
         setLoading(false);
     }, [primaryId]);
@@ -265,7 +267,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
     useEffect(() => { 
         fetchTimeline(); 
         const channel = supabase.channel(`parent-enq-view-${primaryId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiry_messages', filter: `admission_id=eq.${primaryId}` }, () => fetchTimeline())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiry_messages', filter: `enquiry_id=eq.${primaryId}` }, () => fetchTimeline())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [fetchTimeline, primaryId]);
@@ -278,7 +280,7 @@ const ConversationView = ({ enquiry, onBack, refreshEnquiries }: any) => {
         e.preventDefault();
         if (!newMessage.trim() || sending) return;
         setSending(true);
-        const { error } = await supabase.rpc('send_enquiry_message', { p_node_id: primaryId, p_message: newMessage });
+        const { error } = await supabase.rpc('send_enquiry_message', { p_enquiry_id: primaryId, p_message: newMessage });
         if (!error) {
             setNewMessage('');
             await fetchTimeline();

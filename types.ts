@@ -19,8 +19,19 @@ export enum BuiltInRoles {
     SUPER_ADMIN = 'Super Admin'
 }
 
-// Unified EnquiryStatus to handle both DB and UI variations
-export type EnquiryStatus = 'ENQUIRY_ACTIVE' | 'ENQUIRY_VERIFIED' | 'ENQUIRY_IN_PROGRESS' | 'CONVERTED' | 'New' | 'Contacted' | 'Verified' | 'In Review' | 'Completed';
+// Unified EnquiryStatus to handle both DB and UI variations including new states
+export type EnquiryStatus = 
+    | 'ENQUIRY_ACTIVE' 
+    | 'ENQUIRY_VERIFIED' 
+    | 'ENQUIRY_IN_PROGRESS' 
+    | 'CONTACTED'
+    | 'REJECTED'
+    | 'CONVERTED' 
+    | 'New' 
+    | 'Contacted' 
+    | 'Verified' 
+    | 'In Review' 
+    | 'Completed';
 
 export type AdmissionStatus = 'Registered' | 'Pending Review' | 'Verified' | 'Approved' | 'Rejected' | 'Cancelled';
 

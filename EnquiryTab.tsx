@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, formatError } from './services/supabase';
 import { Enquiry, EnquiryStatus } from './types';
@@ -14,12 +15,15 @@ import { ChevronRightIcon } from './components/icons/ChevronRightIcon';
 import { FilterIcon } from './components/icons/FilterIcon';
 import { UsersIcon } from './components/icons/UsersIcon';
 import { SparklesIcon } from './components/icons/SparklesIcon';
+import { AlertTriangleIcon } from './components/icons/AlertTriangleIcon';
 import PremiumAvatar from './components/common/PremiumAvatar';
 
 const statusColors: Record<string, string> = {
   'ENQUIRY_ACTIVE': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   'ENQUIRY_VERIFIED': 'bg-teal-500/20 text-teal-400 border-teal-500/30 font-black shadow-[0_0_15px_rgba(45,212,191,0.1)]',
   'ENQUIRY_IN_PROGRESS': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  'CONTACTED': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  'REJECTED': 'bg-rose-500/10 text-red-400 border-red-500/20',
   'CONVERTED': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
 };
 
@@ -27,6 +31,8 @@ const statusLabels: Record<string, string> = {
   'ENQUIRY_ACTIVE': 'Active',
   'ENQUIRY_VERIFIED': 'Verified',
   'ENQUIRY_IN_PROGRESS': 'In Review',
+  'CONTACTED': 'Contacted',
+  'REJECTED': 'Rejected',
   'CONVERTED': 'Converted',
 };
 
@@ -36,22 +42,6 @@ interface EnquiryTabProps {
     branchId?: number | null;
     onNavigate?: (component: string) => void;
 }
-
-const StatCard: React.FC<{ title: string; value: number; icon: React.ReactNode; color: string; desc: string }> = ({ title, value, icon, color, desc }) => (
-    <div className="bg-[#0d0f14] p-8 rounded-[2.5rem] border border-white/5 shadow-2xl flex flex-col justify-between transition-all hover:border-primary/30 group relative overflow-hidden ring-1 ring-white/5">
-        <div className={`absolute -right-6 -top-6 w-32 h-32 ${color} opacity-[0.03] rounded-full blur-3xl group-hover:opacity-[0.08] transition-opacity duration-1000`}></div>
-        <div className="flex justify-between items-start relative z-10">
-            <div className={`p-3.5 rounded-2xl bg-white/5 text-white/30 ring-1 ring-white/10 group-hover:scale-110 group-hover:text-primary transition-all duration-500`}>
-                {icon}
-            </div>
-            <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{desc}</span>
-        </div>
-        <div className="mt-10 relative z-10">
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] mb-2">{title}</p>
-            <h3 className="text-5xl font-serif font-black text-white tracking-tighter leading-none">{value}</h3>
-        </div>
-    </div>
-);
 
 const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
     const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
@@ -101,18 +91,19 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
     }, [fetchEnquiries, branchId]);
     
     const processedEnquiries = useMemo(() => {
-        let data = enquiries.filter(enq => {
+        const source = Array.isArray(enquiries) ? enquiries : [];
+        let data = source.filter(enq => {
             const matchesStatus = !filterStatus || enq.status === filterStatus;
-            const searchLower = searchTerm.toLowerCase();
+            const searchLower = (searchTerm || '').toLowerCase();
             const matchesSearch = !searchTerm || 
-                enq.applicant_name.toLowerCase().includes(searchLower) ||
+                (enq.applicant_name || '').toLowerCase().includes(searchLower) ||
                 (enq.parent_name || '').toLowerCase().includes(searchLower);
             return matchesStatus && matchesSearch;
         });
 
         data.sort((a, b) => {
-            const aVal = a[sortConfig.key] || '';
-            const bVal = b[sortConfig.key] || '';
+            const aVal = (a[sortConfig.key] || '').toString();
+            const bVal = (b[sortConfig.key] || '').toString();
             const factor = sortConfig.direction === 'ascending' ? 1 : -1;
             if (aVal < bVal) return -1 * factor;
             if (aVal > bVal) return 1 * factor;
@@ -122,11 +113,14 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
         return data;
     }, [enquiries, searchTerm, filterStatus, sortConfig]);
 
-    const stats = useMemo(() => ({
-        total: enquiries.length,
-        verified: enquiries.filter(e => e.status === 'ENQUIRY_VERIFIED').length,
-        converted: enquiries.filter(e => e.status === 'CONVERTED').length
-    }), [enquiries]);
+    const stats = useMemo(() => {
+        const source = Array.isArray(enquiries) ? enquiries : [];
+        return {
+            total: source.length,
+            verified: source.filter(e => e.status === 'ENQUIRY_VERIFIED').length,
+            converted: source.filter(e => e.status === 'CONVERTED').length
+        };
+    }, [enquiries]);
 
     const handleSort = (key: SortableKeys) => {
         setSortConfig(prev => ({
@@ -174,10 +168,23 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
 
             {/* Stats Deck */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <StatBox title="Total Ledger" value={stats.total} icon={<MailIcon className="w-7 h-7"/>} color="bg-blue-500" desc="Total Nodes" />
-                <StatBox title="Verified Stream" value={stats.verified} icon={<ShieldCheckIcon className="w-7 h-7"/>} color="bg-teal-500" desc="Clearance Active" />
-                <StatBox title="promoted" value={stats.converted} icon={<CheckCircleIcon className="w-7 h-7"/>} color="bg-emerald-500" desc="Converted nodes" />
+                <StatCard title="Total Ledger" value={stats.total} icon={<MailIcon className="w-7 h-7"/>} color="bg-blue-500" desc="Total Nodes" />
+                <StatCard title="Verified Stream" value={stats.verified} icon={<ShieldCheckIcon className="h-7 w-7"/>} color="bg-teal-500" desc="Clearance Active" />
+                <StatCard title="Promoted" value={stats.converted} icon={<CheckCircleIcon className="w-7 h-7"/>} color="bg-emerald-500" desc="Converted nodes" />
             </div>
+
+            {error && (
+                <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-[2rem] flex items-center justify-between shadow-xl animate-in shake">
+                    <div className="flex items-center gap-4">
+                        <AlertTriangleIcon className="w-8 h-8 text-red-500 shrink-0" />
+                        <div>
+                            <p className="text-xs font-black uppercase text-red-500 tracking-widest">Fetch Failure</p>
+                            <p className="text-sm font-bold text-red-200/70 mt-1">{error}</p>
+                        </div>
+                    </div>
+                    <button onClick={() => fetchEnquiries()} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg active:scale-95">Retry Protocol</button>
+                </div>
+            )}
             
             {/* Filter Hub */}
             <div className="flex flex-col xl:flex-row gap-8 justify-between items-center bg-[#0d0f14]/80 backdrop-blur-3xl p-6 rounded-[2.8rem] border border-white/5 shadow-2xl ring-1 ring-white/5">
@@ -193,7 +200,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                 </div>
                 
                 <div className="flex bg-black/60 p-2 rounded-[1.8rem] border border-white/5 overflow-x-auto no-scrollbar w-full xl:w-auto shadow-inner">
-                    {['All', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONVERTED'].map(f => (
+                    {['All', 'ENQUIRY_VERIFIED', 'ENQUIRY_IN_PROGRESS', 'CONTACTED', 'REJECTED', 'CONVERTED'].map(f => (
                         <button 
                             key={f}
                             onClick={() => setFilterStatus(f === 'All' ? '' : f)}
@@ -227,14 +234,6 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                         <p className="text-white/30 max-w-sm mx-auto font-serif italic text-lg leading-relaxed">
                             Verified enquiries from the <strong className="text-primary">Handshake Center</strong> will appear here upon authorization.
                         </p>
-                        {onNavigate && (
-                            <button 
-                                onClick={() => onNavigate('Code Verification')}
-                                className="mt-12 px-10 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-[0.3em] transition-all border border-white/5"
-                            >
-                                Enter Verification Vault
-                            </button>
-                        )}
                     </div>
                 ) : (
                     <div className="overflow-x-auto custom-scrollbar">
@@ -324,7 +323,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
     );
 };
 
-const StatBox: React.FC<{ title: string; value: number; icon: React.ReactNode; color: string; desc: string }> = ({ title, value, icon, color, desc }) => (
+const StatCard: React.FC<{ title: string; value: number; icon: React.ReactNode; color: string; desc: string }> = ({ title, value, icon, color, desc }) => (
     <div className="bg-[#0d0f14]/80 backdrop-blur-3xl border border-white/5 p-10 rounded-[3rem] shadow-2xl hover:shadow-primary/10 transition-all duration-700 group overflow-hidden relative ring-1 ring-white/5">
         <div className={`absolute -right-8 -top-8 w-48 h-48 ${color} opacity-[0.03] rounded-full blur-[100px] group-hover:opacity-[0.08] transition-opacity duration-1000`}></div>
         <div className="flex justify-between items-start relative z-10">

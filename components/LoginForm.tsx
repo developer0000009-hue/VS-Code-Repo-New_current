@@ -37,15 +37,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
     };
 
     return (
-        <div className="bg-[#0d0f14]/80 backdrop-blur-3xl p-8 sm:p-12 rounded-[3rem] border border-white/10 space-y-10 shadow-2xl relative overflow-hidden ring-1 ring-white/5">
+        <div className="bg-[#0d0f14]/80 backdrop-blur-3xl p-8 sm:p-12 rounded-[3.5rem] border border-white/10 space-y-12 shadow-2xl relative overflow-hidden ring-1 ring-white/5 font-sans">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent animate-scanner-move pointer-events-none"></div>
             
-            <div className="text-center space-y-3 relative z-10">
+            <div className="text-center space-y-4 relative z-10">
                 <h2 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tighter leading-none uppercase">Initialize.</h2>
                 <p className="text-white/30 text-xs md:text-sm font-serif italic tracking-tight">Secure access to the institutional node.</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6 md:space-y-8 relative z-10">
+            <form onSubmit={handleLogin} className="space-y-6 md:space-y-10 relative z-10">
                 {error && (
                     <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest p-4 rounded-2xl flex items-center gap-3 animate-in shake duration-500">
                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
@@ -56,7 +56,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
                 <div className="space-y-3 group">
                     <label className="block text-[10px] font-black text-white/20 uppercase tracking-[0.4em] ml-1 transition-colors group-focus-within:text-primary">Node Identifier</label>
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
+                        <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
                             <MailIcon className="h-5 w-5" />
                         </div>
                         <input
@@ -64,7 +64,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="block w-full h-[60px] md:h-[68px] pl-14 pr-6 bg-black/40 border border-white/5 rounded-2xl text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-8 focus:ring-primary/5 focus:border-primary focus:bg-black/60 transition-all duration-300 font-mono font-bold tracking-wider"
+                            className="block w-full h-[64px] md:h-[72px] pl-16 pr-6 bg-black/40 border border-white/5 rounded-2xl text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-8 focus:ring-primary/5 focus:border-primary focus:bg-black/60 transition-all duration-300 font-mono font-bold tracking-wider"
                             placeholder="ADMIN@NODE.NET"
                         />
                     </div>
@@ -76,7 +76,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
                         <button type="button" onClick={onForgotPassword} className="text-[10px] font-black text-primary/60 hover:text-primary transition-colors uppercase tracking-[0.2em]">Lost Key?</button>
                     </div>
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
+                        <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
                             <LockIcon className="h-5 w-5" />
                         </div>
                         <input
@@ -84,24 +84,24 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, onForgotPasswor
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="block w-full h-[60px] md:h-[68px] pl-14 pr-14 bg-black/40 border border-white/5 rounded-2xl text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-8 focus:ring-primary/5 focus:border-primary focus:bg-black/60 transition-all duration-300 font-mono font-bold tracking-widest"
+                            className="block w-full h-[64px] md:h-[72px] pl-16 pr-16 bg-black/40 border border-white/5 rounded-2xl text-sm text-white placeholder:text-white/10 focus:outline-none focus:ring-8 focus:ring-primary/5 focus:border-primary focus:bg-black/60 transition-all duration-300 font-mono font-bold tracking-widest"
                             placeholder="••••••••"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 pr-5 flex items-center text-white/20 hover:text-white transition-colors"
+                            className="absolute inset-y-0 right-0 pr-6 flex items-center text-white/20 hover:text-white transition-colors"
                         >
                             {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                         </button>
                     </div>
                 </div>
 
-                <div className="pt-4 md:pt-6">
+                <div className="pt-4">
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-[60px] md:h-[68px] flex items-center justify-center py-3.5 px-8 rounded-2xl shadow-2xl shadow-primary/20 text-[11px] font-black text-white bg-primary hover:bg-primary/90 focus:outline-none transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 uppercase tracking-[0.5em]"
+                        className="w-full h-[64px] md:h-[72px] flex items-center justify-center py-3.5 px-8 rounded-2xl shadow-2xl shadow-primary/20 text-[11px] font-black text-white bg-primary hover:bg-primary/90 focus:outline-none transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 uppercase tracking-[0.5em]"
                     >
                         {loading ? <Spinner size="sm" className="text-white" /> : 'Confirm Identity'}
                     </button>
