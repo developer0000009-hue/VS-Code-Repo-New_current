@@ -197,6 +197,8 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
         setLoading(true);
         setError(null);
         try {
+            console.log("StudentManagementTab: Starting fetch with branchId:", branchId);
+
             // Direct query to ensure complete visibility of all student records
             let query = supabase
                 .from('student_profiles')
@@ -213,12 +215,43 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
 
             // Robust check for branchId (handle 0 as valid ID)
             if (branchId !== null && branchId !== undefined) {
+                console.log("StudentManagementTab: Filtering by branch_id:", branchId);
                 query = query.eq('branch_id', branchId);
+            } else {
+                console.log("StudentManagementTab: No branch filter applied - showing all students");
             }
 
             const { data, error: dbError } = await query;
 
-            if (dbError) throw dbError;
+            console.log("StudentManagementTab: Query result:", { dataCount: data?.length || 0, error: dbError });
+
+            if (dbError) {
+                console.error("StudentManagementTab: Database error:", dbError);
+                throw dbError;
+            }
+
+            // If no students found with branch filter, try to show a helpful message
+            if ((!data || data.length === 0) && branchId !== null && branchId !== undefined) {
+                console.log("StudentManagementTab: No students found for branch, checking if students exist in other branches...");
+                // Try a query without branch filter to see if students exist elsewhere
+                const fallbackQuery = supabase
+                    .from('student_profiles')
+                    .select(`
+                        *,
+                        profiles!inner (
+                            email, display_name, phone, role, is_active, profile_completed, created_at
+                        )
+                    `)
+                    .eq('profiles.role', 'Student')
+                    .limit(1);
+
+                const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+
+                if (!fallbackError && fallbackData && fallbackData.length > 0) {
+                    console.log("StudentManagementTab: Students exist but not in current branch");
+                    setError("No students found in the current branch. Students may be assigned to different branches or need branch assignment.");
+                }
+            }
 
             // Map nested Supabase response to flat StudentForAdmin interface
             const mappedStudents: StudentForAdmin[] = (data || []).map((s: any) => ({
@@ -231,7 +264,7 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                 profile_completed: s.profiles?.profile_completed,
                 created_at: s.created_at || s.profiles?.created_at,
                 // Fallback to local profile photo or undefined if not available on profile relation
-                profile_photo_url: s.profile_photo_url, 
+                profile_photo_url: s.profile_photo_url,
                 gender: s.gender, // fetched from student_profiles (*)
                 date_of_birth: s.date_of_birth, // fetched from student_profiles (*)
                 address: s.address, // fetched from student_profiles (*)
@@ -243,10 +276,11 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                 assigned_class_name: s.school_classes?.name || null
             }));
 
+            console.log("StudentManagementTab: Final mapped students count:", mappedStudents.length);
             setAllStudents(mappedStudents);
         } catch (e: any) {
             // Enhanced Error Logging
-            console.error("Fetch error details:", JSON.stringify(e, null, 2));
+            console.error("StudentManagementTab: Fetch error details:", JSON.stringify(e, null, 2));
             setError(formatError(e));
         } finally {
             setLoading(false);
