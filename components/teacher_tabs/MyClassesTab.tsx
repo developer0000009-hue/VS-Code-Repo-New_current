@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { TeacherClassOverview, TeacherClassDetails, ClassSubject, LessonPlan, FunctionComponentWithIcon } from '../../types';
@@ -137,12 +138,19 @@ const RosterView: React.FC<{details: TeacherClassDetails}> = ({details}) => {
     const roster = details?.roster ?? [];
     return (
         <div>
-            {roster.length === 0 ? <p className="text-muted-foreground">No students in this class.</p> : (
-                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {roster.length === 0 ? <p className="text-muted-foreground text-center py-8">No students in this class.</p> : (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {roster.map(student => (
-                        <li key={student.id} className="px-4 py-3 bg-muted/30 rounded-lg flex items-center gap-3 border border-border">
-                            <img className="h-8 w-8 rounded-full" src={`https://api.dicebear.com/8.x/initials/svg?seed=${student.display_name}`} alt="" />
-                            <span className="text-sm font-medium text-foreground">{student.display_name}</span>
+                        <li key={student.id} className="p-4 bg-card rounded-xl border border-border flex items-center gap-4 shadow-sm transition-all hover:shadow-md hover:border-primary/20">
+                            <div className="h-12 w-12 rounded-full overflow-hidden bg-muted flex-shrink-0 border border-border/50">
+                                <img className="h-full w-full object-cover" src={`https://api.dicebear.com/8.x/initials/svg?seed=${student.display_name}`} alt="" />
+                            </div>
+                            <div>
+                                <p className="font-bold text-foreground">{student.display_name}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    {student.roll_number ? `Roll No. ${student.roll_number}` : 'Student'}
+                                </p>
+                            </div>
                         </li>
                     ))}
                 </ul>

@@ -28,7 +28,7 @@ export type EnquiryStatus =
     | 'ENQUIRY_REJECTED'
     | 'ENQUIRY_CONVERTED';
 
-export type AdmissionStatus = 'Registered' | 'Pending Review' | 'Verified' | 'Approved' | 'Rejected' | 'Cancelled';
+export type AdmissionStatus = 'Registered' | 'Pending Review' | 'Verified' | 'Approved' | 'Rejected' | 'Cancelled' | 'Enrolled';
 
 export interface UserProfile {
     id: string;
@@ -94,6 +94,12 @@ export interface AdmissionApplication {
     // Fix: Added date_of_birth and gender to resolve errors in ChildRegistrationModal and StudentOnboardingWizard
     date_of_birth?: string;
     gender?: string;
+    // Extended fields for display in Family Nodes
+    section?: string;
+    class_name?: string;
+    student_id_number?: string;
+    // Fix: Added notes to resolve schema mismatch during enquiry promotion
+    notes?: string;
 }
 
 export interface SchoolAdminProfileData {
@@ -185,16 +191,21 @@ export interface TransportProfileData {
     license_info?: string;
 }
 
+// Fix: Added EcommerceProfileData to resolve the import error in EcommerceForm.tsx.
+export interface EcommerceProfileData {
+    user_id: string;
+    store_name: string;
+    business_type?: string;
+}
+
 export interface BusRoute {
     id: number;
     name: string;
     description?: string;
 }
 
-export interface EcommerceProfileData {
-    user_id: string;
-    store_name: string;
-    business_type?: string;
+export interface UIWrapperProps {
+    children: React.ReactNode;
 }
 
 export interface SchoolBranch {
@@ -325,6 +336,8 @@ export interface StudentFeeSummary {
     total_paid: number;
     outstanding_balance: number;
     overall_status: 'Paid' | 'Overdue' | 'Pending';
+    // Fix: Added currency to resolve errors in FinanceTab and StudentFinanceDetailView
+    currency?: string;
 }
 
 export interface AdminAnalyticsStats {
@@ -485,6 +498,8 @@ export interface Payment {
     amount: number;
     payment_date: string;
     receipt_number: string;
+    // Fix: Added payment_method to resolve error in StudentFinanceDetailView
+    payment_method?: string;
 }
 
 export interface ClassPerformanceSummary {
@@ -551,6 +566,7 @@ export interface ExpenseReportItem {
 export interface StudentLedgerEntry {
     transaction_date: string;
     debit?: number;
+    currency?: string;
     credit?: number;
     balance: number;
 }

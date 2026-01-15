@@ -24,46 +24,57 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const formatError = (err: any): string => {
     if (!err) return "Synchronization error.";
     
-    // 1. Handle String Inputs
+    // 1. Handle String Inputs directly
     if (typeof err === 'string') {
-        const isJunk = err === "[object Object]" || err === "{}" || err === "null" || err === "undefined";
-        return isJunk ? "Institutional protocol failure." : err;
+        // Check for generic object strings
+        if (err === "[object Object]" || err === "{}") {
+            return "Institutional protocol failure (Empty Error Context).";
+        }
+        return err;
     }
 
-    // 2. Primary Key Extraction (Standard Supabase/PostgREST)
-    let candidate = err.message || err.error_description || err.details || err.hint;
+    // 2. Handle Error Objects (Standard JS Error)
+    if (err instanceof Error) {
+        return err.message;
+    }
+
+    // 3. Primary Key Extraction (Standard Supabase/PostgREST)
+    // Supabase errors often look like { message: "...", code: "...", details: "...", hint: "..." }
+    let candidate = err.message || err.error_description || err.details?.message || err.details || err.hint;
     
-    // 3. Nested Auth/Error Object Probing
-    if (!candidate || typeof candidate !== 'string' || candidate === "[object Object]") {
-        if (err.error) {
-            if (typeof err.error === 'string') candidate = err.error;
-            else if (typeof err.error === 'object') {
-                candidate = err.error.message || err.error.description || err.error.details;
-            }
+    // 4. Nested Auth/Error Object Probing
+    if (!candidate && err.error) {
+        if (typeof err.error === 'string') candidate = err.error;
+        else if (typeof err.error === 'object') {
+            candidate = err.error.message || err.error.description || err.error.details;
         }
     }
 
-    // 4. Array Flattening
-    if (Array.isArray(err) && err.length > 0) {
-        return formatError(err[0]);
-    }
-
-    // 5. Final String Validation
-    if (candidate && typeof candidate === 'string' && candidate !== "[object Object]" && candidate !== "{}") {
-        return candidate;
+    // 5. Final Candidate Validation
+    if (candidate) {
+        if (typeof candidate === 'string') {
+            if (candidate === "[object Object]" || candidate === "{}") {
+                 return "Identity synchronization exception.";
+            }
+            return candidate;
+        }
+        // If candidate is not a string, stringify it
+        try {
+            return JSON.stringify(candidate);
+        } catch {
+            return "Invalid error response format.";
+        }
     }
 
     // 6. Safe JSON Stringification Fallback
     try {
         const str = JSON.stringify(err);
         if (str && str !== '{}' && str !== '[]' && !str.includes("[object Object]")) {
-            return str.length > 250 ? str.substring(0, 247) + "..." : str;
+            // Return a snippet of the JSON if it's not too long, or a generic message
+            return `System Error: ${str.substring(0, 150)}${str.length > 150 ? '...' : ''}`;
         }
     } catch { }
 
     // 7. Last Resort
-    const finalFallback = String(err);
-    return (finalFallback === '[object Object]' || finalFallback === '{}') 
-        ? "Identity synchronization exception." 
-        : finalFallback;
+    return "An unexpected system error occurred.";
 };

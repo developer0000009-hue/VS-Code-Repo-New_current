@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../services/supabase';
+import { supabase, formatError } from '../../services/supabase';
 import { StudentForAdmin } from '../../types';
 import Spinner from '../common/Spinner';
 import { XIcon } from '../icons/XIcon';
@@ -128,7 +128,8 @@ const EditStudentDetailsModal: React.FC<EditStudentDetailsModalProps> = ({ stude
                 const { data, error } = await supabase.rpc('get_linked_parent_for_student', { p_student_id: student.id });
                 
                 if (error) {
-                    console.error("Error fetching parent:", error);
+                    // Use formatError to safely display the error string instead of [object Object]
+                    console.error("Error fetching parent:", formatError(error));
                 } else if (data && data.found) {
                     setParentData(data);
                     // Default to sync if parent exists and data seems aligned, or if forced by previous state
@@ -137,7 +138,7 @@ const EditStudentDetailsModal: React.FC<EditStudentDetailsModalProps> = ({ stude
                      if (isMounted.current) setSyncWithParent(false); // No parent found, disable sync
                 }
             } catch (e) {
-                console.error(e);
+                console.error("Parent fetch exception:", formatError(e));
             } finally {
                 if (isMounted.current) setIsFetchingParent(false);
             }
@@ -196,7 +197,7 @@ const EditStudentDetailsModal: React.FC<EditStudentDetailsModalProps> = ({ stude
             onSave();
             onClose();
         } catch (err: any) {
-            if (isMounted.current) setError(err.message || "Failed to update student details.");
+            if (isMounted.current) setError(formatError(err));
         } finally {
             if (isMounted.current) setLoading(false);
         }

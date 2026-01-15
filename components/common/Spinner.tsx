@@ -14,10 +14,12 @@ const Spinner: React.FC<SpinnerProps> = ({ size = 'md', className = '' }) => {
   };
   
   return (
-    <div className={`inline-block ${className}`}>
-        <div className={`${sizeClasses[size]} animate-spin rounded-full border-primary border-t-transparent border-l-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]`} role="status">
-            <span className="sr-only">Loading...</span>
-        </div>
+    <div className={`inline-block relative ${className}`}>
+        {/* Background Track */}
+        <div className={`${sizeClasses[size]} rounded-full border-current opacity-20`}></div>
+        {/* Spinning Segment */}
+        <div className={`${sizeClasses[size]} absolute top-0 left-0 rounded-full border-current border-t-transparent animate-spin`}></div>
+        <span className="sr-only">Loading...</span>
     </div>
   );
 };

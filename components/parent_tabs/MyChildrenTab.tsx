@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, formatError } from '../../services/supabase';
@@ -42,6 +43,23 @@ const MyChildrenTab: React.FC<MyChildrenTabProps> = ({ onManageDocuments, profil
 
     useEffect(() => {
         fetchData();
+        
+        // Setup Realtime Subscription for instant updates
+        const channel = supabase.channel('family-nodes-sync')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'admissions' }, () => {
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'student_profiles' }, () => {
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'student_enrollments' }, () => {
+                fetchData();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [fetchData]); 
 
     const filteredApplications = useMemo(() => {
@@ -49,10 +67,10 @@ const MyChildrenTab: React.FC<MyChildrenTabProps> = ({ onManageDocuments, profil
             const matchesSearch = (app.applicant_name || '').toLowerCase().includes(searchTerm.toLowerCase());
             const status = (app.status || '').toUpperCase();
             
-            if (activeFilter === 'APPROVED') return matchesSearch && (status === 'APPROVED' || status === 'VERIFIED');
+            if (activeFilter === 'APPROVED') return matchesSearch && (status === 'APPROVED' || status === 'VERIFIED' || status === 'ENROLLED');
             if (activeFilter === 'REJECTED') return matchesSearch && status === 'REJECTED';
             if (activeFilter === 'PENDING') {
-                return matchesSearch && (status !== 'APPROVED' && status !== 'VERIFIED' && status !== 'REJECTED');
+                return matchesSearch && (status !== 'APPROVED' && status !== 'VERIFIED' && status !== 'REJECTED' && status !== 'ENROLLED');
             }
             return matchesSearch;
         });

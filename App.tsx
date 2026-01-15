@@ -6,6 +6,7 @@ import { UserProfile, BuiltInRoles, Role } from './types';
 import Spinner from './components/common/Spinner';
 import NotFound from './components/common/NotFound';
 import { AlertTriangleIcon } from './components/icons/AlertTriangleIcon';
+import PageLoader from './components/common/PageLoader';
 
 // Lazy load dashboards and major components to split code chunks
 const AuthPage = lazy(() => import('./components/AuthPage'));
@@ -15,15 +16,6 @@ const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard'));
 const MinimalAdminDashboard = lazy(() => import('./components/MinimalAdminDashboard'));
 const OnboardingFlow = lazy(() => import('./OnboardingFlow'));
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const LoadingScreen = () => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#08090a] text-center p-6">
-        <Spinner size="lg" />
-        <p className="mt-4 text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-pulse">Loading Module...</p>
-    </div>
-);
 
 const App: React.FC = () => {
     const [session, setSession] = useState<any | null>(null);
@@ -51,7 +43,10 @@ const App: React.FC = () => {
                 .eq('id', currentSession.user.id)
                 .maybeSingle();
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.error("Profile Fetch Error:", profileError);
+                throw profileError;
+            }
 
             if (!profileData) {
                 // Provision new identity node
@@ -84,7 +79,8 @@ const App: React.FC = () => {
             }
         } catch (e: any) {
             console.error("Registry Sync failure:", e);
-            setError(formatError(e));
+            const msg = formatError(e);
+            setError(msg);
         } finally {
             isFetching.current = false;
             setLoading(false);
@@ -165,23 +161,18 @@ const App: React.FC = () => {
     }
 
     if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#08090a] text-center p-6">
-                <Spinner size="lg" />
-                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.4em] text-primary animate-pulse">Establishing Identity Stream</p>
-            </div>
-        );
+        return <PageLoader label="Initializing Portal" sublabel="Authenticating session credentials..." />;
     }
 
     if (!session || !profile) return (
-        <Suspense fallback={<LoadingScreen />}>
+        <Suspense fallback={<PageLoader label="Access Terminal" sublabel="Routing to gateway..." />}>
             <AuthPage />
         </Suspense>
     );
 
     if (!profile.role || (!profile.profile_completed && profile.role !== BuiltInRoles.SUPER_ADMIN)) {
         return (
-            <Suspense fallback={<LoadingScreen />}>
+            <Suspense fallback={<PageLoader label="Identity Node" sublabel="Provisioning workspace..." />}>
                 <OnboardingFlow 
                     profile={profile} 
                     onComplete={() => loadUserData(session, true)} 
@@ -231,7 +222,7 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-[#08090a] selection:bg-primary/20 transition-colors duration-500">
             <Routes>
                 <Route path="/" element={
-                    <Suspense fallback={<LoadingScreen />}>
+                    <Suspense fallback={<PageLoader label="Dashboard Node" sublabel="Finalizing environment sync..." />}>
                         {renderDashboard()}
                     </Suspense>
                 } />

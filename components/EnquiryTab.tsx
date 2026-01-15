@@ -79,13 +79,19 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
 
     const filteredEnquiries = useMemo(() => {
         return enquiries.filter(enq => {
-            const matchesStatus = !filterStatus || enq.status === filterStatus;
+            // FIX: When "All" is selected (empty filterStatus), exclude 'Converted' and 'Rejected' to keep the list focused on active tasks.
+            if (!filterStatus) {
+                if (enq.status === 'ENQUIRY_CONVERTED' || enq.status === 'ENQUIRY_REJECTED') return false;
+            } else {
+                if (enq.status !== filterStatus) return false;
+            }
+
             const searchLower = searchTerm.toLowerCase();
-            return matchesStatus && (
-                !searchTerm || 
+            const matchesSearch = !searchTerm || 
                 enq.applicant_name.toLowerCase().includes(searchLower) ||
-                enq.parent_name.toLowerCase().includes(searchLower)
-            );
+                enq.parent_name.toLowerCase().includes(searchLower);
+                
+            return matchesSearch;
         });
     }, [enquiries, searchTerm, filterStatus]);
 
@@ -167,7 +173,7 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                 
                 <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar w-full lg:w-auto shadow-inner">
                     {(['All', ...Object.keys(statusLabels)] as (keyof typeof statusLabels | 'All')[]).map(f => {
-                        const label = f === 'All' ? 'All' : statusLabels[f as EnquiryStatus];
+                        const label = f === 'All' ? 'Active Desk' : statusLabels[f as string];
                         const key = f === 'All' ? '' : f;
                         const isActive = filterStatus === key;
                         return (
@@ -228,8 +234,8 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                                             <span className="px-3 py-1 rounded-lg bg-white/5 text-white/30 text-[10px] font-black uppercase tracking-widest border border-white/5">Grade {enq.grade}</span>
                                         </td>
                                         <td className="p-5">
-                                            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] border transition-all ${statusColors[enq.status as EnquiryStatus] || 'bg-white/5 text-white/20'}`}>
-                                                {statusLabels[enq.status as EnquiryStatus] || enq.status}
+                                            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] border transition-all ${statusColors[enq.status] || 'bg-white/5 text-white/20'}`}>
+                                                {statusLabels[enq.status] || enq.status}
                                             </span>
                                         </td>
                                         <td className="p-5 font-mono text-[11px] text-white/20 uppercase tracking-tighter">
@@ -268,8 +274,8 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                                     <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">Grade {enq.grade} Node</p>
                                 </div>
                             </div>
-                            <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${statusColors[enq.status as EnquiryStatus]}`}>
-                                {statusLabels[enq.status as EnquiryStatus]}
+                            <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border tracking-widest ${statusColors[enq.status]}`}>
+                                {statusLabels[enq.status]}
                             </span>
                         </div>
                         <div className="flex justify-between items-center pt-4 border-t border-white/[0.03]">
@@ -302,7 +308,9 @@ const EnquiryTab: React.FC<EnquiryTabProps> = ({ branchId, onNavigate }) => {
                     enquiry={viewingEnquiry} 
                     currentBranchId={branchId}
                     onClose={() => setViewingEnquiry(null)} 
-                    onUpdate={() => fetchEnquiries(true)}
+                    onUpdate={() => {
+                        fetchEnquiries(true);
+                    }}
                     onNavigate={onNavigate}
                 />
             )}

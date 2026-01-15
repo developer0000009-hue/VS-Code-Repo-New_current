@@ -10,69 +10,54 @@ interface DistributionProps {
 const CollectionDistributionChart: React.FC<DistributionProps> = ({ paid, pending, overdue }) => {
     const total = paid + pending + overdue || 1;
     
-    // Calculate segments
-    // We'll use a simple donut chart using SVG stroke-dasharray
-    const radius = 40;
+    const radius = 38;
     const circumference = 2 * Math.PI * radius;
     
-    const paidOffset = 0;
-    const pendingOffset = (paid / total) * circumference;
-    const overdueOffset = ((paid + pending) / total) * circumference;
-
     const paidStroke = (paid / total) * circumference;
     const pendingStroke = (pending / total) * circumference;
     const overdueStroke = (overdue / total) * circumference;
 
     return (
-        <div className="flex items-center justify-between h-full w-full">
-            <div className="relative w-40 h-40 flex-shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    {/* Background */}
-                    <circle cx="50" cy="50" r={radius} fill="none" stroke="currentColor" strokeOpacity="0.05" strokeWidth="12" />
+        <div className="flex flex-col items-center justify-between h-full w-full">
+            <div className="relative w-48 h-48 group">
+                <div className="absolute inset-0 bg-primary/5 rounded-full blur-[40px] opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 relative z-10">
+                    {/* Background Ring */}
+                    <circle cx="50" cy="50" r={radius} fill="none" stroke="white" strokeOpacity="0.03" strokeWidth="10" />
                     
-                    {/* Paid Segment */}
-                    {paid > 0 && <circle cx="50" cy="50" r={radius} fill="none" stroke="#10b981" strokeWidth="12" strokeDasharray={`${paidStroke} ${circumference}`} strokeDashoffset={0} strokeLinecap="round" className="transition-all duration-1000 ease-out" />}
+                    {/* Overdue (Red) - Bottom layer */}
+                    <circle cx="50" cy="50" r={radius} fill="none" stroke="#ef4444" strokeWidth="10" strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={0} strokeLinecap="round" opacity="0.2" />
                     
-                    {/* Pending Segment */}
-                    {pending > 0 && <circle cx="50" cy="50" r={radius} fill="none" stroke="#f59e0b" strokeWidth="12" strokeDasharray={`${pendingStroke} ${circumference}`} strokeDashoffset={-paidOffset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />}
+                    {/* Pending (Amber) */}
+                    <circle cx="50" cy="50" r={radius} fill="none" stroke="#f59e0b" strokeWidth="10" strokeDasharray={`${pendingStroke + overdueStroke} ${circumference}`} strokeDashoffset={-paidStroke} strokeLinecap="round" className="transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)]" />
                     
-                    {/* Overdue Segment */}
-                    {overdue > 0 && <circle cx="50" cy="50" r={radius} fill="none" stroke="#ef4444" strokeWidth="12" strokeDasharray={`${overdueStroke} ${circumference}`} strokeDashoffset={-overdueOffset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />}
+                    {/* Paid (Emerald) - Top layer */}
+                    <circle cx="50" cy="50" r={radius} fill="none" stroke="#10b981" strokeWidth="10" strokeDasharray={`${paidStroke} ${circumference}`} strokeDashoffset={0} strokeLinecap="round" className="transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]" />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-black text-foreground">{Math.round((paid/total)*100)}%</span>
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Collected</span>
+                
+                <div className="absolute inset-0 flex flex-col items-center justify-center relative z-20">
+                    <span className="text-4xl font-black text-white tracking-tighter leading-none">{Math.round((paid/total)*100)}%</span>
+                    <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.4em] mt-2">Collected</span>
                 </div>
             </div>
 
-            <div className="flex flex-col gap-4 flex-grow pl-6">
-                <div>
-                    <div className="flex justify-between items-end mb-1">
-                        <span className="text-xs font-bold text-muted-foreground uppercase">Collected</span>
-                        <span className="text-sm font-bold text-emerald-600">{Math.round((paid/total)*100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(paid/total)*100}%` }}></div>
-                    </div>
-                </div>
-                <div>
-                    <div className="flex justify-between items-end mb-1">
-                        <span className="text-xs font-bold text-muted-foreground uppercase">Pending</span>
-                        <span className="text-sm font-bold text-amber-500">{Math.round((pending/total)*100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(pending/total)*100}%` }}></div>
-                    </div>
-                </div>
-                <div>
-                    <div className="flex justify-between items-end mb-1">
-                        <span className="text-xs font-bold text-muted-foreground uppercase">Overdue</span>
-                        <span className="text-sm font-bold text-red-500">{Math.round((overdue/total)*100)}%</span>
-                    </div>
-                    <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
-                        <div className="h-full bg-red-500 rounded-full" style={{ width: `${(overdue/total)*100}%` }}></div>
-                    </div>
-                </div>
+            <div className="grid grid-cols-1 gap-4 w-full mt-10">
+                {[
+                    { label: 'Synchronized', value: paid, color: 'bg-emerald-500', text: 'text-emerald-500' },
+                    { label: 'Pending', value: pending, color: 'bg-amber-500', text: 'text-amber-500' },
+                    { label: 'Risk/Overdue', value: overdue, color: 'bg-red-500', text: 'text-red-500' }
+                ].map((item, i) => {
+                    const percent = Math.round((item.value / total) * 100);
+                    return (
+                        <div key={i} className="flex items-center justify-between group/row">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-1.5 h-1.5 rounded-full ${item.color} shadow-lg shadow-black/50`}></div>
+                                <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] group-hover/row:text-white/60 transition-colors">{item.label}</span>
+                            </div>
+                            <span className={`text-[12px] font-mono font-black ${item.text}`}>{percent}%</span>
+                        </div>
+                    )
+                })}
             </div>
         </div>
     );

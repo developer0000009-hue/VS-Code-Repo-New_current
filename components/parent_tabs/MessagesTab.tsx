@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, formatError } from '../../services/supabase';
 import { MyEnquiry, TimelineItem, EnquiryStatus, Communication } from '../../types';
@@ -274,7 +275,7 @@ const AnnouncementView = ({ announcement }: any) => (
                 </div>
                 <div className="pt-24 border-t border-white/[0.03]">
                     <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.6em] text-white/10 select-none">
-                        <ShieldCheckIcon className="w-6 h-6" /> INTEGRITY LEDGER LOG: {announcement.id?.slice(0, 18).toUpperCase()}
+                        <ShieldCheckIcon className="w-6 h-6" /> INTEGRITY LEDGER LOG: {String(announcement.id || '').slice(0, 18).toUpperCase()}
                     </div>
                 </div>
              </div>
