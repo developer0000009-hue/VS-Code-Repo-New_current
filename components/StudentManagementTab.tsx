@@ -43,17 +43,17 @@ const KPICard: React.FC<{
     const colorBase = color.split('-')[1];
 
     return (
-        <div 
+        <div
             onClick={onClick}
             className={`
                 relative overflow-hidden p-6 rounded-[2rem] border transition-all duration-500 cursor-pointer group
-                ${active 
-                    ? 'bg-card border-primary ring-4 ring-primary/5 shadow-2xl scale-[1.02] z-10' 
+                ${active
+                    ? 'bg-card border-primary ring-4 ring-primary/5 shadow-2xl scale-[1.02] z-10'
                     : 'bg-card/40 border-white/5 hover:border-primary/40 hover:bg-card/60 shadow-sm'
                 }
             `}
         >
-            <div className={`absolute -right-8 -top-8 w-32 h-32 bg-${colorBase}-500/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700`}></div>
+            <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-indigo-500/10"></div>
             <div className="flex justify-between items-start mb-6 relative z-10">
                 <div className={`p-4 rounded-2xl text-white shadow-xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 ${color} ring-1 ring-white/10`}>
                     {icon}
