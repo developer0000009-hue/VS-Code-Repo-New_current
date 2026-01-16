@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, formatError } from '../services/supabase';
 import { StudentForAdmin } from '../types';
@@ -30,12 +29,12 @@ interface StudentManagementTabProps {
     branchId?: number | null;
 }
 
-const KPICard: React.FC<{ 
-    title: string; 
-    value: number; 
-    icon: React.ReactNode; 
-    color: string; 
-    onClick?: () => void; 
+const KPICard: React.FC<{
+    title: string;
+    value: number;
+    icon: React.ReactNode;
+    color: string;
+    onClick?: () => void;
     active?: boolean;
     description?: string;
     loading?: boolean;
@@ -46,10 +45,10 @@ const KPICard: React.FC<{
         <div
             onClick={onClick}
             className={`
-                relative overflow-hidden p-6 rounded-[2rem] border transition-all duration-500 cursor-pointer group
+                relative overflow-hidden p-6 rounded-2xl border transition-all duration-500 cursor-pointer group
                 ${active
-                    ? 'bg-card border-primary ring-4 ring-primary/5 shadow-2xl scale-[1.02] z-10'
-                    : 'bg-card/40 border-white/5 hover:border-primary/40 hover:bg-card/60 shadow-sm'
+                    ? 'bg-card border-primary ring-4 ring-primary shadow-2xl scale-105 z-10'
+                    : 'bg-card border-white hover:border-primary hover:bg-card shadow-sm'
                 }
             `}
         >
@@ -66,7 +65,7 @@ const KPICard: React.FC<{
                     {loading ? (
                         <div className="h-8 w-24 bg-white/5 rounded animate-pulse shimmer" />
                     ) : (
-                        <h3 className="text-4xl font-serif font-black text-foreground tracking-tighter animate-in fade-in">{value.toLocaleString()}</h3>
+                        <h3 className="text-4xl font-serif font-black text-foreground tracking-tighter animate-in fade-in">{value}</h3>
                     )}
                 </div>
                 {description && <p className="text-[10px] text-muted-foreground/60 mt-2 font-medium italic">{description}</p>}
@@ -124,7 +123,7 @@ export const AddStudentModal: React.FC<{ onClose: () => void; onSave: () => void
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="bg-[#0f1115] w-full max-w-md rounded-[2rem] shadow-2xl border border-white/10 p-8 animate-in zoom-in-95 relative overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none"><UserPlusIcon className="w-32 h-32 text-white" /></div>
-                
+
                 <div className="flex justify-between items-center mb-8 relative z-10">
                     <div>
                         <h3 className="text-xl font-black text-white uppercase tracking-tight font-serif">Register Node</h3>
@@ -159,7 +158,7 @@ export const AddStudentModal: React.FC<{ onClose: () => void; onSave: () => void
                             <input value={formData.parent_guardian_details} onChange={e => setFormData({...formData, parent_guardian_details: e.target.value})} className="w-full p-4 bg-black/20 border border-white/10 rounded-2xl text-sm font-bold text-white focus:border-primary/50 focus:bg-black/40 outline-none transition-all placeholder:text-white/10" placeholder="Optional" />
                         </div>
                     </div>
-                    
+
                     <div className="flex justify-end gap-3 pt-6 border-t border-white/5 mt-4">
                         <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl text-xs font-bold text-white/40 hover:text-white hover:bg-white/5 transition-all uppercase tracking-widest">Cancel</button>
                         <button type="submit" disabled={loading} className="px-8 py-3 bg-primary text-white font-black text-xs rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 flex items-center gap-2 transition-all transform active:scale-95 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed">
@@ -180,9 +179,9 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
     const [quickFilter, setQuickFilter] = useState<'All' | 'Active' | 'Pending' | 'New'>('All');
     const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
     const [gradeFilter, setGradeFilter] = useState<string>('All');
-    
+
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
-    
+
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedStudent, setSelectedStudent] = useState<StudentForAdmin | null>(null);
     const [assigningStudent, setAssigningStudent] = useState<StudentForAdmin | null>(null);
@@ -231,7 +230,7 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                 profile_completed: s.profiles?.profile_completed,
                 created_at: s.created_at || s.profiles?.created_at,
                 // Fallback to local profile photo or undefined if not available on profile relation
-                profile_photo_url: s.profile_photo_url, 
+                profile_photo_url: s.profile_photo_url,
                 gender: s.gender, // fetched from student_profiles (*)
                 date_of_birth: s.date_of_birth, // fetched from student_profiles (*)
                 address: s.address, // fetched from student_profiles (*)
@@ -271,8 +270,8 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
 
-    useEffect(() => { 
-        fetchData(); 
+    useEffect(() => {
+        fetchData();
     }, [fetchData, refreshKey]);
 
     const uniqueGrades = useMemo(() => {
@@ -281,8 +280,8 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
             // Ensure 'a' and 'b' are strings
             const strA = String(a);
             const strB = String(b);
-            const numA = parseInt(strA.replace(/\D/g, '')) || 0;
-            const numB = parseInt(strB.replace(/\D/g, '')) || 0;
+            const numA = parseInt(strA.replace(/[^\d]/g, '')) || 0;
+            const numB = parseInt(strB.replace(/[^\d]/g, '')) || 0;
             return numA - numB;
         });
     }, [allStudents]);
@@ -290,9 +289,9 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
     const filteredStudents = useMemo(() => {
         return allStudents.filter(s => {
             const searchLower = searchTerm.toLowerCase();
-            const matchesSearch = !searchTerm || 
-                s.display_name.toLowerCase().includes(searchLower) || 
-                (s.email || '').toLowerCase().includes(searchLower) || 
+            const matchesSearch = !searchTerm ||
+                s.display_name.toLowerCase().includes(searchLower) ||
+                (s.email || '').toLowerCase().includes(searchLower) ||
                 (s.student_id_number || '').toLowerCase().includes(searchLower) ||
                 (s.grade || '').toLowerCase().includes(searchLower);
 
@@ -306,10 +305,10 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
             }
 
             // Explicit Filters
-            const matchesStatus = statusFilter === 'All' 
-                ? true 
+            const matchesStatus = statusFilter === 'All'
+                ? true
                 : statusFilter === 'Active' ? s.is_active : !s.is_active;
-            
+
             const matchesGrade = gradeFilter === 'All' || s.grade === gradeFilter;
 
             return matchesSearch && matchesQuick && matchesStatus && matchesGrade;
@@ -319,14 +318,14 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
             if (a.assigned_class_id && !b.assigned_class_id) return 1;
 
             const dir = sortConfig.direction === 'asc' ? 1 : -1;
-            
+
             // Handle date sorting specially with safeguard for missing dates
             if (sortConfig.key === 'created_at') {
                  const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
                  const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
                  return (timeA - timeB) * dir;
             }
-            
+
             if (sortConfig.key === 'name') return a.display_name.localeCompare(b.display_name) * dir;
             if (sortConfig.key === 'grade') {
                  // Numeric sort for grades if possible
@@ -397,28 +396,28 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                             <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto flex-grow">
                                 <div className="relative flex-grow group">
                                     <SearchIcon className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/10 group-focus-within:text-primary transition-colors duration-300" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search by Name, ID, or Grade..." 
-                                        value={searchTerm} 
-                                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
-                                        className="w-full pl-14 pr-6 py-4 rounded-2xl border border-white/5 bg-black/20 text-sm font-medium text-white focus:bg-black/40 outline-none transition-all placeholder:text-white/10 focus:border-primary/40" 
+                                    <input
+                                        type="text"
+                                        placeholder="Search by Name, ID, or Grade..."
+                                        value={searchTerm}
+                                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                        className="w-full pl-14 pr-6 py-4 rounded-2xl border border-white/5 bg-black/20 text-sm font-medium text-white focus:bg-black/40 outline-none transition-all placeholder:text-white/10 focus:border-primary/40"
                                     />
                                 </div>
                                 <div className="flex gap-3 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
-                                    <select 
-                                        value={statusFilter} 
-                                        onChange={e => { setStatusFilter(e.target.value as any); setCurrentPage(1); }} 
+                                    <select
+                                        value={statusFilter}
+                                        onChange={e => { setStatusFilter(e.target.value as any); setCurrentPage(1); }}
                                         className="h-14 px-6 bg-black/20 border border-white/5 rounded-2xl text-sm font-bold text-white focus:outline-none focus:border-primary/40 cursor-pointer hover:bg-black/30 transition-all appearance-none min-w-[140px]"
                                     >
                                         <option value="All">All Status</option>
                                         <option value="Active">Active Only</option>
                                         <option value="Inactive">Inactive</option>
                                     </select>
-                                    
-                                    <select 
-                                        value={gradeFilter} 
-                                        onChange={e => { setGradeFilter(e.target.value); setCurrentPage(1); }} 
+
+                                    <select
+                                        value={gradeFilter}
+                                        onChange={e => { setGradeFilter(e.target.value); setCurrentPage(1); }}
                                         className="h-14 px-6 bg-black/20 border border-white/5 rounded-2xl text-sm font-bold text-white focus:outline-none focus:border-primary/40 cursor-pointer hover:bg-black/30 transition-all appearance-none min-w-[140px]"
                                     >
                                         <option value="All">All Grades</option>
@@ -441,7 +440,7 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                                         <p className="text-lg font-bold text-white uppercase tracking-widest">No Students Found</p>
                                         <p className="text-xs text-white/50 mt-2 max-w-xs leading-relaxed font-serif italic">
                                             {searchTerm || quickFilter !== 'All' || statusFilter !== 'All' || gradeFilter !== 'All'
-                                                ? "Your current filters match no identities. Reset parameters to view full roster." 
+                                                ? "Your current filters match no identities. Reset parameters to view full roster."
                                                 : "All verified students have been placed in academic units."}
                                         </p>
                                         {(searchTerm || quickFilter !== 'All' || statusFilter !== 'All' || gradeFilter !== 'All') && (
@@ -464,7 +463,7 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                                     </thead>
                                     <tbody className="divide-y divide-white/5 bg-transparent">
                                         {paginatedData.map(student => (
-                                            <tr key={student.id} className={`hover:bg-white/[0.02] cursor-pointer group transition-all duration-300 ${student.id === highlightedId ? 'bg-primary/10 animate-pulse' : ''}`} onClick={() => setSelectedStudent(student)}>
+                                            <tr key={student.id} className="hover:bg-white/20 cursor-pointer group transition-all duration-300" onClick={() => setSelectedStudent(student)}>
                                                 <td className="p-8 pl-10">
                                                     <div className="flex items-center gap-6">
                                                         <PremiumAvatar src={student.profile_photo_url} name={student.display_name} size="xs" className="w-14 h-14 rounded-2xl border border-white/10 shadow-2xl relative z-10" />
@@ -494,7 +493,7 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                                                 <td className="p-8 text-center"><span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] border shadow-inner ${student.is_active ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>{student.is_active ? 'Active' : 'Offline'}</span></td>
                                                 <td className="p-8 text-right pr-10">
                                                     {!student.assigned_class_id ? (
-                                                        <button 
+                                                        <button
                                                             onClick={(e) => { e.stopPropagation(); setAssigningStudent(student); }}
                                                             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-95 flex items-center gap-2 ml-auto"
                                                         >
@@ -510,8 +509,8 @@ const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ branchId })
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
                         <div className="p-8 border-t border-white/5 bg-[#0a0a0c]/80 flex justify-between items-center relative z-10">
                             <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Sequence <span className="text-white/60">{currentPage}</span> of {totalPages || 1}</span>
